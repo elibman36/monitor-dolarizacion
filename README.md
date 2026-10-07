@@ -106,14 +106,20 @@ El cálculo sigue estos pasos:
 2. **Promedio ponderado.** Se promedia dentro de cada bloque y después entre
    bloques. Si falta un componente, su peso se reparte entre los demás. El
    índice sólo se publica si está disponible al menos el 40% del peso.
-3. **Semáforo.** Se ubica el IPD en su percentil de los últimos 2 años:
-   - menos de 75: presión baja;
-   - desde 75: moderada;
-   - desde 90: elevada;
-   - desde 97,5: crítica.
+3. **Índice 0–100.** El IPD se promedia en 10 días hábiles y se lleva a una
+   escala de 0 a 100 con la normal acumulada: Índice = 100 × Φ(IPD / σ), con σ el
+   desvío histórico del IPD promediado. 50 es neutral; debajo, presión
+   apreciatoria (alivio); arriba, presión depreciatoria. Tramos:
+   - 0–10: fuerte presión apreciatoria;
+   - 10–35: presión apreciatoria;
+   - 35–65: neutral;
+   - 65–90: presión depreciatoria;
+   - 90–100: fuerte presión depreciatoria.
+
+   También se publica el percentil del IPD en los últimos 2 años.
 
 Todo es configurable en `monitor/config.py`: horizonte, ventanas, pesos,
-componentes, umbrales y eventos electorales.
+componentes, suavizado y tramos del índice, y eventos.
 
 **Cuidados al leerlo.**
 

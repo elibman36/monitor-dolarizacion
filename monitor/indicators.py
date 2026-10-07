@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 
@@ -178,8 +180,11 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
     pct = rolling_percentile(ipd, config.IPD_PERCENTILE_WINDOW, config.IPD_ZSCORE_MIN_OBS)
     comps = pd.DataFrame(components, index=df.index)
     n_comp = comps.notna().sum(axis=1).where(ipd.notna())
+    indice, sigma = pressure_index(ipd)
     return {
         "ipd": ipd,
+        "indice": indice,
+        "indice_sigma": sigma,
         "percentil": pct,
         "n_componentes": n_comp,
         "blocks": blocks,
@@ -187,13 +192,24 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
     }
 
 
-def status_for(percentile: float) -> tuple[str, str]:
-    if percentile is None or not np.isfinite(percentile):
+def pressure_index(ipd: pd.Series) -> tuple[pd.Series, float]:
+    """Lleva el IPD a una escala 0-100 con 50 = neutral (ver config)."""
+    smooth = ipd.rolling(config.INDICE_SUAVIZADO, min_periods=config.INDICE_SUAVIZADO).mean()
+    sigma = config.INDICE_SIGMA or float(smooth.std())
+    if not np.isfinite(sigma) or sigma <= 0:
+        return pd.Series(np.nan, index=ipd.index), np.nan
+    z = (smooth / sigma).to_numpy()
+    phi = 0.5 * (1 + np.vectorize(math.erf, otypes=[float])(z / math.sqrt(2)))
+    return pd.Series(phi * 100, index=ipd.index).where(smooth.notna()), sigma
+
+
+def status_for(indice: float) -> tuple[str, str]:
+    if indice is None or not np.isfinite(indice):
         return "unknown", "Sin datos suficientes"
-    for threshold, key, label in config.IPD_STATUS:
-        if percentile >= threshold:
+    for lo, hi, key, label in config.INDICE_TRAMOS:
+        if lo <= indice < hi:
             return key, label
-    return config.IPD_STATUS[-1][1], config.IPD_STATUS[-1][2]
+    return "unknown", "Sin datos suficientes"
 
 
 # ---------------------------------------------------------------------------

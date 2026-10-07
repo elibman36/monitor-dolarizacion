@@ -21,6 +21,8 @@
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
   --div-neg: #2a78d6; --div-pos: #e34948; --div-mid: #f0efec;
   --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  /* Escala divergente del índice 0-100: azul = apreciación, rojo = depreciación */
+  --dv-aprec_fuerte: #1c5cab; --dv-aprec: #6da7ec; --dv-neutral: #a3a29b; --dv-deprec: #ec8a89; --dv-deprec_fuerte: #c0302f;
   --up-bad: #b42318; --down-good: #006300;
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -33,6 +35,7 @@
     --s1: #3987e5; --s2: #d95926; --s3: #199e70;
     --div-neg: #3987e5; --div-pos: #e66767; --div-mid: #383835;
     --up-bad: #f97066; --down-good: #0ca30c;
+    --dv-aprec_fuerte: #86b6ef; --dv-aprec: #2a78d6; --dv-neutral: #6b6a64; --dv-deprec: #b03a39; --dv-deprec_fuerte: #f08584;
   }
 }
 :root[data-theme="dark"] {
@@ -43,6 +46,7 @@
   --s1: #3987e5; --s2: #d95926; --s3: #199e70;
   --div-neg: #3987e5; --div-pos: #e66767; --div-mid: #383835;
   --up-bad: #f97066; --down-good: #0ca30c;
+  --dv-aprec_fuerte: #86b6ef; --dv-aprec: #2a78d6; --dv-neutral: #6b6a64; --dv-deprec: #b03a39; --dv-deprec_fuerte: #f08584;
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; }
@@ -65,6 +69,14 @@ h2 { font-size: 16px; margin: 0 0 2px; }
 .hero-num { font-size: 56px; font-weight: 650; line-height: 1; letter-spacing: -0.02em; margin: 10px 0 6px; }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 3px 10px 3px 6px; border-radius: 999px; background: var(--wash); color: var(--ink); }
 .pill .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; font-size: 10px; line-height: 1; }
+.gauge { margin-top: 18px; }
+.gauge-bar { position: relative; display: flex; gap: 2px; height: 12px; }
+.gauge-bar span { height: 100%; }
+.gauge-bar span:first-child { border-radius: 6px 0 0 6px; }
+.gauge-bar span:last-child { border-radius: 0 6px 6px 0; }
+.gauge-mark { position: absolute; top: -5px; width: 4px; height: 22px; margin-left: -2px; border-radius: 2px; background: var(--ink); box-shadow: 0 0 0 2px var(--surface); }
+.gauge-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+.hero-num small { font-size: 20px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin-top: 14px; font-size: 13px; color: var(--ink-2); }
 .kv b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
@@ -118,16 +130,20 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <section class="hero">
     <div class="card" id="hero">
-      <h2>Índice de Presión de Dolarización</h2>
-      <p class="note">Promedio de componentes estandarizados (desvíos respecto de los últimos 2 años)</p>
+      <h2>Índice de Presión Cambiaria</h2>
+      <p class="note">De 0 a 100. 50 es neutral; debajo, presión apreciatoria (alivio); arriba, presión depreciatoria.</p>
       <div class="hero-num" id="hero-num">–</div>
       <span class="pill" id="hero-pill"><span class="dot"></span><span>Cargando…</span></span>
+      <div class="gauge" aria-hidden="true">
+        <div class="gauge-bar" id="gauge-bar"></div>
+        <div class="gauge-scale"><span>0 · apreciación</span><span>50</span><span>depreciación · 100</span></div>
+      </div>
       <div class="kv" id="hero-kv"></div>
     </div>
     <div class="card">
-      <h2>IPD diario</h2>
-      <p class="note">Mayor a 0 = más presión que lo habitual. Línea fina: dato diario; línea gruesa: promedio de 20 días hábiles. Las verticales marcan elecciones y episodios cambiarios.</p>
-      <div class="chart tall" id="c-ipd" role="img" aria-label="Serie diaria del IPD"></div>
+      <h2>Evolución del índice (0–100)</h2>
+      <p class="note" id="idx-note">Promedio de 10 días hábiles del IPD llevado a escala 0–100. El color de la línea indica el tramo; las verticales marcan elecciones y episodios cambiarios.</p>
+      <div class="chart tall" id="c-idx" role="img" aria-label="Índice de presión cambiaria 0 a 100"></div>
     </div>
   </section>
 
@@ -147,9 +163,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   </section>
 
   <section class="card" style="margin-bottom:16px">
-    <h2>Percentil histórico del IPD</h2>
-    <p class="note">Ubicación del IPD dentro de su propia historia reciente. Umbrales del semáforo: 75 (moderada), 90 (elevada), 97,5 (crítica).</p>
-    <div class="chart small" id="c-pct" role="img" aria-label="Percentil del IPD"></div>
+    <h2>IPD en desvíos estándar</h2>
+    <p class="note">La medida de base del índice. Mayor a 0 = más presión que lo habitual en los últimos 2 años. Línea fina: dato diario; línea gruesa: promedio de 20 días hábiles.</p>
+    <div class="chart" id="c-ipd" role="img" aria-label="Serie diaria del IPD en desvíos"></div>
   </section>
 
   <h2 class="section-title">Variables</h2>
@@ -183,7 +199,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <li><b>Dolarización de portafolios:</b> nivel de la brecha CCL/oficial, suba del riesgo país en 5 días, devaluación implícita en los futuros de A3 Mercados (TNA a 90 días) y crecimiento de los depósitos en dólares.</li>
     </ul>
     <p>La serie arranca en los noventa, pero no todos los componentes existen desde el inicio: las reservas están desde 1996, la BADLAR desde 1999, el A3500 desde 2002 y la brecha, los depósitos en dólares y los futuros desde que sus fuentes publican datos. En los primeros años el IPD descansa sobre menos componentes; el tooltip del gráfico indica cuántos había cada día.</p>
-    <p>Si falta un componente, su peso se reparte entre los demás. El índice se publica cuando hay datos para al menos el 40% del peso. El semáforo usa el percentil del IPD en los últimos 2 años. Las compras de personas humanas y las licitaciones se muestran aparte porque se publican con menor frecuencia y rezago.</p>
+    <p>Si falta un componente, su peso se reparte entre los demás. El IPD se publica cuando hay datos para al menos el 40% del peso.</p>
+    <p><b>Índice 0–100.</b> Para comunicarlo, el IPD se promedia en 10 días hábiles y se lleva a una escala de 0 a 100 con la distribución normal: Índice = 100 × Φ(IPD / σ), donde σ es el desvío histórico del IPD promediado. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 1999. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. Las compras de personas humanas y las licitaciones se muestran aparte porque se publican con menor frecuencia y rezago.</p>
     <p class="note">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
   </section>
   <p class="note" id="foot" style="margin-top:16px"></p>
@@ -192,10 +209,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 <script>
 (() => {
   const STATUS = {
-    good: { color: "var(--good)", icon: "✓" },
-    warning: { color: "var(--warning)", icon: "!" },
-    serious: { color: "var(--serious)", icon: "!" },
-    critical: { color: "var(--critical)", icon: "‼" },
+    aprec_fuerte: { color: "var(--dv-aprec_fuerte)", icon: "▼" },
+    aprec: { color: "var(--dv-aprec)", icon: "▼" },
+    neutral: { color: "var(--dv-neutral)", icon: "•" },
+    deprec: { color: "var(--dv-deprec)", icon: "▲" },
+    deprec_fuerte: { color: "var(--dv-deprec_fuerte)", icon: "▲" },
     unknown: { color: "var(--muted)", icon: "?" },
   };
   const TILES = ["tc_oficial_ref", "usd_ccl", "brecha_ccl", "riesgo_pais", "reservas", "tasa", "deval_implicita", "depositos_usd"];
@@ -326,15 +344,20 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   function renderHero() {
     const h = DATA.headline;
     const st = STATUS[h.status] || STATUS.unknown;
-    document.getElementById("hero-num").textContent = h.ipd == null ? "–" : (h.ipd > 0 ? "+" : "") + nf(h.ipd, 2);
+    document.getElementById("hero-num").innerHTML = h.indice == null ? "–" : `${nf(h.indice, 0)}<small>/100</small>`;
     document.getElementById("hero-pill").innerHTML =
       `<span class="dot" style="background:${st.color}" aria-hidden="true">${st.icon}</span><span>${h.status_label}</span>`;
-    const d = (a, b) => (a == null || b == null) ? "–" : ((a - b > 0 ? "+" : "") + nf(a - b, 2));
+    const bar = document.getElementById("gauge-bar");
+    bar.innerHTML = (DATA.config.tramos || []).map((tr) =>
+      `<span style="flex:${tr.to - tr.from};background:var(--dv-${tr.key})" title="${tr.label} (${tr.from}–${Math.round(tr.to)})"></span>`).join("") +
+      (h.indice == null ? "" : `<i class="gauge-mark" style="left:${Math.max(0, Math.min(100, h.indice))}%"></i>`);
+    const d = (a, b, dg) => (a == null || b == null) ? "–" : ((a - b > 0 ? "+" : "") + nf(a - b, dg));
     document.getElementById("hero-kv").innerHTML = `
       <span>Fecha</span><b>${h.date || "–"}</b>
-      <span>Percentil (2 años)</span><b>${h.percentile == null ? "–" : nf(h.percentile, 0)}</b>
-      <span>Cambio en 7 días</span><b>${d(h.ipd, h.ipd_7d)}</b>
-      <span>Cambio en 30 días</span><b>${d(h.ipd, h.ipd_30d)}</b>`;
+      <span>Cambio en 7 días</span><b>${d(h.indice, h.indice_7d, 0)} pts</b>
+      <span>Cambio en 30 días</span><b>${d(h.indice, h.indice_30d, 0)} pts</b>
+      <span>IPD (desvíos)</span><b>${h.ipd == null ? "–" : (h.ipd > 0 ? "+" : "") + nf(h.ipd, 2)}</b>
+      <span>Percentil del IPD (2 años)</span><b>${h.percentile == null ? "–" : nf(h.percentile, 0)}</b>`;
   }
 
   function renderTiles() {
@@ -401,23 +424,48 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     c.setOption(o);
   }
 
-  function renderPct() {
-    const data = cut(DATA.ipd.percentile);
-    if (!data.length) return emptyState("c-pct", "Sin datos de percentil todavía.");
-    const c = mount("c-pct");
+  function renderIndex() {
+    let data = cut(DATA.ipd.indice || []);
+    if (!data.length) return emptyState("c-idx", "Todavía no hay historia suficiente para calcular el índice.");
+    // En rangos de más de 5 años, promedio mensual para que se lean los ciclos.
+    const mensual = (new Date(data[data.length - 1][0]) - new Date(data[0][0])) / 864e5 > 5 * 365;
+    if (mensual) {
+      const acc = new Map();
+      data.forEach(([d, v]) => { const m = d.slice(0, 7); const a = acc.get(m) || [0, 0]; a[0] += v; a[1]++; acc.set(m, a); });
+      data = [...acc].map(([m, [s, n]]) => [m + "-15", s / n]);
+    }
+    document.getElementById("idx-note").textContent = mensual
+      ? "Promedio mensual del índice (en rangos de más de 5 años). El color de la línea indica el tramo; las verticales marcan episodios cambiarios."
+      : "Promedio de 10 días hábiles del IPD llevado a escala 0–100. El color de la línea indica el tramo; las verticales marcan elecciones y episodios cambiarios.";
+    const c = mount("c-idx");
     const o = base();
-    o.yAxis.scale = false; o.yAxis.min = 0; o.yAxis.max = 100;
-    o.tooltip.valueFormatter = (v) => nf(v, 0);
-    const th = [[75, "--warning", "Moderada"], [90, "--serious", "Elevada"], [97.5, "--critical", "Crítica"]];
-    o.series = [lineSeries("Percentil", data, css("--s1"), {
+    o.yAxis.scale = false; o.yAxis.min = 0; o.yAxis.max = 100; o.yAxis.interval = 25;
+    const tramos = DATA.config.tramos || [];
+    const tramoDe = (v) => tramos.find((tr) => v >= tr.from && v < tr.to) || tramos[tramos.length - 1];
+    o.tooltip.formatter = (ps) => {
+      const p = ps[0]; const tr = tramoDe(p.value[1]);
+      const fecha = mensual ? p.value[0].slice(0, 7) + " (promedio)" : p.value[0];
+      return `${fecha}<br><b>${nf(p.value[1], 0)}/100</b><br><span style="color:${css("--muted")}">${tr ? tr.label : ""}</span>`;
+    };
+    o.visualMap = {
+      show: false, type: "piecewise", dimension: 1, seriesIndex: 0,
+      pieces: tramos.map((tr) => ({ gte: tr.from, lt: tr.to, color: css(`--dv-${tr.key}`) })),
+    };
+    const serie = lineSeries("Índice", data, null, {
       markLine: {
         symbol: "none", silent: true,
-        data: th.map(([y, col, l]) => ({
-          yAxis: y, lineStyle: { color: css(col), type: "solid", width: 1 },
-          label: { formatter: `${l} (${String(y).replace(".", ",")})`, color: css("--ink-2"), fontSize: 10, position: "insideEndTop" },
-        })),
+        lineStyle: { color: css("--axis"), type: "solid", width: 1 },
+        data: [{ yAxis: 50, label: { show: false } }, ...eventLines(data)],
       },
-    })];
+      markArea: {
+        silent: true,
+        data: tramos.filter((tr) => tr.key !== "neutral").map((tr) => [
+          { yAxis: tr.from, itemStyle: { color: css(`--dv-${tr.key}`), opacity: 0.07 } }, { yAxis: Math.min(tr.to, 100) }]),
+      },
+    });
+    // Sin color fijo: lo pone el visualMap según el tramo.
+    serie.lineStyle = { width: 2 }; delete serie.itemStyle;
+    o.series = [serie];
     c.setOption(o);
   }
 
@@ -561,7 +609,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   function renderCharts() {
     charts.length = 0;
-    renderIPD(); renderPct(); renderBlocks(); renderContrib(); renderMultiples(); renderMonthly();
+    renderIndex(); renderIPD(); renderBlocks(); renderContrib(); renderMultiples(); renderMonthly();
   }
 
   function renderAll() {

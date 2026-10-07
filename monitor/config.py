@@ -164,14 +164,22 @@ IPD_BLOCKS = {
     },
 }
 
-# Semáforo: percentil del IPD dentro de su propia historia (ventana móvil).
+# Percentil del IPD dentro de su propia historia reciente (dato complementario).
 IPD_PERCENTILE_WINDOW = 504
-IPD_STATUS = [
-    # (percentil mínimo, clave, etiqueta)
-    (97.5, "critical", "Presión crítica"),
-    (90.0, "serious", "Presión elevada"),
-    (75.0, "warning", "Presión moderada"),
-    (0.0, "good", "Presión baja"),
+
+# Índice 0-100: 100 * Φ(IPD suavizado / σ), con Φ la normal acumulada y σ el
+# desvío histórico del IPD suavizado. 50 = neutral; < 50 presión apreciatoria
+# (alivio); > 50 presión depreciatoria. Se suaviza con un promedio de
+# INDICE_SUAVIZADO días hábiles para que el titular no salte día a día.
+INDICE_SUAVIZADO = 10
+INDICE_SIGMA = None  # None = desvío histórico calculado en cada corrida
+INDICE_TRAMOS = [
+    # (desde, hasta, clave, etiqueta) - escala divergente, de azul a rojo
+    (0, 10, "aprec_fuerte", "Fuerte presión apreciatoria"),
+    (10, 35, "aprec", "Presión apreciatoria"),
+    (35, 65, "neutral", "Neutral"),
+    (65, 90, "deprec", "Presión depreciatoria"),
+    (90, 100.0001, "deprec_fuerte", "Fuerte presión depreciatoria"),
 ]
 
 # ---------------------------------------------------------------------------

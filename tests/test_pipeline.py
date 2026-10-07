@@ -206,3 +206,15 @@ def test_parse_compras_personas_humanas():
     assert list(out["fecha"]) == ["2025-05"]
     assert out["compras_usd_millones"].iloc[0] == pytest.approx(2500.0)
     assert out["ventas_usd_millones"].iloc[0] == pytest.approx(400.0)
+
+
+def test_pressure_index_scale():
+    ipd = pd.Series([0.0] * 20 + [1.0] * 20 + [-1.0] * 20)
+    indice, sigma = indicators.pressure_index(ipd)
+    assert indice.iloc[19] == pytest.approx(50.0)
+    assert indice.iloc[-1] < 50 < indice.iloc[39]
+    assert indice.dropna().between(0, 100).all()
+    assert indicators.status_for(50.0)[0] == "neutral"
+    assert indicators.status_for(95.0)[0] == "deprec_fuerte"
+    assert indicators.status_for(100.0)[0] == "deprec_fuerte"
+    assert indicators.status_for(3.0)[0] == "aprec_fuerte"

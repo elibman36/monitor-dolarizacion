@@ -293,7 +293,8 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
 
     d_ipd, v_ipd = _last(ipd["ipd"])
     _, pct = _last(ipd["percentil"])
-    st_key, st_label = indicators.status_for(pct)
+    d_ind, v_ind = _last(ipd["indice"])
+    st_key, st_label = indicators.status_for(v_ind)
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -301,16 +302,21 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
             "horizon": config.IPD_HORIZON,
             "zscore_window": config.IPD_ZSCORE_WINDOW,
             "percentile_window": config.IPD_PERCENTILE_WINDOW,
-            "status_thresholds": [{"pct": p, "key": k, "label": l} for p, k, l in config.IPD_STATUS],
+            "indice_suavizado": config.INDICE_SUAVIZADO,
+            "indice_sigma": _clean(ipd["indice_sigma"]),
+            "tramos": [{"from": lo, "to": min(hi, 100), "key": k, "label": l}
+                       for lo, hi, k, l in config.INDICE_TRAMOS],
         },
         "headline": {
             "date": d_ipd, "ipd": v_ipd, "percentile": pct,
+            "indice": v_ind, "indice_7d": _last(ipd["indice"], 7)[1], "indice_30d": _last(ipd["indice"], 30)[1],
             "status": st_key, "status_label": st_label,
             "ipd_7d": _last(ipd["ipd"], 7)[1], "ipd_30d": _last(ipd["ipd"], 30)[1],
         },
         "ipd": {
             "data": _pairs(ipd["ipd"]),
             "percentile": _pairs(ipd["percentil"]),
+            "indice": _pairs(ipd["indice"]),
             "n_components": _pairs(ipd["n_componentes"]),
             "n_components_total": sum(len(b["components"]) for b in config.IPD_BLOCKS.values()),
             "blocks": {
@@ -360,6 +366,7 @@ def run(offline: bool = False) -> dict:
     # Panel diario completo, útil para análisis en Excel / R / Stata.
     out_panel = panel.copy()
     out_panel["ipd"] = ipd["ipd"]
+    out_panel["indice_0_100"] = ipd["indice"]
     out_panel["ipd_percentil"] = ipd["percentil"]
     out_panel["ipd_n_componentes"] = ipd["n_componentes"]
     for b in ipd["blocks"].columns:
@@ -370,7 +377,7 @@ def run(offline: bool = False) -> dict:
 
     config.OUTPUT_JSON.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     h = payload["headline"]
-    log.info("IPD %s = %s (percentil %s, %s)", h["date"], h["ipd"], h["percentile"], h["status_label"])
+    log.info("IPD %s = %s | índice 0-100 = %s (%s)", h["date"], h["ipd"], h["indice"], h["status_label"])
     return payload
 
 
