@@ -107,7 +107,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </div>
     <div class="controls">
       <div class="seg" id="range" role="group" aria-label="Período">
-        <button data-r="90">3M</button><button data-r="182">6M</button><button data-r="365" aria-pressed="true">1A</button><button data-r="730">2A</button><button data-r="1825">5A</button><button data-r="0">Todo</button>
+        <button data-r="90">3M</button><button data-r="182">6M</button><button data-r="365" aria-pressed="true">1A</button><button data-r="730">2A</button><button data-r="1825">5A</button><button data-r="3650">10A</button><button data-r="0">Todo</button>
       </div>
       <a class="btn" href="https://github.com/elibman36/monitor-dolarizacion/blob/main/data/panel_diario.csv" target="_blank" rel="noopener">Datos (CSV)</a>
       <button class="btn" id="theme" type="button" aria-label="Cambiar tema">◐</button>
@@ -159,7 +159,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   <section class="grid2">
     <div class="card">
       <h2>Compras de USD de personas humanas</h2>
-      <p class="note">Mensual, millones de USD. BCRA, balance cambiario.</p>
+      <p class="note">Compras netas de billetes y divisas sin fines específicos, mensual, millones de USD. BCRA, balance cambiario.</p>
       <div class="chart" id="c-ph" role="img" aria-label="Compras de dólares de personas humanas"></div>
     </div>
     <div class="card">
@@ -179,10 +179,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   <section class="card method">
     <p>El IPD adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza con un z-score móvil y se promedia dentro de dos bloques:</p>
     <ul>
-      <li><b>Presión cambiaria (EMP):</b> depreciación del oficial A3500 en 5 días, pérdida de reservas brutas en 5 días y suba de tasas en pesos (TAMAR/BADLAR) en 5 días, como medida de la defensa del peso.</li>
+      <li><b>Presión cambiaria (EMP):</b> depreciación del oficial A3500 en 5 días, pérdida de reservas brutas en 5 días y suba de la tasa BADLAR en 5 días, como medida de la defensa del peso.</li>
       <li><b>Dolarización de portafolios:</b> nivel de la brecha CCL/oficial, suba del riesgo país en 5 días, devaluación implícita en los futuros de A3 Mercados (TNA a 90 días) y crecimiento de los depósitos en dólares.</li>
     </ul>
-    <p>Si falta un componente, su peso se reparte entre los demás. El índice se publica cuando hay datos para al menos la mitad del peso. El semáforo usa el percentil del IPD en los últimos 2 años. Las compras de personas humanas y las licitaciones se muestran aparte porque se publican con menor frecuencia y rezago.</p>
+    <p>La serie arranca en los noventa, pero no todos los componentes existen desde el inicio: las reservas están desde 1996, la BADLAR desde 1999, el A3500 desde 2002 y la brecha, los depósitos en dólares y los futuros desde que sus fuentes publican datos. En los primeros años el IPD descansa sobre menos componentes; el tooltip del gráfico indica cuántos había cada día.</p>
+    <p>Si falta un componente, su peso se reparte entre los demás. El índice se publica cuando hay datos para al menos el 40% del peso. El semáforo usa el percentil del IPD en los últimos 2 años. Las compras de personas humanas y las licitaciones se muestran aparte porque se publican con menor frecuencia y rezago.</p>
     <p class="note">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
   </section>
   <p class="note" id="foot" style="margin-top:16px"></p>
@@ -205,7 +206,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     { title: "Brecha CCL / oficial", keys: ["brecha_ccl"], unit: "%" },
     { title: "Riesgo país", keys: ["riesgo_pais"], unit: "pb" },
     { title: "Reservas internacionales brutas", keys: ["reservas"], unit: "millones de USD" },
-    { title: "Tasa en pesos (TAMAR / BADLAR)", keys: ["tasa"], unit: "% n.a." },
+    { title: "Tasa BADLAR (bancos privados)", keys: ["tasa"], unit: "% n.a." },
     { title: "Devaluación implícita en futuros (90 días)", keys: ["deval_implicita"], unit: "% TNA" },
     { title: "Interés abierto en futuros de dólar", keys: ["futuros_interes_abierto"], unit: "contratos" },
     { title: "Depósitos en dólares", keys: ["depositos_usd"], unit: "millones de USD" },
@@ -276,7 +277,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   function lineSeries(name, data, color, extra = {}) {
     return Object.assign({
-      name, type: "line", data, showSymbol: false, symbolSize: 8,
+      name, type: "line", data, showSymbol: false, symbolSize: 8, sampling: "lttb",
       lineStyle: { width: 2, color }, itemStyle: { color },
       emphasis: { focus: "none" },
     }, extra);
@@ -285,9 +286,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   function eventLines(pairs) {
     if (!pairs.length) return [];
     const a = pairs[0][0], b = pairs[pairs.length - 1][0];
+    // En rangos largos sólo se rotulan los eventos cambiarios, para no superponer textos.
+    const long = (new Date(b) - new Date(a)) / 864e5 > 6 * 365;
     return (DATA.events || []).filter((e) => e.date >= a && e.date <= b).map((e) => ({
       xAxis: e.date, name: e.label,
-      label: { formatter: e.label, color: css("--muted"), fontSize: 10, position: "insideEndTop" },
+      label: { show: !long || e.tipo === "cambiario", formatter: e.label, color: css("--muted"), fontSize: 10, position: "insideEndTop" },
     }));
   }
 
@@ -353,7 +356,14 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const c = mount("c-ipd");
     const o = base();
     o.yAxis.scale = false;
-    o.tooltip.valueFormatter = (v) => nf(v, 2);
+    const nComp = new Map(DATA.ipd.n_components || []);
+    const nTot = DATA.ipd.n_components_total;
+    o.tooltip.formatter = (ps) => {
+      const p = ps[0];
+      const n = nComp.get(p.value[0]);
+      return `${p.value[0]}<br><b>IPD ${nf(p.value[1], 2)}</b>` +
+        (n != null ? `<br><span style="color:${css("--muted")}">${n} de ${nTot} componentes con datos</span>` : "");
+    };
     o.series = [lineSeries("IPD", data, css("--s1"), {
       markLine: {
         symbol: "none", silent: true,
@@ -461,19 +471,31 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
 
   function renderMonthly() {
-    const ph = DATA.monthly.compras_personas_humanas || [];
-    if (!ph.length) {
-      emptyState("c-ph", "Sin datos cargados. Completá <code>data/manual/compras_personas_humanas.csv</code> con el anexo del balance cambiario del BCRA.");
+    const phAll = DATA.monthly.compras_personas_humanas || [];
+    if (!phAll.length) {
+      emptyState("c-ph", "Sin datos todavía. Se descargan solos del anexo del balance cambiario del BCRA.");
     } else {
+      // Mismo período que el resto del tablero, con un mínimo de 24 meses.
+      const lastM = phAll[phAll.length - 1].fecha;
+      const days = rangeDays ? Math.max(rangeDays, 730) : 0;
+      const fromM = days ? new Date(new Date(lastM + "-01") - days * 864e5).toISOString().slice(0, 7) : "";
+      const ph = phAll.filter((r) => r.fecha >= fromM);
       const c = mount("c-ph");
-      const key = ph[0].netas_usd_millones != null ? "netas_usd_millones" : "compras_usd_millones";
+      const byM = new Map(ph.map((r) => [r.fecha, r]));
       c.setOption({
         animation: false, textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
         grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
-        tooltip: { trigger: "axis", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 }, valueFormatter: (v) => nf(v, 0) + " M USD" },
-        xAxis: { type: "category", data: ph.map((r) => r.fecha), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--muted"), fontSize: 11 } },
+        tooltip: {
+          trigger: "axis", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 },
+          formatter: (ps) => {
+            const r = byM.get(ps[0].name);
+            return `${ps[0].name}<br><b>Netas: ${nf(r.netas_usd_millones, 0)} M USD</b>` +
+              `<br><span style="color:${css("--muted")}">Compras ${nf(r.compras_usd_millones, 0)} · Ventas ${nf(r.ventas_usd_millones, 0)}</span>`;
+          },
+        },
+        xAxis: { type: "category", data: ph.map((r) => r.fecha), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--muted"), fontSize: 11, hideOverlap: true } },
         yAxis: { type: "value", axisLabel: { color: css("--muted"), fontSize: 11 }, splitLine: { lineStyle: { color: css("--grid") } } },
-        series: [{ name: key === "netas_usd_millones" ? "Compras netas" : "Compras brutas", type: "bar", barMaxWidth: 24, data: ph.map((r) => r[key]), itemStyle: { color: css("--s1"), borderRadius: [4, 4, 0, 0] } }],
+        series: [{ name: "Compras netas", type: "bar", barMaxWidth: 24, data: ph.map((r) => r.netas_usd_millones), itemStyle: { color: css("--s1"), borderRadius: [4, 4, 0, 0] } }],
       });
     }
     const lic = DATA.monthly.licitaciones || [];

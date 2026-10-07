@@ -85,16 +85,23 @@ def derived_series(df: pd.DataFrame, futuros: pd.DataFrame) -> pd.DataFrame:
     out["tc_oficial_ref"] = oficial
     if "usd_ccl" in df:
         out["brecha_ccl"] = (df["usd_ccl"] / oficial - 1) * 100
+        # Antes de que haya CCL (2011-2012) se usa la brecha con el blue.
+        if "usd_blue" in df:
+            primer_ccl = df["usd_ccl"].first_valid_index()
+            blue = (df["usd_blue"] / oficial - 1) * 100
+            if primer_ccl is not None:
+                out.loc[out.index < primer_ccl, "brecha_ccl"] = blue[out.index < primer_ccl]
     if "usd_mep" in df:
         out["brecha_mep"] = (df["usd_mep"] / oficial - 1) * 100
     if "usd_blue" in df:
         out["brecha_blue"] = (df["usd_blue"] / oficial - 1) * 100
-    # Tasa de referencia: TAMAR (vigente desde oct-24), completada con BADLAR.
+    # Tasa de referencia: BADLAR (serie larga y homogénea desde 1999); TAMAR
+    # sólo cubre huecos, para no introducir un salto de nivel en oct-24.
     tasa = pd.Series(np.nan, index=df.index)
-    if "tamar" in df:
-        tasa = df["tamar"]
     if "badlar" in df:
-        tasa = tasa.fillna(df["badlar"])
+        tasa = df["badlar"]
+    if "tamar" in df:
+        tasa = tasa.fillna(df["tamar"])
     out["tasa"] = tasa
     dev = implied_devaluation(futuros, oficial)
     if not dev.empty:
@@ -169,11 +176,14 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
     ipd = _weighted_mean(blocks, {k: config.IPD_BLOCKS[k]["weight"] for k in blocks.columns})
     ipd = ipd.reindex(df.index)
     pct = rolling_percentile(ipd, config.IPD_PERCENTILE_WINDOW, config.IPD_ZSCORE_MIN_OBS)
+    comps = pd.DataFrame(components, index=df.index)
+    n_comp = comps.notna().sum(axis=1).where(ipd.notna())
     return {
         "ipd": ipd,
         "percentil": pct,
+        "n_componentes": n_comp,
         "blocks": blocks,
-        "components": pd.DataFrame(components, index=df.index),
+        "components": comps,
     }
 
 

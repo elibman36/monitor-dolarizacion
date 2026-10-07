@@ -50,18 +50,25 @@ python -m http.server               # y abrir http://localhost:8000
 
 ## Variables y fuentes
 
-| Variable | Frecuencia | Fuente | Carga |
-|---|---|---|---|
-| Tipo de cambio mayorista A3500 | diaria | BCRA, API de Estadísticas v4 | automática |
-| Reservas internacionales brutas | diaria | BCRA | automática |
-| Tasas TAMAR / BADLAR privados | diaria | BCRA | automática |
-| Depósitos en dólares | diaria | BCRA (si la variable está en el catálogo) | automática |
-| Dólar oficial, mayorista, MEP, CCL y blue | diaria | [ArgentinaDatos](https://argentinadatos.com) | automática |
-| Riesgo país (EMBI) | diaria | ArgentinaDatos | automática |
-| Brechas CCL, MEP y blue | diaria | cálculo propio | derivada |
-| Futuros de dólar: devaluación implícita e interés abierto | diaria | A3 Mercados (API pública de precios de cierre) | automática; `data/manual/futuros_dolar.csv` para correcciones |
-| Compras de USD de personas humanas | mensual | BCRA, Informe del Mercado de Cambios y Balance Cambiario | `data/manual/compras_personas_humanas.csv` |
-| Licitaciones del Tesoro (share dollar linked / USD) | por licitación | Secretaría de Finanzas | `data/manual/licitaciones_tesoro.csv` |
+| Variable | Desde | Frecuencia | Fuente | Carga |
+|---|---|---|---|---|
+| Reservas internacionales brutas | 1996 | diaria | BCRA, API de Estadísticas v4 | automática |
+| Tasa BADLAR privados (TAMAR como respaldo) | 1999 | diaria | BCRA | automática |
+| Tipo de cambio mayorista A3500 | 2002 | diaria | BCRA | automática |
+| Depósitos en dólares del sector privado | 2002 | diaria | BCRA | automática |
+| Riesgo país (EMBI) | 1999 | diaria | [ArgentinaDatos](https://argentinadatos.com) | automática |
+| Dólar oficial, mayorista y blue | 2011 | diaria | ArgentinaDatos | automática |
+| Dólar CCL | 2013 | diaria | ArgentinaDatos | automática |
+| Dólar MEP | 2018 | diaria | ArgentinaDatos | automática |
+| Brechas CCL, MEP y blue | 2011 | diaria | cálculo propio (CCL; antes de 2013, blue) | derivada |
+| Futuros de dólar: devaluación implícita e interés abierto | 2020 | diaria | A3 Mercados (API pública de precios de cierre) | automática; `data/manual/futuros_dolar.csv` para correcciones |
+| Compras de USD de personas humanas | 2003 | mensual | BCRA, anexo del Informe de Evolución del Mercado de Cambios | automática (semanal); `data/manual/compras_personas_humanas.csv` para correcciones |
+| Licitaciones del Tesoro (share dollar linked / USD) | — | por licitación | Secretaría de Finanzas | `data/manual/licitaciones_tesoro.csv` |
+
+**Historia.** El IPD arranca en 1999. En los primeros años se calcula con los
+componentes que ya existían (reservas, BADLAR y riesgo país; desde 2002 también el
+A3500 y los depósitos en dólares). El panel diario incluye la columna
+`ipd_n_componentes` y el tooltip del gráfico indica cuántos había cada día.
 
 **Fuentes manuales.** Cada CSV trae en su encabezado el formato y de dónde
 sacar el dato. En equipo, lo más práctico suele ser llevarlas en una Google
@@ -85,7 +92,7 @@ de peso cada uno:
 |---|---|---|---|
 | Presión cambiaria (EMP) | Tipo de cambio A3500 | Δlog 5 días | + |
 | | Reservas brutas | Δlog 5 días | − |
-| | Tasa TAMAR / BADLAR | Δ 5 días | + |
+| | Tasa BADLAR | Δ 5 días | + |
 | Dolarización de portafolios | Brecha CCL / oficial | nivel | + |
 | | Riesgo país | Δ 5 días | + |
 | | Devaluación implícita en futuros | nivel | + |
@@ -98,7 +105,7 @@ El cálculo sigue estos pasos:
    inversa del desvío, como en el EMP clásico.
 2. **Promedio ponderado.** Se promedia dentro de cada bloque y después entre
    bloques. Si falta un componente, su peso se reparte entre los demás. El
-   índice sólo se publica si está disponible al menos el 50% del peso.
+   índice sólo se publica si está disponible al menos el 40% del peso.
 3. **Semáforo.** Se ubica el IPD en su percentil de los últimos 2 años:
    - menos de 75: presión baja;
    - desde 75: moderada;
@@ -125,4 +132,3 @@ componentes, umbrales y eventos electorales.
   linked a partir de precios de mercado.
 - Agregar flujos diarios de FCI de dólares y de money market (CAFCI).
 - Agregar las expectativas de tipo de cambio del REM (mensual).
-- Descargar automáticamente el anexo del balance cambiario.

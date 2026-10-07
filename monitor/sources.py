@@ -223,6 +223,47 @@ def a3_futuros_dolar(desde: str, hasta: str | None = None) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# BCRA - Anexo del Informe de Evolución del Mercado de Cambios
+# ---------------------------------------------------------------------------
+
+def parse_compras_personas_humanas(datos: pd.DataFrame) -> pd.DataFrame:
+    """Compras y ventas mensuales de billetes y divisas de personas humanas.
+
+    `datos` es la hoja larga del anexo (Anexo, Mes, Sector, Monto, A, B, C, D),
+    con montos en dólares: las compras de los clientes figuran con signo
+    negativo (egresos del mercado) y las ventas con signo positivo. Se toma el
+    rubro "Compra-venta de billetes y divisas sin fines específicos"
+    (formación de activos externos) del sector personas humanas.
+    """
+    d = datos.copy()
+    d.columns = [str(c).strip() for c in d.columns]
+    d = d[d["Sector"].astype(str).str.strip().str.casefold() == config.BCRA_ANEXO_SECTOR.casefold()]
+    d = d[d["B"].astype(str).str.contains(r"compra-venta de billetes y divisas", case=False, regex=True)]
+    d["Monto"] = pd.to_numeric(d["Monto"], errors="coerce")
+    d["fecha"] = pd.to_datetime(d["Mes"]).dt.strftime("%Y-%m")
+    compras = d[d["C"].astype(str).str.contains(r"^\s*02- compra", case=False, regex=True)]
+    ventas = d[d["C"].astype(str).str.contains(r"^\s*01- venta", case=False, regex=True)]
+    out = pd.DataFrame({
+        "compras_usd_millones": -compras.groupby("fecha")["Monto"].sum() / 1e6,
+        "ventas_usd_millones": ventas.groupby("fecha")["Monto"].sum() / 1e6,
+    }).fillna(0.0).round(2)
+    out.index.name = "fecha"
+    out["fuente"] = "BCRA, anexo del Informe de Evolución del Mercado de Cambios"
+    return out.reset_index().sort_values("fecha")
+
+
+def bcra_compras_personas_humanas() -> pd.DataFrame:
+    r = _session.get(config.BCRA_ANEXO_CAMBIOS_URL, timeout=180, verify=_bcra_verify(),
+                     headers={"Accept": "*/*"})
+    r.raise_for_status()
+    datos = pd.read_excel(io.BytesIO(r.content), sheet_name=config.BCRA_ANEXO_HOJA, engine="openpyxl")
+    out = parse_compras_personas_humanas(datos)
+    if out.empty:
+        raise RuntimeError("el anexo no trae operaciones de personas humanas")
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Fuentes manuales (CSV local o URL publicada)
 # ---------------------------------------------------------------------------
 

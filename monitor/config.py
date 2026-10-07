@@ -12,8 +12,10 @@ SERIES_DIR = DATA_DIR / "series"
 MANUAL_DIR = DATA_DIR / "manual"
 OUTPUT_JSON = DATA_DIR / "monitor.json"
 
-# Primer día que se descarga y se publica.
-START_DATE = "2019-01-01"
+# Primer día que se descarga y se publica. Cada serie arranca cuando su fuente
+# tiene datos (reservas: 1996; BADLAR: 1999; A3500: 2002; CCL, MEP y futuros,
+# más tarde). Si faltan componentes, el IPD se calcula con los disponibles.
+START_DATE = "1996-01-01"
 
 # ---------------------------------------------------------------------------
 # Fuentes diarias automáticas
@@ -82,6 +84,8 @@ MANUAL_SOURCES = {
         "freq": "diaria",
         "fuente": "A3 Mercados - precios de ajuste e interés abierto de futuros DLR",
     },
+    # Se descarga sola del anexo del BCRA (ver BCRA_ANEXO_CAMBIOS_URL); este
+    # CSV sólo sirve para agregar o corregir meses a mano.
     "compras_personas_humanas": {
         "file": "compras_personas_humanas.csv",
         "url": None,
@@ -96,8 +100,16 @@ MANUAL_SOURCES = {
     },
 }
 
-# Primer día que se pide a la API de A3 (antes de 2021 no devuelve datos).
-FUTUROS_START_DATE = "2021-01-01"
+# Primer día que se pide a la API de A3 (antes de 2020 no devuelve datos).
+FUTUROS_START_DATE = "2020-01-01"
+
+# Anexo estadístico del Informe de Evolución del Mercado de Cambios (BCRA):
+# hoja larga con operaciones mensuales por sector y concepto desde 2003.
+BCRA_ANEXO_CAMBIOS_URL = ("https://www.bcra.gob.ar/archivos/Pdfs/PublicacionesEstadisticas/"
+                          "informes/anexo-estadistico-mercado-cambios-balance-cambiario.xlsx")
+BCRA_ANEXO_HOJA = "Datos Mercado de Cambios"
+BCRA_ANEXO_SECTOR = "Personas Humanas"
+BCRA_ANEXO_DIAS_ENTRE_DESCARGAS = 7  # el anexo se actualiza una vez por mes
 
 # Devaluación implícita: TNA de los futuros interpolada a un plazo constante.
 # Se descartan contratos con menos de FUTUROS_PLAZO_MINIMO_DIAS (muy ruidosos).
@@ -121,7 +133,7 @@ IPD_HORIZON = 5            # días hábiles para variaciones (≈ 1 semana)
 IPD_ZSCORE_WINDOW = 504    # ventana móvil para estandarizar (≈ 2 años)
 IPD_ZSCORE_MIN_OBS = 120   # mínimo de observaciones para calcular el z-score
 IPD_Z_CLIP = 4.0           # recorte de outliers
-IPD_MIN_WEIGHT_SHARE = 0.5 # peso mínimo disponible para publicar el índice
+IPD_MIN_WEIGHT_SHARE = 0.4 # peso mínimo disponible para publicar el índice
 
 IPD_BLOCKS = {
     "emp": {
@@ -165,18 +177,37 @@ IPD_STATUS = [
 # ---------------------------------------------------------------------------
 # Eventos a marcar en los gráficos
 # ---------------------------------------------------------------------------
+# tipo "cambiario" se rotula siempre; "electoral", sólo en rangos de hasta 6 años.
 EVENTS = [
-    {"date": "2019-08-11", "label": "PASO 2019"},
-    {"date": "2019-10-27", "label": "Generales 2019"},
-    {"date": "2021-09-12", "label": "PASO 2021"},
-    {"date": "2021-11-14", "label": "Legislativas 2021"},
-    {"date": "2023-08-13", "label": "PASO 2023"},
-    {"date": "2023-10-22", "label": "Generales 2023"},
-    {"date": "2023-11-19", "label": "Balotaje 2023"},
-    {"date": "2023-12-13", "label": "Devaluación dic-23"},
-    {"date": "2025-04-14", "label": "Bandas cambiarias / fin cepo PH"},
-    {"date": "2025-09-07", "label": "Elecciones PBA 2025"},
-    {"date": "2025-10-26", "label": "Legislativas 2025"},
+    {"date": "1999-10-24", "label": "Generales 1999", "tipo": "electoral"},
+    {"date": "2001-10-14", "label": "Legislativas 2001", "tipo": "electoral"},
+    {"date": "2001-12-03", "label": "Corralito", "tipo": "cambiario"},
+    {"date": "2002-01-06", "label": "Fin de la convertibilidad", "tipo": "cambiario"},
+    {"date": "2003-04-27", "label": "Generales 2003", "tipo": "electoral"},
+    {"date": "2005-10-23", "label": "Legislativas 2005", "tipo": "electoral"},
+    {"date": "2007-10-28", "label": "Generales 2007", "tipo": "electoral"},
+    {"date": "2008-09-15", "label": "Quiebra de Lehman", "tipo": "cambiario"},
+    {"date": "2009-06-28", "label": "Legislativas 2009", "tipo": "electoral"},
+    {"date": "2011-10-23", "label": "Generales 2011", "tipo": "electoral"},
+    {"date": "2011-10-31", "label": "Cepo 2011", "tipo": "cambiario"},
+    {"date": "2013-10-27", "label": "Legislativas 2013", "tipo": "electoral"},
+    {"date": "2014-01-23", "label": "Devaluación ene-14", "tipo": "cambiario"},
+    {"date": "2015-10-25", "label": "Generales 2015", "tipo": "electoral"},
+    {"date": "2015-12-17", "label": "Salida del cepo", "tipo": "cambiario"},
+    {"date": "2017-10-22", "label": "Legislativas 2017", "tipo": "electoral"},
+    {"date": "2018-05-03", "label": "Corrida 2018", "tipo": "cambiario"},
+    {"date": "2019-08-11", "label": "PASO 2019", "tipo": "electoral"},
+    {"date": "2019-09-01", "label": "Cepo 2019", "tipo": "cambiario"},
+    {"date": "2019-10-27", "label": "Generales 2019", "tipo": "electoral"},
+    {"date": "2021-09-12", "label": "PASO 2021", "tipo": "electoral"},
+    {"date": "2021-11-14", "label": "Legislativas 2021", "tipo": "electoral"},
+    {"date": "2023-08-13", "label": "PASO 2023", "tipo": "electoral"},
+    {"date": "2023-10-22", "label": "Generales 2023", "tipo": "electoral"},
+    {"date": "2023-11-19", "label": "Balotaje 2023", "tipo": "electoral"},
+    {"date": "2023-12-13", "label": "Devaluación dic-23", "tipo": "cambiario"},
+    {"date": "2025-04-14", "label": "Bandas cambiarias / fin cepo PH", "tipo": "cambiario"},
+    {"date": "2025-09-07", "label": "Elecciones PBA 2025", "tipo": "electoral"},
+    {"date": "2025-10-26", "label": "Legislativas 2025", "tipo": "electoral"},
     # Calendario 2027 a confirmar por la Cámara Nacional Electoral.
-    {"date": "2027-10-24", "label": "Generales 2027 (a confirmar)"},
+    {"date": "2027-10-24", "label": "Generales 2027 (a confirmar)", "tipo": "electoral"},
 ]

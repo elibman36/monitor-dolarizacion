@@ -86,6 +86,9 @@ def fake_api(monkeypatch, tmp_path):
         raise AssertionError(f"URL inesperada: {url}")
 
     monkeypatch.setattr(sources, "get_json", fake_get_json)
+    monkeypatch.setattr(sources, "bcra_compras_personas_humanas", lambda: pd.DataFrame({
+        "fecha": ["2025-01", "2025-02"], "compras_usd_millones": [1500.0, 1800.0],
+        "ventas_usd_millones": [300.0, 250.0], "fuente": ["test", "test"]}))
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "SERIES_DIR", tmp_path / "series")
     monkeypatch.setattr(config, "OUTPUT_JSON", tmp_path / "monitor.json")
@@ -113,6 +116,10 @@ def test_run_end_to_end(fake_api):
     fecha_shock = syn["fechas"][715].strftime("%Y-%m-%d")
     fecha_calma = syn["fechas"][600].strftime("%Y-%m-%d")
     assert ipd[fecha_shock] > ipd[fecha_calma] + 1
+    ph = payload["monthly"]["compras_personas_humanas"]
+    assert [r["fecha"] for r in ph] == ["2025-01", "2025-02"]
+    assert ph[1]["netas_usd_millones"] == pytest.approx(1550.0)
+    assert payload["ipd"]["n_components"]
     json.loads((tmp / "monitor.json").read_text())
 
 
@@ -178,3 +185,24 @@ def test_a3_expiry():
     assert sources._a3_expiry("DLR102026") == pd.Timestamp("2026-10-30")
     assert sources._a3_expiry("DLR052026") == pd.Timestamp("2026-05-29")  # 31/5 es domingo
     assert sources._a3_expiry("DLR/SPOT") is None
+
+
+def test_parse_compras_personas_humanas():
+    datos = pd.DataFrame({
+        "Anexo": [65, 66, 63, 65, 23],
+        "Mes": pd.to_datetime(["2025-05-01"] * 4 + ["2025-05-01"]),
+        "Sector": ["Personas Humanas", "Personas Humanas", "Personas Humanas", "Comercio", "Personas Humanas"],
+        "Monto": [-2_000_000_000, -500_000_000, 400_000_000, -9e9, -1e8],
+        "A": ["03- Cuenta Financiera"] * 4 + ["01- Cuenta Corriente"],
+        "B": ["03- Compra-venta de billetes y divisas sin fines específicos"] * 4 + ["02- Servicios"],
+        "C": ["02- Compra de billetes y divisas sin fines específicos",
+              "02- Compra de billetes y divisas sin fines específicos",
+              "01- Venta de billetes y divisas sin fines específicos",
+              "02- Compra de billetes y divisas sin fines específicos",
+              "02- Servicios - Egresos"],
+        "D": ["Billetes - Egresos", "Otras inversiones", "Billetes - Ingresos", "Billetes - Egresos", "x"],
+    })
+    out = sources.parse_compras_personas_humanas(datos)
+    assert list(out["fecha"]) == ["2025-05"]
+    assert out["compras_usd_millones"].iloc[0] == pytest.approx(2500.0)
+    assert out["ventas_usd_millones"].iloc[0] == pytest.approx(400.0)

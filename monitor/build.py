@@ -43,6 +43,43 @@ def save_series(key: str, s: pd.Series) -> None:
     s.to_frame().to_csv(_cache_path(key), date_format="%Y-%m-%d", float_format="%.6g")
 
 
+# Registro de hasta qué fecha hacia atrás ya se pidió cada serie, para que las
+# corridas diarias sólo descarguen lo nuevo y la historia se pida una sola vez.
+_DOWNLOADS_META = "_descargas.json"
+
+
+def _downloads_meta() -> dict:
+    path = config.SERIES_DIR / _DOWNLOADS_META
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def _save_downloads_meta(meta: dict) -> None:
+    config.SERIES_DIR.mkdir(parents=True, exist_ok=True)
+    (config.SERIES_DIR / _DOWNLOADS_META).write_text(json.dumps(meta, indent=1, sort_keys=True))
+
+
+def incremental_start(key: str, start: str, overlap_days: int = 60) -> str:
+    """Fecha desde la que hay que descargar `key`.
+
+    Si la historia desde `start` ya se pidió alguna vez, se re-descargan sólo
+    los últimos `overlap_days` (las fuentes revisan datos recientes).
+    """
+    cached = load_cached(key) if key != "futuros_dolar" else None
+    requested = _downloads_meta().get(key)
+    if requested and requested <= start:
+        if cached is None:
+            return start
+        if not cached.empty:
+            return (cached.index.max() - pd.Timedelta(days=overlap_days)).strftime("%Y-%m-%d")
+    return start
+
+
+def mark_downloaded(key: str, start: str) -> None:
+    meta = _downloads_meta()
+    meta[key] = start
+    _save_downloads_meta(meta)
+
+
 def refresh(key: str, fetch) -> tuple[pd.Series, str]:
     """Descarga una serie y la combina con la copia guardada.
 
@@ -71,23 +108,57 @@ def load_futures(offline: bool) -> pd.DataFrame:
     cached = pd.read_csv(path) if path.exists() else pd.DataFrame()
     fut = cached
     if not offline:
-        # Se re-descargan los últimos 10 días por si A3 corrige ajustes.
-        desde = config.FUTUROS_START_DATE
-        if not cached.empty:
+        requested = _downloads_meta().get(FUTURES_CACHE)
+        if requested and requested <= config.FUTUROS_START_DATE and not cached.empty:
+            # Se re-descargan los últimos 10 días por si A3 corrige ajustes.
             desde = (pd.to_datetime(cached["fecha"]).max() - pd.Timedelta(days=10)).strftime("%Y-%m-%d")
+        else:
+            desde = config.FUTUROS_START_DATE
         try:
             fresh = sources.a3_futuros_dolar(desde)
             fut = pd.concat([cached, fresh]).drop_duplicates(["fecha", "contrato"], keep="last")
             fut = fut.sort_values(["fecha", "vencimiento"])
             config.SERIES_DIR.mkdir(parents=True, exist_ok=True)
             fut.to_csv(path, index=False)
-            log.info("A3: %d filas de futuros (%d nuevas)", len(fut), len(fresh))
+            mark_downloaded(FUTURES_CACHE, config.FUTUROS_START_DATE)
+            log.info("A3: %d filas de futuros (%d descargadas desde %s)", len(fut), len(fresh), desde)
         except Exception as exc:  # noqa: BLE001
             log.warning("A3 no disponible (%s); uso copia guardada (%d filas)", exc, len(cached))
     manual = sources.manual_source("futuros_dolar")
     if not manual.empty:
         fut = pd.concat([fut, manual]).drop_duplicates(["fecha", "contrato"], keep="last")
     return fut
+
+
+PH_CACHE = "compras_personas_humanas"
+
+
+def load_compras_personas_humanas(offline: bool) -> pd.DataFrame:
+    """Compras de USD de personas humanas (anexo del BCRA) + correcciones manuales."""
+    path = config.SERIES_DIR / f"{PH_CACHE}.csv"
+    cached = pd.read_csv(path, dtype={"fecha": str}) if path.exists() else pd.DataFrame()
+    data = cached
+    last = _downloads_meta().get(f"{PH_CACHE}_ultima_descarga")
+    due = (last is None or cached.empty or
+           (datetime.now(timezone.utc).date() - datetime.fromisoformat(last).date()).days
+           >= config.BCRA_ANEXO_DIAS_ENTRE_DESCARGAS)
+    if not offline and due:
+        try:
+            fresh = sources.bcra_compras_personas_humanas()
+            data = pd.concat([cached, fresh]).drop_duplicates("fecha", keep="last").sort_values("fecha")
+            config.SERIES_DIR.mkdir(parents=True, exist_ok=True)
+            data.to_csv(path, index=False)
+            meta = _downloads_meta()
+            meta[f"{PH_CACHE}_ultima_descarga"] = datetime.now(timezone.utc).date().isoformat()
+            _save_downloads_meta(meta)
+            log.info("BCRA anexo: %d meses de compras de personas humanas", len(data))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Anexo del BCRA no disponible (%s); uso copia guardada (%d meses)", exc, len(cached))
+    manual = sources.manual_source("compras_personas_humanas")
+    if not manual.empty:
+        manual["fecha"] = manual["fecha"].astype(str).str[:7]
+        data = pd.concat([data, manual]).drop_duplicates("fecha", keep="last").sort_values("fecha")
+    return data
 
 
 def fetch_all(offline: bool) -> tuple[dict[str, pd.Series], dict[str, str]]:
@@ -112,9 +183,12 @@ def fetch_all(offline: bool) -> tuple[dict[str, pd.Series], dict[str, str]]:
         base, ids = None, {}
     for key in config.BCRA_VARIABLES:
         if base and key in ids:
+            desde = incremental_start(key, config.START_DATE)
             series[key], status[key] = refresh(
-                key, lambda k=key: sources.bcra_series(base, ids[k], k)
+                key, lambda k=key, d=desde: sources.bcra_series(base, ids[k], k, start=d)
             )
+            if status[key] == "ok":
+                mark_downloaded(key, config.START_DATE)
         elif base:
             series[key], status[key] = load_cached(key), "n/d: variable no encontrada en el catálogo"
         else:
@@ -145,7 +219,7 @@ SERIES_META = {
     "brecha_mep": ("Brecha MEP / oficial", "%", "Cálculo propio"),
     "riesgo_pais": ("Riesgo país", "pb", "ArgentinaDatos (JP Morgan EMBI)"),
     "reservas": ("Reservas internacionales brutas", "millones de USD", "BCRA"),
-    "tasa": ("Tasa de referencia (TAMAR / BADLAR privados)", "% n.a.", "BCRA"),
+    "tasa": ("Tasa BADLAR bancos privados", "% n.a.", "BCRA"),
     "depositos_usd": ("Depósitos en dólares", "millones de USD", "BCRA"),
     "deval_implicita": ("Devaluación implícita en futuros a 90 días", "% TNA", "A3 Mercados"),
     "deval_implicita_mensual": ("Devaluación mensual implícita en futuros (90 días)", "% mensual", "A3 Mercados"),
@@ -237,6 +311,8 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
         "ipd": {
             "data": _pairs(ipd["ipd"]),
             "percentile": _pairs(ipd["percentil"]),
+            "n_components": _pairs(ipd["n_componentes"]),
+            "n_components_total": sum(len(b["components"]) for b in config.IPD_BLOCKS.values()),
             "blocks": {
                 b: {"label": config.IPD_BLOCKS[b]["label"], "data": _pairs(ipd["blocks"][b])}
                 for b in ipd["blocks"].columns
@@ -276,7 +352,7 @@ def run(offline: bool = False) -> dict:
     panel = indicators.derived_series(panel, futuros)
     ipd = indicators.compute_ipd(panel)
 
-    compras = indicators.monthly_fx_purchases(sources.manual_source("compras_personas_humanas"))
+    compras = indicators.monthly_fx_purchases(load_compras_personas_humanas(offline))
     licitaciones = indicators.auction_dollar_share(sources.manual_source("licitaciones_tesoro"))
 
     payload = build_payload(panel, ipd, compras, licitaciones, status, daily)
@@ -285,6 +361,7 @@ def run(offline: bool = False) -> dict:
     out_panel = panel.copy()
     out_panel["ipd"] = ipd["ipd"]
     out_panel["ipd_percentil"] = ipd["percentil"]
+    out_panel["ipd_n_componentes"] = ipd["n_componentes"]
     for b in ipd["blocks"].columns:
         out_panel[f"ipd_bloque_{b}"] = ipd["blocks"][b]
     for c in ipd["components"].columns:
