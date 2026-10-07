@@ -247,22 +247,3 @@ def monthly_fx_purchases(df: pd.DataFrame) -> pd.DataFrame:
     if {"compras_usd_millones", "ventas_usd_millones"} <= set(out.columns):
         out["netas_usd_millones"] = out["compras_usd_millones"] - out["ventas_usd_millones"].fillna(0)
     return out.sort_values("fecha")
-
-
-def auction_dollar_share(df: pd.DataFrame) -> pd.DataFrame:
-    """Participación de instrumentos con cobertura cambiaria en cada licitación.
-
-    Tipos considerados cobertura: DL (dollar linked) y USD (hard dollar / duales
-    con componente cambiario) - configurable vía la columna `tipo`.
-    """
-    if df.empty:
-        return df
-    d = df.copy()
-    d["fecha"] = pd.to_datetime(d["fecha"])
-    d["monto"] = pd.to_numeric(d["monto_vn_millones_ars"], errors="coerce")
-    d["tipo"] = d["tipo"].astype(str).str.upper().str.strip()
-    total = d.groupby("fecha")["monto"].sum()
-    cobertura = d[d["tipo"].isin(["DL", "USD", "DUAL_DL"])].groupby("fecha")["monto"].sum()
-    out = pd.DataFrame({"total_millones_ars": total, "cobertura_millones_ars": cobertura}).fillna(0)
-    out["share_cobertura"] = out["cobertura_millones_ars"] / out["total_millones_ars"].replace(0, np.nan) * 100
-    return out.reset_index()

@@ -261,25 +261,3 @@ def bcra_compras_personas_humanas() -> pd.DataFrame:
     if out.empty:
         raise RuntimeError("el anexo no trae operaciones de personas humanas")
     return out
-
-
-# ---------------------------------------------------------------------------
-# Fuentes manuales (CSV local o URL publicada)
-# ---------------------------------------------------------------------------
-
-def manual_source(key: str) -> pd.DataFrame:
-    spec = config.MANUAL_SOURCES[key]
-    path = config.MANUAL_DIR / spec["file"]
-    if spec.get("url"):
-        try:
-            r = _session.get(spec["url"], timeout=60)
-            r.raise_for_status()
-            pd.read_csv(io.StringIO(r.text))  # valida antes de sobreescribir
-            path.write_text(r.text, encoding="utf-8")
-            log.info("Fuente manual %s actualizada desde URL", key)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("No se pudo actualizar %s desde URL (%s); uso copia local", key, exc)
-    if not path.exists():
-        return pd.DataFrame()
-    df = pd.read_csv(path, comment="#")
-    return df.dropna(how="all")

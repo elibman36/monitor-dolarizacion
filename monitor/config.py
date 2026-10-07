@@ -9,7 +9,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "data"
 SERIES_DIR = DATA_DIR / "series"
-MANUAL_DIR = DATA_DIR / "manual"
 OUTPUT_JSON = DATA_DIR / "monitor.json"
 
 # Primer día que se descarga y se publica. Cada serie arranca cuando su fuente
@@ -70,36 +69,8 @@ ARGENTINADATOS_DOLARES = {
 ARGENTINADATOS_RIESGO_PAIS = {"label": "Riesgo país (EMBI Argentina)", "unit": "pb"}
 
 # ---------------------------------------------------------------------------
-# Fuentes manuales / semiautomáticas
+# Futuros de dólar (A3 Mercados) y anexo cambiario del BCRA
 # ---------------------------------------------------------------------------
-# Cada fuente es un CSV en data/manual/. Si se define `url` (por ejemplo, una
-# Google Sheet publicada como CSV), el pipeline la descarga primero y
-# sobreescribe el archivo local; si falla, usa la última copia local.
-MANUAL_SOURCES = {
-    # Los futuros se descargan solos de A3 Mercados; este CSV sólo sirve para
-    # agregar o corregir filas a mano (tiene prioridad sobre la descarga).
-    "futuros_dolar": {
-        "file": "futuros_dolar.csv",
-        "url": None,
-        "freq": "diaria",
-        "fuente": "A3 Mercados - precios de ajuste e interés abierto de futuros DLR",
-    },
-    # Se descarga sola del anexo del BCRA (ver BCRA_ANEXO_CAMBIOS_URL); este
-    # CSV sólo sirve para agregar o corregir meses a mano.
-    "compras_personas_humanas": {
-        "file": "compras_personas_humanas.csv",
-        "url": None,
-        "freq": "mensual",
-        "fuente": "BCRA - Informe de Evolución del Mercado de Cambios y Balance Cambiario",
-    },
-    "licitaciones_tesoro": {
-        "file": "licitaciones_tesoro.csv",
-        "url": None,
-        "freq": "por licitación",
-        "fuente": "Secretaría de Finanzas - resultados de licitaciones",
-    },
-}
-
 # Primer día que se pide a la API de A3 (antes de 2020 no devuelve datos).
 FUTUROS_START_DATE = "2020-01-01"
 

@@ -103,7 +103,7 @@ FUTURES_CACHE = "futuros_dolar"
 
 
 def load_futures(offline: bool) -> pd.DataFrame:
-    """Futuros de A3 (descarga incremental) + correcciones manuales."""
+    """Futuros de A3 (descarga incremental)."""
     path = config.SERIES_DIR / f"{FUTURES_CACHE}.csv"
     cached = pd.read_csv(path) if path.exists() else pd.DataFrame()
     fut = cached
@@ -124,9 +124,6 @@ def load_futures(offline: bool) -> pd.DataFrame:
             log.info("A3: %d filas de futuros (%d descargadas desde %s)", len(fut), len(fresh), desde)
         except Exception as exc:  # noqa: BLE001
             log.warning("A3 no disponible (%s); uso copia guardada (%d filas)", exc, len(cached))
-    manual = sources.manual_source("futuros_dolar")
-    if not manual.empty:
-        fut = pd.concat([fut, manual]).drop_duplicates(["fecha", "contrato"], keep="last")
     return fut
 
 
@@ -134,7 +131,7 @@ PH_CACHE = "compras_personas_humanas"
 
 
 def load_compras_personas_humanas(offline: bool) -> pd.DataFrame:
-    """Compras de USD de personas humanas (anexo del BCRA) + correcciones manuales."""
+    """Compras de USD de personas humanas (anexo del BCRA)."""
     path = config.SERIES_DIR / f"{PH_CACHE}.csv"
     cached = pd.read_csv(path, dtype={"fecha": str}) if path.exists() else pd.DataFrame()
     data = cached
@@ -154,10 +151,6 @@ def load_compras_personas_humanas(offline: bool) -> pd.DataFrame:
             log.info("BCRA anexo: %d meses de compras de personas humanas", len(data))
         except Exception as exc:  # noqa: BLE001
             log.warning("Anexo del BCRA no disponible (%s); uso copia guardada (%d meses)", exc, len(cached))
-    manual = sources.manual_source("compras_personas_humanas")
-    if not manual.empty:
-        manual["fecha"] = manual["fecha"].astype(str).str[:7]
-        data = pd.concat([data, manual]).drop_duplicates("fecha", keep="last").sort_values("fecha")
     return data
 
 
@@ -257,7 +250,7 @@ def _last(s: pd.Series, lag_days: int = 0):
 
 
 def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
-                  licitaciones: pd.DataFrame, fetch_status: dict[str, str],
+                  fetch_status: dict[str, str],
                   raw: dict[str, pd.Series] | None = None) -> dict:
     raw = raw or {}
     series_out = {}
@@ -335,13 +328,6 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
                  for k, v in row.items()}
                 for row in compras.to_dict("records")
             ] if not compras.empty else [],
-            "licitaciones": [
-                {"fecha": r["fecha"].strftime("%Y-%m-%d"),
-                 "total_millones_ars": _clean(r["total_millones_ars"]),
-                 "cobertura_millones_ars": _clean(r["cobertura_millones_ars"]),
-                 "share_cobertura": _clean(r["share_cobertura"])}
-                for r in licitaciones.to_dict("records")
-            ] if not licitaciones.empty else [],
         },
         "events": config.EVENTS,
         "sources_status": fetch_status,
@@ -361,9 +347,8 @@ def run(offline: bool = False) -> dict:
     ipd = indicators.compute_ipd(panel)
 
     compras = indicators.monthly_fx_purchases(load_compras_personas_humanas(offline))
-    licitaciones = indicators.auction_dollar_share(sources.manual_source("licitaciones_tesoro"))
 
-    payload = build_payload(panel, ipd, compras, licitaciones, status, daily)
+    payload = build_payload(panel, ipd, compras, status, daily)
 
     # Panel diario completo, útil para análisis en Excel / R / Stata.
     out_panel = panel.copy()

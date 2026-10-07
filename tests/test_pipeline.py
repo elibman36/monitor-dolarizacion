@@ -92,9 +92,7 @@ def fake_api(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "SERIES_DIR", tmp_path / "series")
     monkeypatch.setattr(config, "OUTPUT_JSON", tmp_path / "monitor.json")
-    monkeypatch.setattr(config, "MANUAL_DIR", tmp_path / "manual")
     monkeypatch.setattr(config, "START_DATE", "2023-01-01")
-    (tmp_path / "manual").mkdir()
     return syn, tmp_path
 
 
@@ -168,17 +166,6 @@ def test_weighted_mean_requires_min_weight():
     out = indicators._weighted_mean(frame, {"a": 1, "b": 1, "c": 1})
     assert out.iloc[0] == pytest.approx(2.0)
     assert np.isnan(out.iloc[1])  # sólo 1/3 del peso disponible
-
-
-def test_auction_share():
-    df = pd.DataFrame({
-        "fecha": ["2026-03-10"] * 3,
-        "instrumento": ["S30A6", "D30J6", "TZX27"],
-        "tipo": ["LECAP", "DL", "CER"],
-        "monto_vn_millones_ars": [600, 300, 100],
-    })
-    out = indicators.auction_dollar_share(df)
-    assert out["share_cobertura"].iloc[0] == pytest.approx(30.0)
 
 
 def test_a3_expiry():

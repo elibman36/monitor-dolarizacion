@@ -86,6 +86,7 @@ h2 { font-size: 16px; margin: 0 0 2px; }
 .tile .delta { font-size: 12px; margin-top: 2px; color: var(--ink-2); }
 .tile .delta .up { color: var(--up-bad); } .tile .delta .down { color: var(--down-good); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid1 { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
 .card-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
 .chart { width: 100%; height: 300px; }
@@ -178,16 +179,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   <section class="grid3" id="multiples"></section>
 
   <h2 class="section-title">Indicadores de menor frecuencia</h2>
-  <section class="grid2">
+  <section class="grid1">
     <div class="card">
       <h2>Compras de USD de personas humanas</h2>
       <p class="note">Compras netas de billetes y divisas sin fines específicos, mensual, millones de USD. BCRA, balance cambiario.</p>
       <div class="chart" id="c-ph" role="img" aria-label="Compras de dólares de personas humanas"></div>
-    </div>
-    <div class="card">
-      <h2>Demanda de cobertura en licitaciones del Tesoro</h2>
-      <p class="note">% del monto adjudicado en instrumentos dollar linked o en USD.</p>
-      <div class="chart" id="c-lic" role="img" aria-label="Participación de instrumentos con cobertura cambiaria en licitaciones"></div>
     </div>
   </section>
 
@@ -206,7 +202,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </ul>
     <p>El índice se publica desde 2003. Los datos de 1996–2002 sólo se usan como referencia para estandarizar: con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20 a 45 puntos por semana y se desplomó con el corralito, y hay huecos en los datos, así que el índice de esos años no es confiable. Desde 2003 hay 7 de los 9 componentes; la brecha se suma en 2011 (con el blue hasta 2012) y los futuros en 2020. El tooltip del gráfico del IPD indica cuántos componentes había cada día.</p>
     <p>Si falta un componente, su peso se reparte entre los demás. El IPD se publica cuando hay datos para al menos el 40% del peso.</p>
-    <p><b>Índice 0–100.</b> Para comunicarlo, el IPD se promedia en 10 días hábiles y se lleva a una escala de 0 a 100 con la distribución normal: Índice = 100 × Φ(IPD / σ), donde σ es el desvío histórico del IPD promediado. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 2003. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. Las compras de personas humanas y las licitaciones se muestran aparte porque se publican con menor frecuencia y rezago.</p>
+    <p><b>Índice 0–100.</b> Para comunicarlo, el IPD se promedia en 10 días hábiles y se lleva a una escala de 0 a 100 con la distribución normal: Índice = 100 × Φ(IPD / σ), donde σ es el desvío histórico del IPD promediado. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 2003. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. Las compras de personas humanas se muestran aparte porque se publican mensualmente y con rezago.</p>
     <p class="note">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
   </section>
   <p class="note" id="foot" style="margin-top:16px"></p>
@@ -222,12 +218,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     deprec_fuerte: { color: "var(--dv-deprec_fuerte)", icon: "▲" },
     unknown: { color: "var(--muted)", icon: "?" },
   };
-  const TILES = ["tc_oficial_ref", "usd_ccl", "brecha_ccl", "riesgo_pais", "reservas", "tasa", "deval_implicita", "depositos_usd"];
+  const TILES = ["tc_oficial_ref", "usd_ccl", "brecha_ccl", "brecha_mep", "riesgo_pais", "reservas", "tasa", "deval_implicita", "depositos_usd"];
   // Variables donde una suba es "mala" (más presión): se colorea el delta.
   const UP_IS_PRESSURE = { tc_oficial_ref: 1, usd_ccl: 1, usd_mep: 1, brecha_ccl: 1, brecha_mep: 1, riesgo_pais: 1, reservas: -1, deval_implicita: 1, depositos_usd: 1 };
   const MULTIPLES = [
     { title: "Tipo de cambio", keys: ["tc_oficial_ref", "usd_mep", "usd_ccl"], names: ["Oficial (A3500)", "MEP", "CCL"], unit: "$ por USD" },
-    { title: "Brecha CCL / oficial", keys: ["brecha_ccl"], unit: "%" },
+    { title: "Brecha cambiaria contra el oficial", keys: ["brecha_ccl", "brecha_mep"], names: ["CCL", "MEP"], unit: "%" },
     { title: "Volatilidad cambiaria (20 días)", keys: ["vol_oficial", "vol_ccl"], names: ["Oficial", "CCL"], unit: "% anualizada" },
     { title: "Riesgo país", keys: ["riesgo_pais"], unit: "pb" },
     { title: "Reservas internacionales brutas", keys: ["reservas"], unit: "millones de USD" },
@@ -564,9 +560,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       card.innerHTML = `<h2>${m.title}</h2><p class="note">${m.unit}${avail.length ? " · " + [...new Set(avail.map((k) => DATA.series[k].source))].join(" / ") : ""}</p><div class="chart small" id="m-${idx}"></div>`;
       box.appendChild(card);
       if (!avail.length) {
-        const hint = m.keys.includes("deval_implicita") || m.keys.includes("futuros_interes_abierto")
-          ? "Cargá datos de futuros en <code>data/manual/futuros_dolar.csv</code>." : "Serie no disponible en la fuente.";
-        return emptyState(`m-${idx}`, hint);
+        return emptyState(`m-${idx}`, "Serie no disponible en la fuente.");
       }
       const c = mount(`m-${idx}`);
       const o = base();
@@ -609,20 +603,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         series: [{ name: "Compras netas", type: "bar", barMaxWidth: 24, data: ph.map((r) => r.netas_usd_millones), itemStyle: { color: css("--s1"), borderRadius: [4, 4, 0, 0] } }],
       });
     }
-    const lic = DATA.monthly.licitaciones || [];
-    if (!lic.length) {
-      emptyState("c-lic", "Sin datos cargados. Completá <code>data/manual/licitaciones_tesoro.csv</code> con los resultados de cada licitación.");
-    } else {
-      const c = mount("c-lic");
-      c.setOption({
-        animation: false, textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
-        grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
-        tooltip: { trigger: "axis", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 }, valueFormatter: (v) => nf(v, 1) + "%" },
-        xAxis: { type: "category", data: lic.map((r) => r.fecha), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--muted"), fontSize: 11 } },
-        yAxis: { type: "value", min: 0, max: 100, axisLabel: { color: css("--muted"), fontSize: 11 }, splitLine: { lineStyle: { color: css("--grid") } } },
-        series: [{ name: "Cobertura cambiaria", type: "bar", barMaxWidth: 24, data: lic.map((r) => r.share_cobertura), itemStyle: { color: css("--s1"), borderRadius: [4, 4, 0, 0] } }],
-      });
-    }
   }
 
   function renderTable() {
@@ -637,7 +617,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const st = document.getElementById("src-status");
     st.innerHTML = Object.entries(DATA.sources_status || {}).map(([k, v]) =>
       { const bad = v.startsWith("error") || v.startsWith("fallo"); return `<span class="${bad ? "err" : ""}" title="${v}">${v === "ok" ? "✓" : bad ? "✕" : "•"} ${k}</span>`; }).join("");
-    document.getElementById("foot").textContent = `Actualizado: ${new Date(DATA.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, ArgentinaDatos, A3 Mercados, Secretaría de Finanzas.`;
+    document.getElementById("foot").textContent = `Actualizado: ${new Date(DATA.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, ArgentinaDatos, A3 Mercados.`;
   }
 
   function renderCharts() {

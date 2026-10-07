@@ -10,15 +10,14 @@ del *Exchange Market Pressure Index* a la economía bimonetaria argentina.
 ├── index.html              ← tablero (estático, lee data/monitor.json)
 ├── monitor/
 │   ├── config.py           ← fuentes, componentes, pesos, umbrales, eventos
-│   ├── sources.py          ← descarga (BCRA, ArgentinaDatos, CSV manuales)
+│   ├── sources.py          ← descarga (BCRA, ArgentinaDatos, A3 Mercados)
 │   ├── indicators.py       ← series derivadas e IPD
 │   └── build.py            ← orquestador: python -m monitor.build
 ├── data/
 │   ├── monitor.json        ← lo que consume el tablero (generado)
 │   ├── panel_diario.csv    ← panel diario completo, para Excel/R/Stata (generado)
 │   ├── bcra_catalogo.csv   ← catálogo de variables del BCRA (generado)
-│   ├── series/*.csv        ← historia cruda de cada serie (generado)
-│   └── manual/*.csv        ← fuentes que se cargan a mano o desde una Google Sheet
+│   └── series/*.csv        ← historia cruda de cada serie (generado)
 └── tests/
 ```
 
@@ -61,9 +60,8 @@ python -m http.server               # y abrir http://localhost:8000
 | Dólar CCL | 2013 | diaria | ArgentinaDatos | automática |
 | Dólar MEP | 2018 | diaria | ArgentinaDatos | automática |
 | Brechas CCL, MEP y blue | 2011 | diaria | cálculo propio (CCL; antes de 2013, blue) | derivada |
-| Futuros de dólar: devaluación implícita e interés abierto | 2020 | diaria | A3 Mercados (API pública de precios de cierre) | automática; `data/manual/futuros_dolar.csv` para correcciones |
-| Compras de USD de personas humanas | 2003 | mensual | BCRA, anexo del Informe de Evolución del Mercado de Cambios | automática (semanal); `data/manual/compras_personas_humanas.csv` para correcciones |
-| Licitaciones del Tesoro (share dollar linked / USD) | — | por licitación | Secretaría de Finanzas | `data/manual/licitaciones_tesoro.csv` |
+| Futuros de dólar: devaluación implícita e interés abierto | 2020 | diaria | A3 Mercados (API pública de precios de cierre) | automática |
+| Compras de USD de personas humanas | 2003 | mensual | BCRA, anexo del Informe de Evolución del Mercado de Cambios | automática (semanal) |
 
 **Historia.** El IPD se publica desde 2003 (`IPD_PUBLICAR_DESDE`). Las series
 se descargan desde 1996, pero 1996–2002 sólo sirve como ventana de referencia:
@@ -72,11 +70,7 @@ puntos por semana y se desplomó con el corralito, y hay huecos en los datos.
 Desde 2003 hay 7 de los 9 componentes; la brecha se suma en 2011 y los futuros
 en 2020. El panel diario incluye la columna `ipd_n_componentes`.
 
-**Fuentes manuales.** Cada CSV trae en su encabezado el formato y de dónde
-sacar el dato. En equipo, lo más práctico suele ser llevarlas en una Google
-Sheet: publicala como CSV y poné el link en `MANUAL_SOURCES[...]["url"]` dentro
-de `monitor/config.py`. El pipeline la descarga en cada corrida y, si la descarga
-falla, conserva la copia local.
+Todas las fuentes son automáticas: no hay datos que cargar a mano.
 
 **IDs del BCRA.** Las variables se buscan con una expresión regular sobre su
 descripción. Después de la primera corrida conviene revisar
