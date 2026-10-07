@@ -19,40 +19,39 @@ START_DATE = "2019-01-01"
 # Fuentes diarias automáticas
 # ---------------------------------------------------------------------------
 # BCRA - API de Estadísticas Monetarias (v4, con fallback a v3).
-# Los IDs cambian poco, pero para no depender de ellos se busca cada variable
-# por una expresión regular sobre su descripción. Si `id` está definido se usa
-# ese y se ignora la regex. El catálogo completo queda en
-# data/bcra_catalogo.csv después de cada corrida para poder fijar los IDs.
+# IDs verificados contra el catálogo de la API v4 (oct-2026). Si `id` es None,
+# la variable se busca con la regex sobre su descripción. El catálogo completo
+# queda en data/bcra_catalogo.csv después de cada corrida.
 BCRA_VARIABLES = {
     "reservas": {
-        "id": None,
+        "id": 1,
         "regex": r"reservas internacionales",
         "label": "Reservas internacionales brutas",
         "unit": "millones de USD",
     },
     "tc_a3500": {
-        "id": None,
-        "regex": r"(?:mayorista.*3500|3500.*mayorista)",
+        "id": 5,
+        "regex": r"tipo de cambio mayorista de referencia",
         "label": "Tipo de cambio mayorista (Com. A3500)",
         "unit": "$ por USD",
     },
     "badlar": {
-        "id": None,
+        "id": 7,
         "regex": r"badlar.*privados",
-        "label": "Tasa BADLAR bancos privados",
+        "label": "Tasa BADLAR bancos privados (n.a.)",
         "unit": "% n.a.",
     },
     "tamar": {
-        "id": None,
+        "id": 44,
         "regex": r"tamar.*privados",
         "label": "Tasa TAMAR bancos privados",
         "unit": "% n.a.",
         "optional": True,
     },
     "depositos_usd": {
-        "id": None,
+        "id": 108,
         "regex": r"dep[oó]sitos.*(?:d[oó]lares|moneda extranjera)",
-        "label": "Depósitos en dólares",
+        "label": "Depósitos en dólares del sector privado",
         "unit": "millones de USD",
         "optional": True,
     },

@@ -153,10 +153,19 @@ def _last(s: pd.Series, lag_days: int = 0):
 
 
 def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
-                  licitaciones: pd.DataFrame, fetch_status: dict[str, str]) -> dict:
+                  licitaciones: pd.DataFrame, fetch_status: dict[str, str],
+                  raw: dict[str, pd.Series] | None = None) -> dict:
+    raw = raw or {}
     series_out = {}
     for key, (label, unit, source) in SERIES_META.items():
-        s = ipd["ipd"] if key == "ipd" else panel.get(key)
+        # Las series descargadas se publican sin el relleno del panel, para que
+        # la fecha del último dato sea la real.
+        if key == "ipd":
+            s = ipd["ipd"]
+        elif key in raw:
+            s = raw[key][raw[key].index >= panel.index.min()]
+        else:
+            s = panel.get(key)
         if s is None or s.dropna().empty:
             continue
         d_last, v_last = _last(s)
@@ -242,7 +251,7 @@ def run(offline: bool = False) -> dict:
     compras = indicators.monthly_fx_purchases(sources.manual_source("compras_personas_humanas"))
     licitaciones = indicators.auction_dollar_share(sources.manual_source("licitaciones_tesoro"))
 
-    payload = build_payload(panel, ipd, compras, licitaciones, status)
+    payload = build_payload(panel, ipd, compras, licitaciones, status, daily)
 
     # Panel diario completo, útil para análisis en Excel / R / Stata.
     out_panel = panel.copy()

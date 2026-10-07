@@ -42,7 +42,7 @@ def fake_api(monkeypatch, tmp_path):
 
     catalog = [
         {"idVariable": 1, "descripcion": "Reservas Internacionales del BCRA (en millones de dólares)"},
-        {"idVariable": 5, "descripcion": "Tipo de Cambio Mayorista ($ por USD) Comunicación A 3500 - Referencia"},
+        {"idVariable": 5, "descripcion": "Tipo de cambio mayorista de referencia"},
         {"idVariable": 7, "descripcion": "BADLAR en pesos de bancos privados (en % n.a.)"},
     ]
     by_id = {1: syn["reservas"], 5: syn["tc"], 7: syn["badlar"]}
@@ -52,6 +52,8 @@ def fake_api(monkeypatch, tmp_path):
             return {"status": 200, "results": catalog}
         if "/monetarias/" in url:
             var = int(url.rsplit("/", 1)[1])
+            if var not in by_id:
+                return {"status": 200, "results": []}
             desde, hasta = params["desde"], params["hasta"]
             det = [{"fecha": f, "valor": float(v)} for f, v in zip(fechas, by_id[var]) if desde <= f <= hasta]
             # formato v4: results -> [{idVariable, detalle}]
