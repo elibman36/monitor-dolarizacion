@@ -126,7 +126,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </div>
     <div class="card">
       <h2>IPD diario</h2>
-      <p class="note">Mayor a 0 = más presión que lo habitual. Las líneas verticales marcan elecciones y cambios de régimen.</p>
+      <p class="note">Mayor a 0 = más presión que lo habitual. Línea fina: dato diario; línea gruesa: promedio de 20 días hábiles. Las verticales marcan elecciones y episodios cambiarios.</p>
       <div class="chart tall" id="c-ipd" role="img" aria-label="Serie diaria del IPD"></div>
     </div>
   </section>
@@ -283,6 +283,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     }, extra);
   }
 
+  // Promedio móvil simple de n observaciones (para leer tendencias en rangos largos).
+  function movingAvg(pairs, n) {
+    const out = []; let sum = 0;
+    for (let i = 0; i < pairs.length; i++) {
+      sum += pairs[i][1];
+      if (i >= n) sum -= pairs[i - n][1];
+      if (i >= n - 1) out.push([pairs[i][0], sum / n]);
+    }
+    return out;
+  }
+  const isLong = (pairs) => pairs.length > 1 && (new Date(pairs[pairs.length - 1][0]) - new Date(pairs[0][0])) / 864e5 > 2 * 365;
+
   function eventLines(pairs) {
     if (!pairs.length) return [];
     const a = pairs[0][0], b = pairs[pairs.length - 1][0];
@@ -364,13 +376,28 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       return `${p.value[0]}<br><b>IPD ${nf(p.value[1], 2)}</b>` +
         (n != null ? `<br><span style="color:${css("--muted")}">${n} de ${nTot} componentes con datos</span>` : "");
     };
-    o.series = [lineSeries("IPD", data, css("--s1"), {
-      markLine: {
-        symbol: "none", silent: true,
-        lineStyle: { color: css("--axis"), type: "solid", width: 1 },
-        data: [{ yAxis: 0, label: { show: false } }, ...eventLines(data)],
-      },
-    })];
+    o.grid.top = 32;
+    o.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } };
+    const ma = movingAvg(DATA.ipd.data, 20);
+    const maMap = new Map(ma);
+    const baseTooltip = o.tooltip.formatter;
+    o.tooltip.formatter = (ps) => {
+      const p = ps.find((x) => x.seriesName === "Diario") || ps[0];
+      const m = maMap.get(p.value[0]);
+      return baseTooltip([p]) + (m != null ? `<br>Promedio 20 días: ${nf(m, 2)}` : "");
+    };
+    o.series = [
+      lineSeries("Diario", data, css("--s1"), {
+        lineStyle: { width: 1, color: css("--s1"), opacity: 0.35 },
+        itemStyle: { color: css("--s1"), opacity: 0.35 },
+        markLine: {
+          symbol: "none", silent: true,
+          lineStyle: { color: css("--axis"), type: "solid", width: 1 },
+          data: [{ yAxis: 0, label: { show: false } }, ...eventLines(data)],
+        },
+      }),
+      lineSeries("Promedio 20 días", cut(ma), css("--s1"), { z: 3 }),
+    ];
     c.setOption(o);
   }
 
@@ -404,9 +431,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     o.tooltip.valueFormatter = (v) => nf(v, 2);
     o.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } };
     const cols = [css("--s1"), css("--s2")];
+    const long = isLong(cut(DATA.ipd.data));
+    if (long) o.grid.top = 56;
     o.series = keys.map((k, i) => {
-      const d = cut(DATA.ipd.blocks[k].data);
-      return lineSeries(DATA.ipd.blocks[k].label, d, cols[i % cols.length], {
+      const full = DATA.ipd.blocks[k].data;
+      const d = cut(long ? movingAvg(full, 20) : full);
+      return lineSeries(DATA.ipd.blocks[k].label + (long ? " (prom. 20 días)" : ""), d, cols[i % cols.length], {
         endLabel: { show: false },
         markLine: i === 0 ? { symbol: "none", silent: true, lineStyle: { color: css("--axis"), type: "solid", width: 1 }, data: [{ yAxis: 0, label: { show: false } }] } : undefined,
       });
