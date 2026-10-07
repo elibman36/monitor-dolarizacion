@@ -132,18 +132,28 @@ def test_failed_source_keeps_cache(fake_api, monkeypatch):
 
 def test_implied_devaluation():
     fut = pd.DataFrame({
-        "fecha": ["2026-01-05", "2026-01-05"],
-        "contrato": ["DLR/ENE26", "DLR/FEB26"],
-        "vencimiento": ["2026-01-30", "2026-02-27"],
-        "precio_ajuste": [1050.0, 1080.0],
-        "interes_abierto": [100, 200],
+        "fecha": ["2026-01-05"] * 3,
+        "contrato": ["DLR012026", "DLR022026", "DLR042026"],
+        "vencimiento": ["2026-01-15", "2026-02-27", "2026-04-30"],
+        "precio_ajuste": [1010.0, 1030.0, 1060.0],
+        "interes_abierto": [100, 200, 50],
+        "tasa_implicita_a3": [np.nan, 20.0, 26.0],
     })
     spot = pd.Series([1000.0], index=pd.to_datetime(["2026-01-05"]))
     out = indicators.implied_devaluation(fut, spot)
-    # ENE26 vence en 25 días (>= 20): ese es el contrato elegido.
-    expected = ((1050 / 1000) ** (365 / 25) - 1) * 100
+    # ENE26 (10 días) se descarta; 90 días cae entre FEB26 (53 d) y ABR26 (115 d).
+    expected = 20.0 + (90 - 53) / (115 - 53) * 6.0
     assert out["deval_implicita"].iloc[0] == pytest.approx(expected)
-    assert out["futuros_interes_abierto"].iloc[0] == 300
+    assert out["deval_implicita_mensual"].iloc[0] == pytest.approx(expected * 30 / 365)
+    assert out["futuros_interes_abierto"].iloc[0] == 350
+
+
+def test_implied_devaluation_sin_tasa_a3():
+    fut = pd.DataFrame({"fecha": ["2026-01-05"], "contrato": ["DLR042026"],
+                        "vencimiento": ["2026-04-05"], "precio_ajuste": [1050.0]})
+    spot = pd.Series([1000.0], index=pd.to_datetime(["2026-01-05"]))
+    out = indicators.implied_devaluation(fut, spot)
+    assert out["deval_implicita"].iloc[0] == pytest.approx(5.0 * 365 / 90)
 
 
 def test_weighted_mean_requires_min_weight():

@@ -59,7 +59,7 @@ python -m http.server               # y abrir http://localhost:8000
 | Dólar oficial, mayorista, MEP, CCL y blue | diaria | [ArgentinaDatos](https://argentinadatos.com) | automática |
 | Riesgo país (EMBI) | diaria | ArgentinaDatos | automática |
 | Brechas CCL, MEP y blue | diaria | cálculo propio | derivada |
-| Futuros de dólar: devaluación implícita e interés abierto | diaria | A3 Mercados | `data/manual/futuros_dolar.csv` |
+| Futuros de dólar: devaluación implícita e interés abierto | diaria | A3 Mercados (API pública de precios de cierre) | automática; `data/manual/futuros_dolar.csv` para correcciones |
 | Compras de USD de personas humanas | mensual | BCRA, Informe del Mercado de Cambios y Balance Cambiario | `data/manual/compras_personas_humanas.csv` |
 | Licitaciones del Tesoro (share dollar linked / USD) | por licitación | Secretaría de Finanzas | `data/manual/licitaciones_tesoro.csv` |
 

@@ -39,11 +39,13 @@ def official_rate(df: pd.DataFrame) -> pd.Series:
 
 
 def implied_devaluation(futuros: pd.DataFrame, spot: pd.Series) -> pd.DataFrame:
-    """Devaluación implícita anualizada y tasa mensual equivalente.
+    """Devaluación implícita en futuros a plazo constante.
 
-    Para cada fecha se toma el primer contrato con al menos
-    FUTUROS_PLAZO_MINIMO_DIAS de plazo y se compara contra el A3500 del día:
-        TNA implícita = (F / S) ^ (365 / días) - 1   (efectiva anual)
+    Para cada fecha se toma la tasa nominal anual (TNA) implícita de cada
+    contrato -la que publica A3 (`tasa_implicita_a3`) o, si falta,
+    (F / S - 1) * 365 / días contra el A3500- y se interpola linealmente en
+    días al plazo FUTUROS_PLAZO_CONSTANTE_DIAS. Usar TNA y no tasa efectiva
+    evita que contratos muy cortos exploten al anualizar.
     También suma el interés abierto de todos los contratos.
     """
     cols = ["deval_implicita", "deval_implicita_mensual", "futuros_interes_abierto"]
@@ -54,22 +56,27 @@ def implied_devaluation(futuros: pd.DataFrame, spot: pd.Series) -> pd.DataFrame:
     f["vencimiento"] = pd.to_datetime(f["vencimiento"])
     f["precio_ajuste"] = pd.to_numeric(f["precio_ajuste"], errors="coerce")
     f["dias"] = (f["vencimiento"] - f["fecha"]).dt.days
+    s = spot.reindex(f["fecha"]).to_numpy()
+    tna_propia = (f["precio_ajuste"].to_numpy() / s - 1) * 365 / f["dias"].to_numpy() * 100
+    tna_a3 = pd.to_numeric(f["tasa_implicita_a3"], errors="coerce") if "tasa_implicita_a3" in f \
+        else pd.Series(np.nan, index=f.index)
+    f["tna"] = tna_a3.fillna(pd.Series(tna_propia, index=f.index))
+    if "interes_abierto" not in f:
+        f["interes_abierto"] = np.nan
+    f["interes_abierto"] = pd.to_numeric(f["interes_abierto"], errors="coerce")
+
+    target = config.FUTUROS_PLAZO_CONSTANTE_DIAS
+    minimo = config.FUTUROS_PLAZO_MINIMO_DIAS
     rows = []
     for fecha, g in f.groupby("fecha"):
-        s = spot.get(fecha, np.nan)
-        oi = pd.to_numeric(g.get("interes_abierto"), errors="coerce").sum(min_count=1) \
-            if "interes_abierto" in g else np.nan
-        elegibles = g[(g["dias"] >= config.FUTUROS_PLAZO_MINIMO_DIAS) & g["precio_ajuste"].notna()]
-        if elegibles.empty or not np.isfinite(s) or s <= 0:
+        oi = g["interes_abierto"].sum(min_count=1)
+        g = g[(g["dias"] >= minimo) & g["tna"].notna()].sort_values("dias")
+        if g.empty:
             rows.append((fecha, np.nan, np.nan, oi))
             continue
-        c = elegibles.sort_values("dias").iloc[0]
-        ratio = c["precio_ajuste"] / s
-        anual = (ratio ** (365.0 / c["dias"]) - 1) * 100
-        mensual = (ratio ** (30.0 / c["dias"]) - 1) * 100
-        rows.append((fecha, anual, mensual, oi))
-    out = pd.DataFrame(rows, columns=["fecha", *cols]).set_index("fecha").sort_index()
-    return out
+        tna = float(np.interp(target, g["dias"], g["tna"]))  # extremos: valor del contrato más cercano
+        rows.append((fecha, tna, tna * 30 / 365, oi))
+    return pd.DataFrame(rows, columns=["fecha", *cols]).set_index("fecha").sort_index()
 
 
 def derived_series(df: pd.DataFrame, futuros: pd.DataFrame) -> pd.DataFrame:

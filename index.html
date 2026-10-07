@@ -109,7 +109,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <div class="seg" id="range" role="group" aria-label="Período">
         <button data-r="90">3M</button><button data-r="182">6M</button><button data-r="365" aria-pressed="true">1A</button><button data-r="730">2A</button><button data-r="1825">5A</button><button data-r="0">Todo</button>
       </div>
-      <a class="btn" href="data/panel_diario.csv" download>Descargar CSV</a>
+      <a class="btn" href="https://github.com/elibman36/monitor-dolarizacion/blob/main/data/panel_diario.csv" target="_blank" rel="noopener">Datos (CSV)</a>
       <button class="btn" id="theme" type="button" aria-label="Cambiar tema">◐</button>
     </div>
   </header>
@@ -180,7 +180,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <p>El IPD adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza con un z-score móvil y se promedia dentro de dos bloques:</p>
     <ul>
       <li><b>Presión cambiaria (EMP):</b> depreciación del oficial A3500 en 5 días, pérdida de reservas brutas en 5 días y suba de tasas en pesos (TAMAR/BADLAR) en 5 días, como medida de la defensa del peso.</li>
-      <li><b>Dolarización de portafolios:</b> nivel de la brecha CCL/oficial, suba del riesgo país en 5 días, devaluación implícita en futuros de A3 Mercados y crecimiento de los depósitos en dólares.</li>
+      <li><b>Dolarización de portafolios:</b> nivel de la brecha CCL/oficial, suba del riesgo país en 5 días, devaluación implícita en los futuros de A3 Mercados (TNA a 90 días) y crecimiento de los depósitos en dólares.</li>
     </ul>
     <p>Si falta un componente, su peso se reparte entre los demás. El índice se publica cuando hay datos para al menos la mitad del peso. El semáforo usa el percentil del IPD en los últimos 2 años. Las compras de personas humanas y las licitaciones se muestran aparte porque se publican con menor frecuencia y rezago.</p>
     <p class="note">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
@@ -206,7 +206,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     { title: "Riesgo país", keys: ["riesgo_pais"], unit: "pb" },
     { title: "Reservas internacionales brutas", keys: ["reservas"], unit: "millones de USD" },
     { title: "Tasa en pesos (TAMAR / BADLAR)", keys: ["tasa"], unit: "% n.a." },
-    { title: "Devaluación implícita en futuros", keys: ["deval_implicita"], unit: "% efectivo anual" },
+    { title: "Devaluación implícita en futuros (90 días)", keys: ["deval_implicita"], unit: "% TNA" },
     { title: "Interés abierto en futuros de dólar", keys: ["futuros_interes_abierto"], unit: "contratos" },
     { title: "Depósitos en dólares", keys: ["depositos_usd"], unit: "millones de USD" },
   ];

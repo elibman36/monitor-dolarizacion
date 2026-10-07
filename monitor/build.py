@@ -147,8 +147,8 @@ SERIES_META = {
     "reservas": ("Reservas internacionales brutas", "millones de USD", "BCRA"),
     "tasa": ("Tasa de referencia (TAMAR / BADLAR privados)", "% n.a.", "BCRA"),
     "depositos_usd": ("Depósitos en dólares", "millones de USD", "BCRA"),
-    "deval_implicita": ("Devaluación implícita en futuros (anualizada)", "% e.a.", "A3 Mercados / cálculo propio"),
-    "deval_implicita_mensual": ("Devaluación implícita en futuros (mensual)", "%", "A3 Mercados / cálculo propio"),
+    "deval_implicita": ("Devaluación implícita en futuros a 90 días", "% TNA", "A3 Mercados"),
+    "deval_implicita_mensual": ("Devaluación mensual implícita en futuros (90 días)", "% mensual", "A3 Mercados"),
     "futuros_interes_abierto": ("Interés abierto futuros de dólar", "contratos", "A3 Mercados"),
 }
 

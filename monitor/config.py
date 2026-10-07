@@ -99,8 +99,9 @@ MANUAL_SOURCES = {
 # Primer día que se pide a la API de A3 (antes de 2021 no devuelve datos).
 FUTUROS_START_DATE = "2021-01-01"
 
-# Plazo mínimo (días corridos) del contrato de futuros usado para la
-# devaluación implícita: se toma el primer vencimiento con al menos este plazo.
+# Devaluación implícita: TNA de los futuros interpolada a un plazo constante.
+# Se descartan contratos con menos de FUTUROS_PLAZO_MINIMO_DIAS (muy ruidosos).
+FUTUROS_PLAZO_CONSTANTE_DIAS = 90
 FUTUROS_PLAZO_MINIMO_DIAS = 20
 
 # ---------------------------------------------------------------------------
