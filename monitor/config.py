@@ -133,6 +133,14 @@ IPD_HORIZON = 5            # días hábiles para variaciones (≈ 1 semana)
 IPD_ZSCORE_WINDOW = 504    # ventana móvil para estandarizar (≈ 2 años)
 IPD_ZSCORE_MIN_OBS = 120   # mínimo de observaciones para calcular el z-score
 IPD_Z_CLIP = 4.0           # recorte de outliers
+# Estandarización: "robusto" usa mediana y MAD (desvío absoluto mediano x 1,4826)
+# de la ventana; "clasico", media y desvío estándar. La robusta evita que un
+# episodio extremo (p. ej. la devaluación de dic-23) infle la escala durante
+# dos años y haga parecer chicos los movimientos siguientes.
+IPD_ZSCORE_METODO = "robusto"
+# Volatilidad cambiaria: desvío de las variaciones diarias en esta ventana
+# (días hábiles), anualizado.
+IPD_VOL_VENTANA = 20
 IPD_MIN_WEIGHT_SHARE = 0.4 # peso mínimo disponible para publicar el índice
 
 IPD_BLOCKS = {
@@ -142,6 +150,8 @@ IPD_BLOCKS = {
         "components": {
             "tc_a3500":  {"transform": "dlog",  "sign": +1, "weight": 1.0,
                           "label": "Depreciación del oficial"},
+            "vol_oficial": {"transform": "level", "sign": +1, "weight": 1.0,
+                            "label": "Volatilidad del oficial"},
             "reservas":  {"transform": "dlog",  "sign": -1, "weight": 1.0,
                           "label": "Pérdida de reservas"},
             "tasa":      {"transform": "diff",  "sign": +1, "weight": 1.0,
@@ -154,6 +164,8 @@ IPD_BLOCKS = {
         "components": {
             "brecha_ccl":  {"transform": "level", "sign": +1, "weight": 1.0,
                             "label": "Brecha CCL / oficial"},
+            "vol_ccl":     {"transform": "level", "sign": +1, "weight": 1.0,
+                            "label": "Volatilidad del CCL"},
             "riesgo_pais": {"transform": "diff",  "sign": +1, "weight": 1.0,
                             "label": "Suba del riesgo país"},
             "deval_implicita": {"transform": "level", "sign": +1, "weight": 1.0,

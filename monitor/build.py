@@ -217,6 +217,8 @@ SERIES_META = {
     "usd_blue": ("Dólar blue", "$ por USD", "ArgentinaDatos"),
     "brecha_ccl": ("Brecha CCL / oficial", "%", "Cálculo propio"),
     "brecha_mep": ("Brecha MEP / oficial", "%", "Cálculo propio"),
+    "vol_oficial": ("Volatilidad del oficial (20 días, anualizada)", "%", "Cálculo propio"),
+    "vol_ccl": ("Volatilidad del CCL (20 días, anualizada)", "%", "Cálculo propio"),
     "riesgo_pais": ("Riesgo país", "pb", "ArgentinaDatos (JP Morgan EMBI)"),
     "reservas": ("Reservas internacionales brutas", "millones de USD", "BCRA"),
     "tasa": ("Tasa BADLAR bancos privados", "% n.a.", "BCRA"),

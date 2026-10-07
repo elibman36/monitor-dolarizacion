@@ -91,18 +91,23 @@ de peso cada uno:
 | Bloque | Componente | Transformación | Signo |
 |---|---|---|---|
 | Presión cambiaria (EMP) | Tipo de cambio A3500 | Δlog 5 días | + |
+| | Volatilidad del oficial | desvío de variaciones diarias, 20 días, anualizado | + |
 | | Reservas brutas | Δlog 5 días | − |
 | | Tasa BADLAR | Δ 5 días | + |
 | Dolarización de portafolios | Brecha CCL / oficial | nivel | + |
+| | Volatilidad del CCL | desvío de variaciones diarias, 20 días, anualizado | + |
 | | Riesgo país | Δ 5 días | + |
 | | Devaluación implícita en futuros | nivel | + |
 | | Depósitos en USD (peso ½) | Δlog 5 días | + |
 
 El cálculo sigue estos pasos:
 
-1. **Estandarización.** Cada componente pasa a z-score móvil sobre 504 días
-   hábiles (unos 2 años), recortado a ±4. Esto equivale a ponderar por la
-   inversa del desvío, como en el EMP clásico.
+1. **Estandarización.** Cada componente se estandariza contra los últimos 504
+   días hábiles (unos 2 años) con mediana y MAD (desvío absoluto mediano ×
+   1,4826), recortado a ±4. Equivale a ponderar por la inversa de la
+   dispersión, como en el EMP clásico, pero sin que un episodio extremo (la
+   devaluación de dic-23) infle la escala durante dos años. La versión con
+   media y desvío estándar sigue disponible (`IPD_ZSCORE_METODO = "clasico"`).
 2. **Promedio ponderado.** Se promedia dentro de cada bloque y después entre
    bloques. Si falta un componente, su peso se reparte entre los demás. El
    índice sólo se publica si está disponible al menos el 40% del peso.

@@ -193,10 +193,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <h2 class="section-title">Metodología</h2>
   <section class="card method">
-    <p>El IPD adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza con un z-score móvil y se promedia dentro de dos bloques:</p>
+    <p>El IPD adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes) y se promedia dentro de dos bloques:</p>
     <ul>
-      <li><b>Presión cambiaria (EMP):</b> depreciación del oficial A3500 en 5 días, pérdida de reservas brutas en 5 días y suba de la tasa BADLAR en 5 días, como medida de la defensa del peso.</li>
-      <li><b>Dolarización de portafolios:</b> nivel de la brecha CCL/oficial, suba del riesgo país en 5 días, devaluación implícita en los futuros de A3 Mercados (TNA a 90 días) y crecimiento de los depósitos en dólares.</li>
+      <li><b>Presión cambiaria (EMP):</b> depreciación del oficial A3500 en 5 días, volatilidad del oficial (20 días), pérdida de reservas brutas en 5 días y suba de la tasa BADLAR en 5 días, como medida de la defensa del peso.</li>
+      <li><b>Dolarización de portafolios:</b> nivel de la brecha CCL/oficial, volatilidad del CCL (20 días), suba del riesgo país en 5 días, devaluación implícita en los futuros de A3 Mercados (TNA a 90 días) y crecimiento de los depósitos en dólares.</li>
     </ul>
     <p>La serie arranca en los noventa, pero no todos los componentes existen desde el inicio: las reservas están desde 1996, la BADLAR desde 1999, el A3500 desde 2002 y la brecha, los depósitos en dólares y los futuros desde que sus fuentes publican datos. En los primeros años el IPD descansa sobre menos componentes; el tooltip del gráfico indica cuántos había cada día.</p>
     <p>Si falta un componente, su peso se reparte entre los demás. El IPD se publica cuando hay datos para al menos el 40% del peso.</p>
@@ -222,6 +222,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   const MULTIPLES = [
     { title: "Tipo de cambio", keys: ["tc_oficial_ref", "usd_mep", "usd_ccl"], names: ["Oficial (A3500)", "MEP", "CCL"], unit: "$ por USD" },
     { title: "Brecha CCL / oficial", keys: ["brecha_ccl"], unit: "%" },
+    { title: "Volatilidad cambiaria (20 días)", keys: ["vol_oficial", "vol_ccl"], names: ["Oficial", "CCL"], unit: "% anualizada" },
     { title: "Riesgo país", keys: ["riesgo_pais"], unit: "pb" },
     { title: "Reservas internacionales brutas", keys: ["reservas"], unit: "millones de USD" },
     { title: "Tasa BADLAR (bancos privados)", keys: ["tasa"], unit: "% n.a." },

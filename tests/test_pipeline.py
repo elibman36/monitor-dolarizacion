@@ -218,3 +218,17 @@ def test_pressure_index_scale():
     assert indicators.status_for(95.0)[0] == "deprec_fuerte"
     assert indicators.status_for(100.0)[0] == "deprec_fuerte"
     assert indicators.status_for(3.0)[0] == "aprec_fuerte"
+
+
+def test_robust_z_ignora_outliers():
+    rng = np.random.default_rng(1)
+    x = pd.Series(np.r_[rng.standard_normal(200), [80.0], rng.standard_normal(40), [3.0]])
+    z = indicators.rolling_z(x, window=300, min_obs=50, clip=4.0)
+    # Con media/desvío, el 80 inflaría la escala y el 3 quedaría cerca de 0,5.
+    assert z.iloc[-1] > 2.5
+
+
+def test_realized_vol():
+    s = pd.Series(np.exp(np.cumsum([0.01, -0.01] * 30)))
+    v = indicators.realized_vol(s, 20)
+    assert v.iloc[-1] == pytest.approx(0.01 * np.sqrt(20 / 19) * np.sqrt(252) * 100, rel=1e-6)

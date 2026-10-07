@@ -93,6 +93,9 @@ def derived_series(df: pd.DataFrame, futuros: pd.DataFrame) -> pd.DataFrame:
             blue = (df["usd_blue"] / oficial - 1) * 100
             if primer_ccl is not None:
                 out.loc[out.index < primer_ccl, "brecha_ccl"] = blue[out.index < primer_ccl]
+    out["vol_oficial"] = realized_vol(oficial, config.IPD_VOL_VENTANA)
+    if "usd_ccl" in df:
+        out["vol_ccl"] = realized_vol(df["usd_ccl"], config.IPD_VOL_VENTANA)
     if "usd_mep" in df:
         out["brecha_mep"] = (df["usd_mep"] / oficial - 1) * 100
     if "usd_blue" in df:
@@ -128,9 +131,20 @@ def transform(s: pd.Series, kind: str, horizon: int) -> pd.Series:
 
 
 def rolling_z(x: pd.Series, window: int, min_obs: int, clip: float) -> pd.Series:
-    roll = x.rolling(window, min_periods=min_obs)
-    z = (x - roll.mean()) / roll.std()
+    if config.IPD_ZSCORE_METODO == "robusto":
+        med = x.rolling(window, min_periods=min_obs).median()
+        mad = (x - med).abs().rolling(window, min_periods=min_obs).median() * 1.4826
+        z = (x - med) / mad.replace(0, np.nan)
+    else:
+        roll = x.rolling(window, min_periods=min_obs)
+        z = (x - roll.mean()) / roll.std()
     return z.clip(-clip, clip)
+
+
+def realized_vol(s: pd.Series, window: int) -> pd.Series:
+    """Volatilidad anualizada (%) de las variaciones diarias en `window` días hábiles."""
+    r = np.log(s).diff()
+    return r.rolling(window, min_periods=max(5, int(window * 0.75))).std() * math.sqrt(252) * 100
 
 
 def _weighted_mean(frame: pd.DataFrame, weights: dict[str, float]) -> pd.Series:
