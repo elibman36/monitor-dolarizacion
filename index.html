@@ -87,6 +87,7 @@ h2 { font-size: 16px; margin: 0 0 2px; }
 .tile .delta .up { color: var(--up-bad); } .tile .delta .down { color: var(--down-good); }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+.card-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
 .chart { width: 100%; height: 300px; }
 .chart.tall { height: 360px; }
 .chart.small { height: 220px; }
@@ -141,7 +142,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <div class="kv" id="hero-kv"></div>
     </div>
     <div class="card">
-      <h2>Evolución del índice (0–100)</h2>
+      <div class="card-head">
+        <h2>Evolución del índice (0–100)</h2>
+        <div class="seg" id="idx-freq" role="group" aria-label="Frecuencia del gráfico">
+          <button data-f="d" aria-pressed="true">Diario</button><button data-f="w">Semanal</button><button data-f="m">Mensual</button>
+        </div>
+      </div>
       <p class="note" id="idx-note">Promedio de 10 días hábiles del IPD llevado a escala 0–100. El color de la línea indica el tramo; las verticales marcan elecciones y episodios cambiarios.</p>
       <div class="chart tall" id="c-idx" role="img" aria-label="Índice de presión cambiaria 0 a 100"></div>
     </div>
@@ -259,6 +265,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     rangeDays = +b.dataset.r;
     renderCharts();
   }));
+
+  let idxFreq = "d";
+  try { idxFreq = localStorage.getItem("md-idx-freq") || "d"; } catch (e) {}
+  document.querySelectorAll("#idx-freq button").forEach((b) => {
+    b.setAttribute("aria-pressed", String(b.dataset.f === idxFreq));
+    b.addEventListener("click", () => {
+      idxFreq = b.dataset.f;
+      document.querySelectorAll("#idx-freq button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+      try { localStorage.setItem("md-idx-freq", idxFreq); } catch (e) {}
+      if (DATA) renderIndex();
+    });
+  });
 
   function cut(pairs) {
     if (!rangeDays || !pairs.length) return pairs;
@@ -428,16 +446,22 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   function renderIndex() {
     let data = cut(DATA.ipd.indice || []);
     if (!data.length) return emptyState("c-idx", "Todavía no hay historia suficiente para calcular el índice.");
-    // En rangos de más de 5 años, promedio mensual para que se lean los ciclos.
-    const mensual = (new Date(data[data.length - 1][0]) - new Date(data[0][0])) / 864e5 > 5 * 365;
-    if (mensual) {
+    // Diario: el dato publicado (promedio de 10 días hábiles). Semanal y mensual: promedios.
+    const keyOf = { w: (d) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return x.toISOString().slice(0, 10); },
+                    m: (d) => d.slice(0, 7) + "-01" }[idxFreq];
+    if (keyOf) {
       const acc = new Map();
-      data.forEach(([d, v]) => { const m = d.slice(0, 7); const a = acc.get(m) || [0, 0]; a[0] += v; a[1]++; acc.set(m, a); });
-      data = [...acc].map(([m, [s, n]]) => [m + "-15", s / n]);
+      data.forEach(([d, v]) => { const k = keyOf(d); const a = acc.get(k) || [0, 0]; a[0] += v; a[1]++; acc.set(k, a); });
+      data = [...acc].map(([k, [s, n]]) => [k, s / n]);
     }
-    document.getElementById("idx-note").textContent = mensual
-      ? "Promedio mensual del índice (en rangos de más de 5 años). El color de la línea indica el tramo; las verticales marcan episodios cambiarios."
-      : "Promedio de 10 días hábiles del IPD llevado a escala 0–100. El color de la línea indica el tramo; las verticales marcan elecciones y episodios cambiarios.";
+    const notas = {
+      d: "Dato diario: promedio de 10 días hábiles del IPD llevado a escala 0–100.",
+      w: "Promedio semanal del índice (cada punto es la semana que empieza ese lunes).",
+      m: "Promedio mensual del índice.",
+    };
+    document.getElementById("idx-note").textContent = notas[idxFreq] +
+      " El color indica el tramo; las verticales marcan elecciones y episodios cambiarios. Arrastrá la barra inferior o usá la rueda del mouse para hacer zoom.";
+    const fmtFecha = (d) => idxFreq === "m" ? d.slice(0, 7) + " (promedio)" : idxFreq === "w" ? `Semana del ${d}` : d;
     const c = mount("c-idx");
     const o = base();
     o.yAxis.scale = false; o.yAxis.min = 0; o.yAxis.max = 100; o.yAxis.interval = 25;
@@ -445,7 +469,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const tramoDe = (v) => tramos.find((tr) => v >= tr.from && v < tr.to) || tramos[tramos.length - 1];
     o.tooltip.formatter = (ps) => {
       const p = ps[0]; const tr = tramoDe(p.value[1]);
-      const fecha = mensual ? p.value[0].slice(0, 7) + " (promedio)" : p.value[0];
+      const fecha = fmtFecha(p.value[0]);
       return `${fecha}<br><b>${nf(p.value[1], 0)}/100</b><br><span style="color:${css("--muted")}">${tr ? tr.label : ""}</span>`;
     };
     o.visualMap = {
@@ -465,8 +489,16 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       },
     });
     // Sin color fijo: lo pone el visualMap según el tramo.
-    serie.lineStyle = { width: 2 }; delete serie.itemStyle;
+    serie.lineStyle = { width: idxFreq === "d" && data.length > 1500 ? 1.5 : 2 }; delete serie.itemStyle;
     o.series = [serie];
+    o.grid.bottom = 44;
+    o.dataZoom = [
+      { type: "inside", xAxisIndex: 0, filterMode: "none" },
+      { type: "slider", xAxisIndex: 0, filterMode: "none", height: 18, bottom: 6, showDetail: false,
+        borderColor: css("--border"), fillerColor: css("--wash"), backgroundColor: "transparent",
+        dataBackground: { lineStyle: { color: css("--axis") }, areaStyle: { color: css("--wash") } },
+        handleStyle: { color: css("--surface"), borderColor: css("--axis") }, moveHandleStyle: { color: css("--axis") } },
+    ];
     c.setOption(o);
   }
 
