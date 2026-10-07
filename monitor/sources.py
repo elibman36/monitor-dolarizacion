@@ -26,6 +26,7 @@ BCRA_BASES = [
     "https://api.bcra.gob.ar/estadisticas/v3.0/monetarias",
 ]
 ARGENTINADATOS_BASE = "https://api.argentinadatos.com/v1"
+A3_CLOSING_PRICES = "https://apicem.matbarofex.com.ar/api/v2/closing-prices"
 USER_AGENT = "monitor-dolarizacion/1.0 (+https://github.com/elibman36/monitor-dolarizacion)"
 
 _session = requests.Session()
@@ -163,6 +164,62 @@ def argentinadatos_riesgo_pais(name: str = "riesgo_pais") -> pd.Series:
     payload = get_json(f"{ARGENTINADATOS_BASE}/finanzas/indices/riesgo-pais")
     s = _to_series(payload, "fecha", "valor", name)
     return s[s.index >= config.START_DATE]
+
+
+# ---------------------------------------------------------------------------
+# A3 Mercados (ex Matba-Rofex) - futuros de dólar
+# ---------------------------------------------------------------------------
+
+def _a3_expiry(symbol: str) -> pd.Timestamp | None:
+    """DLR102026 -> último día hábil de octubre de 2026 (vencimiento de A3)."""
+    m = re.fullmatch(r"DLR(\d{2})(\d{4})", symbol)
+    if not m:
+        return None
+    month_start = pd.Timestamp(year=int(m.group(2)), month=int(m.group(1)), day=1)
+    return month_start + pd.offsets.BMonthEnd(0)
+
+
+def a3_futuros_dolar(desde: str, hasta: str | None = None) -> pd.DataFrame:
+    """Precios de ajuste e interés abierto de los futuros mensuales de dólar.
+
+    Devuelve una fila por fecha y contrato con las columnas que usa
+    indicators.implied_devaluation(). La API pagina de a `pageSize` filas.
+    """
+    hasta = hasta or date.today().isoformat()
+    rows: list[dict] = []
+    for year in range(int(desde[:4]), int(hasta[:4]) + 1):
+        a, b = max(desde, f"{year}-01-01"), min(hasta, f"{year}-12-31")
+        if a > b:
+            continue
+        page = 1
+        while True:
+            payload = get_json(A3_CLOSING_PRICES, params={
+                "product": "DLR", "segment": "Monedas", "type": "FUT",
+                "excludeEmptyVol": "false", "from": a, "to": b,
+                "page": page, "pageSize": 1000, "_ds": 1,
+            })
+            data = payload.get("data", []) or []
+            for x in data:
+                venc = _a3_expiry(str(x.get("symbol", "")))
+                if venc is None:
+                    continue
+                rows.append({
+                    "fecha": str(x["dateTime"])[:10],
+                    "contrato": x["symbol"],
+                    "vencimiento": venc.strftime("%Y-%m-%d"),
+                    "precio_ajuste": x.get("settlement"),
+                    "interes_abierto": x.get("openInterest"),
+                    "volumen": x.get("volume"),
+                    "tasa_implicita_a3": x.get("impliedRate"),
+                })
+            size = int(payload.get("pageSize") or len(data) or 1)
+            total = int(payload.get("totalEntries") or 0)
+            if not data or page * size >= total:
+                break
+            page += 1
+            time.sleep(0.3)
+    return pd.DataFrame(rows, columns=["fecha", "contrato", "vencimiento", "precio_ajuste",
+                                       "interes_abierto", "volumen", "tasa_implicita_a3"])
 
 
 # ---------------------------------------------------------------------------

@@ -62,6 +62,34 @@ def refresh(key: str, fetch) -> tuple[pd.Series, str]:
         return cached, f"error: {exc}"
 
 
+FUTURES_CACHE = "futuros_dolar"
+
+
+def load_futures(offline: bool) -> pd.DataFrame:
+    """Futuros de A3 (descarga incremental) + correcciones manuales."""
+    path = config.SERIES_DIR / f"{FUTURES_CACHE}.csv"
+    cached = pd.read_csv(path) if path.exists() else pd.DataFrame()
+    fut = cached
+    if not offline:
+        # Se re-descargan los últimos 10 días por si A3 corrige ajustes.
+        desde = config.FUTUROS_START_DATE
+        if not cached.empty:
+            desde = (pd.to_datetime(cached["fecha"]).max() - pd.Timedelta(days=10)).strftime("%Y-%m-%d")
+        try:
+            fresh = sources.a3_futuros_dolar(desde)
+            fut = pd.concat([cached, fresh]).drop_duplicates(["fecha", "contrato"], keep="last")
+            fut = fut.sort_values(["fecha", "vencimiento"])
+            config.SERIES_DIR.mkdir(parents=True, exist_ok=True)
+            fut.to_csv(path, index=False)
+            log.info("A3: %d filas de futuros (%d nuevas)", len(fut), len(fresh))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("A3 no disponible (%s); uso copia guardada (%d filas)", exc, len(cached))
+    manual = sources.manual_source("futuros_dolar")
+    if not manual.empty:
+        fut = pd.concat([fut, manual]).drop_duplicates(["fecha", "contrato"], keep="last")
+    return fut
+
+
 def fetch_all(offline: bool) -> tuple[dict[str, pd.Series], dict[str, str]]:
     series: dict[str, pd.Series] = {}
     status: dict[str, str] = {}
@@ -244,7 +272,7 @@ def run(offline: bool = False) -> dict:
     index = indicators.business_days(daily)
     panel = indicators.align(daily, index)
 
-    futuros = sources.manual_source("futuros_dolar")
+    futuros = load_futures(offline)
     panel = indicators.derived_series(panel, futuros)
     ipd = indicators.compute_ipd(panel)
 

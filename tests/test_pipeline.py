@@ -58,6 +58,22 @@ def fake_api(monkeypatch, tmp_path):
             det = [{"fecha": f, "valor": float(v)} for f, v in zip(fechas, by_id[var]) if desde <= f <= hasta]
             # formato v4: results -> [{idVariable, detalle}]
             return {"status": 200, "results": [{"idVariable": var, "detalle": det}]}
+        if url == sources.A3_CLOSING_PRICES:
+            # Un contrato por mes, vence a fin del mes siguiente; 2 páginas de 100.
+            if params["from"] < "2025-01-01":
+                return {"pageSize": 100, "page": 1, "totalEntries": 0, "data": []}
+            rows = []
+            for f, spot in zip(fechas, syn["tc"]):
+                if not (params["from"] <= f <= params["to"]):
+                    continue
+                venc = pd.Timestamp(f) + pd.offsets.MonthEnd(2)
+                rows.append({"dateTime": f + "T00:00:00.000Z",
+                             "symbol": f"DLR{venc.month:02d}{venc.year}",
+                             "settlement": float(spot) * 1.03, "openInterest": 1000.0,
+                             "volume": 10, "impliedRate": 30.0})
+            page = params["page"]
+            return {"pageSize": 100, "page": page, "totalEntries": len(rows),
+                    "data": rows[(page - 1) * 100: page * 100]}
         if url.endswith("/riesgo-pais"):
             return [{"fecha": f, "valor": float(v)} for f, v in zip(fechas, syn["riesgo"])]
         if "/cotizaciones/dolares/" in url:
@@ -84,7 +100,12 @@ def test_run_end_to_end(fake_api):
     payload = build.run()
     assert (tmp / "monitor.json").exists()
     assert (tmp / "panel_diario.csv").exists()
-    assert set(payload["series"]) >= {"tc_oficial_ref", "brecha_ccl", "riesgo_pais", "reservas", "tasa"}
+    assert set(payload["series"]) >= {"tc_oficial_ref", "brecha_ccl", "riesgo_pais", "reservas",
+                                      "tasa", "deval_implicita", "futuros_interes_abierto"}
+    fut = pd.read_csv(tmp / "series" / "futuros_dolar.csv")
+    # Paginación: todas las fechas hábiles de 2025 en adelante, sin duplicados.
+    assert fut["fecha"].nunique() == sum(1 for x in syn["fechas"] if x.year >= 2025)
+    assert not fut.duplicated(["fecha", "contrato"]).any()
     h = payload["headline"]
     assert h["ipd"] is not None
     # El shock simulado debe verse como presión alta al inicio del episodio.
@@ -141,3 +162,9 @@ def test_auction_share():
     })
     out = indicators.auction_dollar_share(df)
     assert out["share_cobertura"].iloc[0] == pytest.approx(30.0)
+
+
+def test_a3_expiry():
+    assert sources._a3_expiry("DLR102026") == pd.Timestamp("2026-10-30")
+    assert sources._a3_expiry("DLR052026") == pd.Timestamp("2026-05-29")  # 31/5 es domingo
+    assert sources._a3_expiry("DLR/SPOT") is None

@@ -504,7 +504,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const st = document.getElementById("src-status");
     st.innerHTML = Object.entries(DATA.sources_status || {}).map(([k, v]) =>
       { const bad = v.startsWith("error") || v.startsWith("fallo"); return `<span class="${bad ? "err" : ""}" title="${v}">${v === "ok" ? "✓" : bad ? "✕" : "•"} ${k}</span>`; }).join("");
-    document.getElementById("foot").textContent = `Actualizado: ${new Date(DATA.generated_at).toLocaleString("es-AR")}. Fuentes: BCRA, ArgentinaDatos, A3 Mercados, Secretaría de Finanzas.`;
+    document.getElementById("foot").textContent = `Actualizado: ${new Date(DATA.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, ArgentinaDatos, A3 Mercados, Secretaría de Finanzas.`;
   }
 
   function renderCharts() {

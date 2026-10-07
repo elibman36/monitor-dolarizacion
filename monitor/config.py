@@ -74,6 +74,8 @@ ARGENTINADATOS_RIESGO_PAIS = {"label": "Riesgo país (EMBI Argentina)", "unit": 
 # Google Sheet publicada como CSV), el pipeline la descarga primero y
 # sobreescribe el archivo local; si falla, usa la última copia local.
 MANUAL_SOURCES = {
+    # Los futuros se descargan solos de A3 Mercados; este CSV sólo sirve para
+    # agregar o corregir filas a mano (tiene prioridad sobre la descarga).
     "futuros_dolar": {
         "file": "futuros_dolar.csv",
         "url": None,
@@ -93,6 +95,9 @@ MANUAL_SOURCES = {
         "fuente": "Secretaría de Finanzas - resultados de licitaciones",
     },
 }
+
+# Primer día que se pide a la API de A3 (antes de 2021 no devuelve datos).
+FUTUROS_START_DATE = "2021-01-01"
 
 # Plazo mínimo (días corridos) del contrato de futuros usado para la
 # devaluación implícita: se toma el primer vencimiento con al menos este plazo.

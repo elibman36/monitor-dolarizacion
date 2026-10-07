@@ -120,8 +120,7 @@ componentes, umbrales y eventos electorales.
 
 ## Próximos pasos posibles
 
-- Automatizar los futuros de A3 Mercados (requiere acceso a su API de market
-  data) y sumar la posición del BCRA en futuros.
+- Sumar la posición del BCRA en futuros (se publica con rezago).
 - Agregar el breakeven de devaluación implícito entre LECAPs y bonos dollar
   linked a partir de precios de mercado.
 - Agregar flujos diarios de FCI de dólares y de money market (CAFCI).
