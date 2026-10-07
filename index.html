@@ -239,6 +239,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   const charts = [];
   let DATA = null;
   let rangeDays = 365;
+  // El gráfico del índice abre con toda la historia; sigue a los botones de
+  // período recién cuando el usuario elige uno.
+  let idxFullHistory = true;
 
   // ---- tema -------------------------------------------------------------
   const themeBtn = document.getElementById("theme");
@@ -259,6 +262,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     document.querySelectorAll("#range button").forEach((x) => x.setAttribute("aria-pressed", "false"));
     b.setAttribute("aria-pressed", "true");
     rangeDays = +b.dataset.r;
+    idxFullHistory = false;
     renderCharts();
   }));
 
@@ -440,7 +444,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
 
   function renderIndex() {
-    let data = cut(DATA.ipd.indice || []);
+    let data = idxFullHistory ? (DATA.ipd.indice || []) : cut(DATA.ipd.indice || []);
     if (!data.length) return emptyState("c-idx", "Todavía no hay historia suficiente para calcular el índice.");
     // Diario: el dato publicado (promedio de 10 días hábiles). Semanal y mensual: promedios.
     const keyOf = { w: (d) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return x.toISOString().slice(0, 10); },
