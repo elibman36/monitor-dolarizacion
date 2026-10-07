@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor de Dolarización</title>
+<meta name="description" content="Seguimiento diario de la presión cambiaria y la dolarización de portafolios en Argentina: Índice de Presión de Dolarización (IPD) y sus componentes.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --wash: rgba(11,11,11,0.05);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --div-neg: #2a78d6; --div-pos: #e34948; --div-mid: #f0efec;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
+  --up-bad: #b42318; --down-good: #006300;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
+    --muted: #898781; --grid: #2c2c2a; --axis: #383835;
+    --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --div-neg: #3987e5; --div-pos: #e66767; --div-mid: #383835;
+    --up-bad: #f97066; --down-good: #0ca30c;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
+  --muted: #898781; --grid: #2c2c2a; --axis: #383835;
+  --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --div-neg: #3987e5; --div-pos: #e66767; --div-mid: #383835;
+  --up-bad: #f97066; --down-good: #0ca30c;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--page); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
+header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+h1 { font-size: 24px; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 16px; margin: 0 0 2px; }
+.sub { color: var(--ink-2); margin: 4px 0 0; }
+.note { color: var(--muted); font-size: 13px; margin: 0; }
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: inherit; font-size: 13px; border: 0; background: none; color: var(--ink-2); padding: 6px 10px; cursor: pointer; }
+.seg button:hover { background: var(--wash); }
+.seg button[aria-pressed="true"] { color: var(--ink); font-weight: 600; background: var(--wash); }
+.btn { font: inherit; font-size: 13px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink-2); padding: 6px 10px; cursor: pointer; text-decoration: none; }
+.btn:hover { background: var(--wash); color: var(--ink); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.hero { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 16px; margin-bottom: 16px; }
+.hero-num { font-size: 56px; font-weight: 650; line-height: 1; letter-spacing: -0.02em; margin: 10px 0 6px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; padding: 3px 10px 3px 6px; border-radius: 999px; background: var(--wash); color: var(--ink); }
+.pill .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-grid; place-items: center; color: #fff; font-size: 10px; line-height: 1; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin-top: 14px; font-size: 13px; color: var(--ink-2); }
+.kv b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile .lbl { font-size: 12px; color: var(--ink-2); min-height: 32px; }
+.tile .val { font-size: 22px; font-weight: 600; margin-top: 4px; }
+.tile .unit { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 2px; }
+.tile .delta { font-size: 12px; margin-top: 2px; color: var(--ink-2); }
+.tile .delta .up { color: var(--up-bad); } .tile .delta .down { color: var(--down-good); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
+.chart { width: 100%; height: 300px; }
+.chart.tall { height: 360px; }
+.chart.small { height: 220px; }
+.section-title { margin: 28px 0 10px; font-size: 18px; }
+.empty { color: var(--muted); font-size: 13px; padding: 24px 8px; text-align: center; border: 1px dashed var(--axis); border-radius: 8px; margin-top: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--grid); }
+th { color: var(--ink-2); font-weight: 600; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.table-wrap { overflow-x: auto; }
+.status-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.status-list span { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--wash); color: var(--ink-2); }
+.status-list span.err { color: var(--critical); }
+.method p, .method li { color: var(--ink-2); font-size: 14px; }
+.method code { font-size: 13px; }
+#banner { display: none; margin-bottom: 16px; }
+@media (max-width: 900px) {
+  .hero, .grid2 { grid-template-columns: 1fr; }
+  .grid3 { grid-template-columns: 1fr; }
+  .hero-num { font-size: 44px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Monitor de Dolarización de Portafolios</h1>
+      <p class="sub">Presión cambiaria y demanda de cobertura en Argentina, con datos diarios.</p>
+    </div>
+    <div class="controls">
+      <div class="seg" id="range" role="group" aria-label="Período">
+        <button data-r="90">3M</button><button data-r="182">6M</button><button data-r="365" aria-pressed="true">1A</button><button data-r="730">2A</button><button data-r="1825">5A</button><button data-r="0">Todo</button>
+      </div>
+      <a class="btn" href="data/panel_diario.csv" download>Descargar CSV</a>
+      <button class="btn" id="theme" type="button" aria-label="Cambiar tema">◐</button>
+    </div>
+  </header>
+
+  <div id="banner" class="card empty"></div>
+
+  <section class="hero">
+    <div class="card" id="hero">
+      <h2>Índice de Presión de Dolarización</h2>
+      <p class="note">Promedio de componentes estandarizados (desvíos respecto de los últimos 2 años)</p>
+      <div class="hero-num" id="hero-num">–</div>
+      <span class="pill" id="hero-pill"><span class="dot"></span><span>Cargando…</span></span>
+      <div class="kv" id="hero-kv"></div>
+    </div>
+    <div class="card">
+      <h2>IPD diario</h2>
+      <p class="note">Mayor a 0 = más presión que lo habitual. Las líneas verticales marcan elecciones y cambios de régimen.</p>
+      <div class="chart tall" id="c-ipd" role="img" aria-label="Serie diaria del IPD"></div>
+    </div>
+  </section>
+
+  <section class="tiles" id="tiles"></section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>Qué explica el IPD hoy</h2>
+      <p class="note">Contribución de cada componente (z-score). Rojo = presiona; azul = alivia.</p>
+      <div class="chart" id="c-contrib" role="img" aria-label="Contribución por componente"></div>
+    </div>
+    <div class="card">
+      <h2>Bloques del índice</h2>
+      <p class="note">Presión cambiaria clásica (EMP) vs. dolarización de portafolios y expectativas.</p>
+      <div class="chart" id="c-blocks" role="img" aria-label="Sub-índices por bloque"></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom:16px">
+    <h2>Percentil histórico del IPD</h2>
+    <p class="note">Ubicación del IPD dentro de su propia historia reciente. Umbrales del semáforo: 75 (moderada), 90 (elevada), 97,5 (crítica).</p>
+    <div class="chart small" id="c-pct" role="img" aria-label="Percentil del IPD"></div>
+  </section>
+
+  <h2 class="section-title">Variables</h2>
+  <section class="grid3" id="multiples"></section>
+
+  <h2 class="section-title">Indicadores de menor frecuencia</h2>
+  <section class="grid2">
+    <div class="card">
+      <h2>Compras de USD de personas humanas</h2>
+      <p class="note">Mensual, millones de USD. BCRA, balance cambiario.</p>
+      <div class="chart" id="c-ph" role="img" aria-label="Compras de dólares de personas humanas"></div>
+    </div>
+    <div class="card">
+      <h2>Demanda de cobertura en licitaciones del Tesoro</h2>
+      <p class="note">% del monto adjudicado en instrumentos dollar linked o en USD.</p>
+      <div class="chart" id="c-lic" role="img" aria-label="Participación de instrumentos con cobertura cambiaria en licitaciones"></div>
+    </div>
+  </section>
+
+  <h2 class="section-title">Tabla de datos</h2>
+  <section class="card table-wrap">
+    <table id="tbl"><thead><tr><th>Variable</th><th class="num">Último</th><th>Fecha</th><th class="num">Hace 7 días</th><th class="num">Hace 30 días</th><th>Fuente</th></tr></thead><tbody></tbody></table>
+    <div class="status-list" id="src-status"></div>
+  </section>
+
+  <h2 class="section-title">Metodología</h2>
+  <section class="card method">
+    <p>El IPD adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza con un z-score móvil y se promedia dentro de dos bloques:</p>
+    <ul>
+      <li><b>Presión cambiaria (EMP):</b> depreciación del oficial A3500 en 5 días, pérdida de reservas brutas en 5 días y suba de tasas en pesos (TAMAR/BADLAR) en 5 días, como medida de la defensa del peso.</li>
+      <li><b>Dolarización de portafolios:</b> nivel de la brecha CCL/oficial, suba del riesgo país en 5 días, devaluación implícita en futuros de A3 Mercados y crecimiento de los depósitos en dólares.</li>
+    </ul>
+    <p>Si falta un componente, su peso se reparte entre los demás. El índice se publica cuando hay datos para al menos la mitad del peso. El semáforo usa el percentil del IPD en los últimos 2 años. Las compras de personas humanas y las licitaciones se muestran aparte porque se publican con menor frecuencia y rezago.</p>
+    <p class="note">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
+  </section>
+  <p class="note" id="foot" style="margin-top:16px"></p>
+</div>
+
+<script>
+(() => {
+  const STATUS = {
+    good: { color: "var(--good)", icon: "✓" },
+    warning: { color: "var(--warning)", icon: "!" },
+    serious: { color: "var(--serious)", icon: "!" },
+    critical: { color: "var(--critical)", icon: "‼" },
+    unknown: { color: "var(--muted)", icon: "?" },
+  };
+  const TILES = ["tc_oficial_ref", "usd_ccl", "brecha_ccl", "riesgo_pais", "reservas", "tasa", "deval_implicita", "depositos_usd"];
+  // Variables donde una suba es "mala" (más presión): se colorea el delta.
+  const UP_IS_PRESSURE = { tc_oficial_ref: 1, usd_ccl: 1, usd_mep: 1, brecha_ccl: 1, brecha_mep: 1, riesgo_pais: 1, reservas: -1, deval_implicita: 1, depositos_usd: 1 };
+  const MULTIPLES = [
+    { title: "Tipo de cambio", keys: ["tc_oficial_ref", "usd_mep", "usd_ccl"], names: ["Oficial (A3500)", "MEP", "CCL"], unit: "$ por USD" },
+    { title: "Brecha CCL / oficial", keys: ["brecha_ccl"], unit: "%" },
+    { title: "Riesgo país", keys: ["riesgo_pais"], unit: "pb" },
+    { title: "Reservas internacionales brutas", keys: ["reservas"], unit: "millones de USD" },
+    { title: "Tasa en pesos (TAMAR / BADLAR)", keys: ["tasa"], unit: "% n.a." },
+    { title: "Devaluación implícita en futuros", keys: ["deval_implicita"], unit: "% efectivo anual" },
+    { title: "Interés abierto en futuros de dólar", keys: ["futuros_interes_abierto"], unit: "contratos" },
+    { title: "Depósitos en dólares", keys: ["depositos_usd"], unit: "millones de USD" },
+  ];
+
+  const nf = (v, d = 1) => v == null ? "–" : v.toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const digitsFor = (unit, v) => unit && unit.includes("$") ? (Math.abs(v) >= 100 ? 0 : 2) : (unit && unit.startsWith("millones") || unit === "pb" || unit === "contratos") ? 0 : 1;
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const charts = [];
+  let DATA = null;
+  let rangeDays = 365;
+
+  // ---- tema -------------------------------------------------------------
+  const themeBtn = document.getElementById("theme");
+  try { const t = localStorage.getItem("md-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+  themeBtn.addEventListener("click", () => {
+    const dark = document.documentElement.dataset.theme
+      ? document.documentElement.dataset.theme === "dark"
+      : matchMedia("(prefers-color-scheme: dark)").matches;
+    const next = dark ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("md-theme", next); } catch (e) {}
+    renderAll();
+  });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderAll);
+
+  // ---- rango ------------------------------------------------------------
+  document.querySelectorAll("#range button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#range button").forEach((x) => x.setAttribute("aria-pressed", "false"));
+    b.setAttribute("aria-pressed", "true");
+    rangeDays = +b.dataset.r;
+    renderCharts();
+  }));
+
+  function cut(pairs) {
+    if (!rangeDays || !pairs.length) return pairs;
+    const last = new Date(pairs[pairs.length - 1][0]);
+    const from = new Date(last - rangeDays * 864e5).toISOString().slice(0, 10);
+    return pairs.filter((p) => p[0] >= from);
+  }
+
+  function base() {
+    return {
+      animation: false,
+      textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
+      grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
+      tooltip: {
+        trigger: "axis", confine: true,
+        backgroundColor: css("--surface"), borderColor: css("--border"),
+        textStyle: { color: css("--ink"), fontSize: 12 },
+        axisPointer: { type: "line", lineStyle: { color: css("--axis") } },
+      },
+      xAxis: {
+        type: "time",
+        axisLine: { lineStyle: { color: css("--axis") } },
+        axisTick: { show: false },
+        axisLabel: { color: css("--muted"), fontSize: 11, hideOverlap: true },
+        splitLine: { show: false },
+      },
+      yAxis: {
+        type: "value", scale: true,
+        axisLine: { show: false }, axisTick: { show: false },
+        axisLabel: { color: css("--muted"), fontSize: 11 },
+        splitLine: { lineStyle: { color: css("--grid"), type: "solid" } },
+      },
+    };
+  }
+
+  function lineSeries(name, data, color, extra = {}) {
+    return Object.assign({
+      name, type: "line", data, showSymbol: false, symbolSize: 8,
+      lineStyle: { width: 2, color }, itemStyle: { color },
+      emphasis: { focus: "none" },
+    }, extra);
+  }
+
+  function eventLines(pairs) {
+    if (!pairs.length) return [];
+    const a = pairs[0][0], b = pairs[pairs.length - 1][0];
+    return (DATA.events || []).filter((e) => e.date >= a && e.date <= b).map((e) => ({
+      xAxis: e.date, name: e.label,
+      label: { formatter: e.label, color: css("--muted"), fontSize: 10, position: "insideEndTop" },
+    }));
+  }
+
+  function mount(id) {
+    const el = document.getElementById(id);
+    let c = echarts.getInstanceByDom(el);
+    if (c) c.dispose();
+    c = echarts.init(el, null, { renderer: "svg" });
+    charts.push(c);
+    return c;
+  }
+
+  function emptyState(id, msg) {
+    const el = document.getElementById(id);
+    const c = echarts.getInstanceByDom(el); if (c) c.dispose();
+    el.style.height = "auto";
+    el.innerHTML = `<div class="empty">${msg}</div>`;
+  }
+
+  // ---- hero y tiles -------------------------------------------------------
+  function renderHero() {
+    const h = DATA.headline;
+    const st = STATUS[h.status] || STATUS.unknown;
+    document.getElementById("hero-num").textContent = h.ipd == null ? "–" : (h.ipd > 0 ? "+" : "") + nf(h.ipd, 2);
+    document.getElementById("hero-pill").innerHTML =
+      `<span class="dot" style="background:${st.color}" aria-hidden="true">${st.icon}</span><span>${h.status_label}</span>`;
+    const d = (a, b) => (a == null || b == null) ? "–" : ((a - b > 0 ? "+" : "") + nf(a - b, 2));
+    document.getElementById("hero-kv").innerHTML = `
+      <span>Fecha</span><b>${h.date || "–"}</b>
+      <span>Percentil (2 años)</span><b>${h.percentile == null ? "–" : nf(h.percentile, 0)}</b>
+      <span>Cambio en 7 días</span><b>${d(h.ipd, h.ipd_7d)}</b>
+      <span>Cambio en 30 días</span><b>${d(h.ipd, h.ipd_30d)}</b>`;
+  }
+
+  function renderTiles() {
+    const box = document.getElementById("tiles");
+    box.innerHTML = "";
+    TILES.forEach((k) => {
+      const s = DATA.series[k];
+      if (!s) return;
+      const dg = digitsFor(s.unit, s.last);
+      let delta = "";
+      if (s.prev_7d != null && s.last != null) {
+        const isPct = s.unit.startsWith("%") || s.unit === "pb";
+        const ch = isPct ? s.last - s.prev_7d : (s.last / s.prev_7d - 1) * 100;
+        const sign = Math.sign(ch) * (UP_IS_PRESSURE[k] || 0);
+        const cls = sign > 0 ? "up" : sign < 0 ? "down" : "";
+        const arrow = ch > 0 ? "▲" : ch < 0 ? "▼" : "•";
+        const txt = isPct ? `${ch > 0 ? "+" : ""}${nf(ch, s.unit === "pb" ? 0 : 1)} ${s.unit === "pb" ? "pb" : "pp"}` : `${ch > 0 ? "+" : ""}${nf(ch, 1)}%`;
+        delta = `<div class="delta"><span class="${cls}">${arrow} ${txt}</span> en 7 días</div>`;
+      }
+      const el = document.createElement("div");
+      el.className = "card tile";
+      el.innerHTML = `<div class="lbl">${s.label}</div><div class="val">${nf(s.last, dg)}<span class="unit">${s.unit}</span></div>${delta}`;
+      box.appendChild(el);
+    });
+  }
+
+  // ---- gráficos -----------------------------------------------------------
+  function renderIPD() {
+    const data = cut(DATA.ipd.data);
+    if (!data.length) return emptyState("c-ipd", "Todavía no hay historia suficiente para calcular el IPD.");
+    const c = mount("c-ipd");
+    const o = base();
+    o.yAxis.scale = false;
+    o.tooltip.valueFormatter = (v) => nf(v, 2);
+    o.series = [lineSeries("IPD", data, css("--s1"), {
+      markLine: {
+        symbol: "none", silent: true,
+        lineStyle: { color: css("--axis"), type: "solid", width: 1 },
+        data: [{ yAxis: 0, label: { show: false } }, ...eventLines(data)],
+      },
+    })];
+    c.setOption(o);
+  }
+
+  function renderPct() {
+    const data = cut(DATA.ipd.percentile);
+    if (!data.length) return emptyState("c-pct", "Sin datos de percentil todavía.");
+    const c = mount("c-pct");
+    const o = base();
+    o.yAxis.scale = false; o.yAxis.min = 0; o.yAxis.max = 100;
+    o.tooltip.valueFormatter = (v) => nf(v, 0);
+    const th = [[75, "--warning", "Moderada"], [90, "--serious", "Elevada"], [97.5, "--critical", "Crítica"]];
+    o.series = [lineSeries("Percentil", data, css("--s1"), {
+      markLine: {
+        symbol: "none", silent: true,
+        data: th.map(([y, col, l]) => ({
+          yAxis: y, lineStyle: { color: css(col), type: "solid", width: 1 },
+          label: { formatter: `${l} (${String(y).replace(".", ",")})`, color: css("--ink-2"), fontSize: 10, position: "insideEndTop" },
+        })),
+      },
+    })];
+    c.setOption(o);
+  }
+
+  function renderBlocks() {
+    const keys = Object.keys(DATA.ipd.blocks);
+    if (!keys.length) return emptyState("c-blocks", "Sin datos.");
+    const c = mount("c-blocks");
+    const o = base();
+    o.yAxis.scale = false;
+    o.grid.top = 36;
+    o.tooltip.valueFormatter = (v) => nf(v, 2);
+    o.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } };
+    const cols = [css("--s1"), css("--s2")];
+    o.series = keys.map((k, i) => {
+      const d = cut(DATA.ipd.blocks[k].data);
+      return lineSeries(DATA.ipd.blocks[k].label, d, cols[i % cols.length], {
+        endLabel: { show: false },
+        markLine: i === 0 ? { symbol: "none", silent: true, lineStyle: { color: css("--axis"), type: "solid", width: 1 }, data: [{ yAxis: 0, label: { show: false } }] } : undefined,
+      });
+    });
+    c.setOption(o);
+  }
+
+  function renderContrib() {
+    const comps = DATA.ipd.components.filter((x) => x.z != null);
+    if (!comps.length) return emptyState("c-contrib", "Sin componentes disponibles.");
+    comps.sort((a, b) => a.z - b.z);
+    const c = mount("c-contrib");
+    const pos = css("--div-pos"), neg = css("--div-neg");
+    c.setOption({
+      animation: false,
+      textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
+      grid: { left: 16, right: 40, top: 8, bottom: 8, containLabel: true },
+      tooltip: {
+        trigger: "item", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"),
+        textStyle: { color: css("--ink"), fontSize: 12 },
+        formatter: (p) => `${p.name}<br><b>${nf(p.value, 2)}</b> desvíos<br><span style="color:${css("--muted")}">al ${comps[p.dataIndex].last_date}</span>`,
+      },
+      xAxis: { type: "value", axisLabel: { color: css("--muted"), fontSize: 11 }, splitLine: { lineStyle: { color: css("--grid") } } },
+      yAxis: { type: "category", data: comps.map((x) => x.label), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--ink-2"), fontSize: 12 } },
+      series: [{
+        type: "bar", barMaxWidth: 18,
+        data: comps.map((x) => ({
+          value: x.z,
+          itemStyle: { color: x.z >= 0 ? pos : neg, borderRadius: x.z >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4] },
+        })),
+        label: { show: true, position: "right", color: css("--ink-2"), fontSize: 11, formatter: (p) => nf(p.value, 1) },
+      }],
+    });
+  }
+
+  function renderMultiples() {
+    const box = document.getElementById("multiples");
+    box.innerHTML = "";
+    const cols = [css("--s1"), css("--s2"), css("--s3")];
+    MULTIPLES.forEach((m, idx) => {
+      const avail = m.keys.filter((k) => DATA.series[k]);
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `<h2>${m.title}</h2><p class="note">${m.unit}${avail.length ? " · " + [...new Set(avail.map((k) => DATA.series[k].source))].join(" / ") : ""}</p><div class="chart small" id="m-${idx}"></div>`;
+      box.appendChild(card);
+      if (!avail.length) {
+        const hint = m.keys.includes("deval_implicita") || m.keys.includes("futuros_interes_abierto")
+          ? "Cargá datos de futuros en <code>data/manual/futuros_dolar.csv</code>." : "Serie no disponible en la fuente.";
+        return emptyState(`m-${idx}`, hint);
+      }
+      const c = mount(`m-${idx}`);
+      const o = base();
+      const unit = m.unit;
+      o.tooltip.valueFormatter = (v) => nf(v, digitsFor(unit, v));
+      if (avail.length > 1) {
+        o.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 11 } };
+        o.grid.top = 32;
+      }
+      o.series = avail.map((k) => lineSeries(m.names ? m.names[m.keys.indexOf(k)] : DATA.series[k].label, cut(DATA.series[k].data), cols[m.keys.indexOf(k)]));
+      c.setOption(o);
+    });
+  }
+
+  function renderMonthly() {
+    const ph = DATA.monthly.compras_personas_humanas || [];
+    if (!ph.length) {
+      emptyState("c-ph", "Sin datos cargados. Completá <code>data/manual/compras_personas_humanas.csv</code> con el anexo del balance cambiario del BCRA.");
+    } else {
+      const c = mount("c-ph");
+      const key = ph[0].netas_usd_millones != null ? "netas_usd_millones" : "compras_usd_millones";
+      c.setOption({
+        animation: false, textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
+        grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
+        tooltip: { trigger: "axis", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 }, valueFormatter: (v) => nf(v, 0) + " M USD" },
+        xAxis: { type: "category", data: ph.map((r) => r.fecha), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--muted"), fontSize: 11 } },
+        yAxis: { type: "value", axisLabel: { color: css("--muted"), fontSize: 11 }, splitLine: { lineStyle: { color: css("--grid") } } },
+        series: [{ name: key === "netas_usd_millones" ? "Compras netas" : "Compras brutas", type: "bar", barMaxWidth: 24, data: ph.map((r) => r[key]), itemStyle: { color: css("--s1"), borderRadius: [4, 4, 0, 0] } }],
+      });
+    }
+    const lic = DATA.monthly.licitaciones || [];
+    if (!lic.length) {
+      emptyState("c-lic", "Sin datos cargados. Completá <code>data/manual/licitaciones_tesoro.csv</code> con los resultados de cada licitación.");
+    } else {
+      const c = mount("c-lic");
+      c.setOption({
+        animation: false, textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
+        grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
+        tooltip: { trigger: "axis", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 }, valueFormatter: (v) => nf(v, 1) + "%" },
+        xAxis: { type: "category", data: lic.map((r) => r.fecha), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--muted"), fontSize: 11 } },
+        yAxis: { type: "value", min: 0, max: 100, axisLabel: { color: css("--muted"), fontSize: 11 }, splitLine: { lineStyle: { color: css("--grid") } } },
+        series: [{ name: "Cobertura cambiaria", type: "bar", barMaxWidth: 24, data: lic.map((r) => r.share_cobertura), itemStyle: { color: css("--s1"), borderRadius: [4, 4, 0, 0] } }],
+      });
+    }
+  }
+
+  function renderTable() {
+    const tb = document.querySelector("#tbl tbody");
+    tb.innerHTML = "";
+    Object.entries(DATA.series).forEach(([k, s]) => {
+      const dg = digitsFor(s.unit, s.last);
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${s.label} <span style="color:var(--muted)">(${s.unit})</span></td><td class="num">${nf(s.last, dg)}</td><td>${s.last_date}</td><td class="num">${nf(s.prev_7d, dg)}</td><td class="num">${nf(s.prev_30d, dg)}</td><td>${s.source}</td>`;
+      tb.appendChild(tr);
+    });
+    const st = document.getElementById("src-status");
+    st.innerHTML = Object.entries(DATA.sources_status || {}).map(([k, v]) =>
+      { const bad = v.startsWith("error") || v.startsWith("fallo"); return `<span class="${bad ? "err" : ""}" title="${v}">${v === "ok" ? "✓" : bad ? "✕" : "•"} ${k}</span>`; }).join("");
+    document.getElementById("foot").textContent = `Actualizado: ${new Date(DATA.generated_at).toLocaleString("es-AR")}. Fuentes: BCRA, ArgentinaDatos, A3 Mercados, Secretaría de Finanzas.`;
+  }
+
+  function renderCharts() {
+    charts.length = 0;
+    renderIPD(); renderPct(); renderBlocks(); renderContrib(); renderMultiples(); renderMonthly();
+  }
+
+  function renderAll() {
+    if (!DATA) return;
+    renderHero(); renderTiles(); renderCharts(); renderTable();
+  }
+
+  window.addEventListener("resize", () => charts.forEach((c) => c.resize()));
+
+  const src = new URLSearchParams(location.search).get("data") || "data/monitor.json";
+  fetch(src, { cache: "no-store" })
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((d) => { DATA = d; renderAll(); })
+    .catch(() => {
+      const b = document.getElementById("banner");
+      b.style.display = "block";
+      b.innerHTML = "Todavía no hay datos publicados. Corré <code>python -m monitor.build</code> o esperá la primera ejecución diaria de GitHub Actions.";
+      document.getElementById("hero-pill").innerHTML = '<span class="dot" style="background:var(--muted)">?</span><span>Sin datos</span>';
+    });
+})();
+</script>
+</body>
+</html>

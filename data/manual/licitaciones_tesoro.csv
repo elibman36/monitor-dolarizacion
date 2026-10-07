@@ -1,0 +1,5 @@
+# Resultados de licitaciones del Tesoro. Una fila por instrumento adjudicado.
+# tipo: LECAP, BONCAP, CER, TAMAR, DL (dollar linked), USD (hard dollar), DUAL_DL, OTRO
+# monto_vn_millones_ars: valor efectivo adjudicado en millones de pesos.
+# Fuente: https://www.argentina.gob.ar/economia/finanzas/licitaciones
+fecha,instrumento,tipo,monto_vn_millones_ars

@@ -1,0 +1,4 @@
+# Futuros de dólar A3 Mercados (ex Matba-Rofex). Una fila por fecha y contrato.
+# precio_ajuste en $ por USD; interes_abierto en contratos (opcional).
+# Fuente: https://www.a3mercados.com.ar (Market data > Futuros > DLR)
+fecha,contrato,vencimiento,precio_ajuste,interes_abierto

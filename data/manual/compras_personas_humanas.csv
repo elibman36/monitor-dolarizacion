@@ -1,0 +1,4 @@
+# Compras/ventas de moneda extranjera de personas humanas (formación de activos externos).
+# fecha en formato YYYY-MM. Montos en millones de USD.
+# Fuente: BCRA - Informe de Evolución del Mercado de Cambios y Balance Cambiario (anexo Excel).
+fecha,compras_usd_millones,ventas_usd_millones,personas_compradoras_miles,fuente
