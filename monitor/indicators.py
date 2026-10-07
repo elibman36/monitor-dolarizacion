@@ -191,6 +191,11 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
     blocks = pd.DataFrame(block_series, index=df.index)
     ipd = _weighted_mean(blocks, {k: config.IPD_BLOCKS[k]["weight"] for k in blocks.columns})
     ipd = ipd.reindex(df.index)
+    # Antes de IPD_PUBLICAR_DESDE los datos sólo sirven de ventana de referencia.
+    publicar = df.index >= pd.Timestamp(config.IPD_PUBLICAR_DESDE)
+    ipd = ipd.where(publicar)
+    blocks.loc[~publicar] = np.nan
+    components = {k: v.where(publicar) for k, v in components.items()}
     pct = rolling_percentile(ipd, config.IPD_PERCENTILE_WINDOW, config.IPD_ZSCORE_MIN_OBS)
     comps = pd.DataFrame(components, index=df.index)
     n_comp = comps.notna().sum(axis=1).where(ipd.notna())

@@ -65,10 +65,12 @@ python -m http.server               # y abrir http://localhost:8000
 | Compras de USD de personas humanas | 2003 | mensual | BCRA, anexo del Informe de Evolución del Mercado de Cambios | automática (semanal); `data/manual/compras_personas_humanas.csv` para correcciones |
 | Licitaciones del Tesoro (share dollar linked / USD) | — | por licitación | Secretaría de Finanzas | `data/manual/licitaciones_tesoro.csv` |
 
-**Historia.** El IPD arranca en 1999. En los primeros años se calcula con los
-componentes que ya existían (reservas, BADLAR y riesgo país; desde 2002 también el
-A3500 y los depósitos en dólares). El panel diario incluye la columna
-`ipd_n_componentes` y el tooltip del gráfico indica cuántos había cada día.
+**Historia.** El IPD se publica desde 2003 (`IPD_PUBLICAR_DESDE`). Las series
+se descargan desde 1996, pero 1996–2002 sólo sirve como ventana de referencia:
+con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20–45
+puntos por semana y se desplomó con el corralito, y hay huecos en los datos.
+Desde 2003 hay 7 de los 9 componentes; la brecha se suma en 2011 y los futuros
+en 2020. El panel diario incluye la columna `ipd_n_componentes`.
 
 **Fuentes manuales.** Cada CSV trae en su encabezado el formato y de dónde
 sacar el dato. En equipo, lo más práctico suele ser llevarlas en una Google

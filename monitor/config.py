@@ -129,6 +129,12 @@ FUTUROS_PLAZO_MINIMO_DIAS = 20
 #   diff  -> diferencia simple en `horizon` días hábiles
 #   level -> nivel de la serie
 # sign: +1 si un aumento implica más presión, -1 si implica menos.
+# Primer día que se publica el IPD. Antes de 2003 la serie no es confiable:
+# con la convertibilidad el tipo de cambio no se movía (faltan dos
+# componentes), la BADLAR oscilaba 20-45 pp por semana y el corralito la
+# desplomó, y hay huecos en los datos de dic-01 a feb-02. Esos años se usan
+# sólo como ventana de referencia para estandarizar.
+IPD_PUBLICAR_DESDE = "2003-01-01"
 IPD_HORIZON = 5            # días hábiles para variaciones (≈ 1 semana)
 IPD_ZSCORE_WINDOW = 504    # ventana móvil para estandarizar (≈ 2 años)
 IPD_ZSCORE_MIN_OBS = 120   # mínimo de observaciones para calcular el z-score
