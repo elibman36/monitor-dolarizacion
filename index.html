@@ -199,7 +199,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <p>El IPD adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes) y se promedia dentro de dos bloques:</p>
     <ul>
       <li><b>Presión cambiaria (EMP):</b> depreciación del oficial A3500 en 5 días, volatilidad del oficial (20 días), pérdida de reservas brutas en 5 días y suba de la tasa BADLAR en 5 días, como medida de la defensa del peso.</li>
-      <li><b>Dolarización de portafolios:</b> nivel de la brecha CCL/oficial, volatilidad del CCL (20 días), suba del riesgo país en 5 días, devaluación implícita en los futuros de A3 Mercados (TNA a 90 días) y crecimiento de los depósitos en dólares.</li>
+      <li><b>Dolarización de portafolios:</b> nivel de la brecha CCL/oficial, volatilidad del CCL (20 días), suba del riesgo país en 5 días, devaluación implícita en los futuros de A3 Mercados (TNA a 90 días) y caída de los depósitos en dólares del sector privado (cuando bajan, suma presión; cuando suben, alivia).</li>
     </ul>
     <p>El índice se publica desde 2003. Los datos de 1996–2002 sólo se usan como referencia para estandarizar: con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20 a 45 puntos por semana y se desplomó con el corralito, y hay huecos en los datos, así que el índice de esos años no es confiable. Desde 2003 hay 7 de los 9 componentes; la brecha se suma en 2011 (con el blue hasta 2012) y los futuros en 2020. El tooltip del gráfico del IPD indica cuántos componentes había cada día.</p>
     <p><b>Ponderación.</b> Los dos bloques pesan 50% cada uno. Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así el riesgo país y los depósitos en dólares no quedan afuera aunque la PCA les asigne carga nula. Los pesos se recalculan en cada actualización con toda la historia.</p>
@@ -224,7 +224,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   };
   const TILES = ["tc_oficial_ref", "usd_ccl", "brecha_ccl", "brecha_mep", "riesgo_pais", "reservas", "tasa", "deval_implicita", "depositos_usd"];
   // Variables donde una suba es "mala" (más presión): se colorea el delta.
-  const UP_IS_PRESSURE = { tc_oficial_ref: 1, usd_ccl: 1, usd_mep: 1, brecha_ccl: 1, brecha_mep: 1, riesgo_pais: 1, reservas: -1, deval_implicita: 1, depositos_usd: 1 };
+  const UP_IS_PRESSURE = { tc_oficial_ref: 1, usd_ccl: 1, usd_mep: 1, brecha_ccl: 1, brecha_mep: 1, riesgo_pais: 1, reservas: -1, deval_implicita: 1, depositos_usd: -1 };
   const MULTIPLES = [
     { title: "Tipo de cambio", keys: ["tc_oficial_ref", "usd_mep", "usd_ccl"], names: ["Oficial (A3500)", "MEP", "CCL"], unit: "$ por USD" },
     { title: "Brecha cambiaria contra el oficial", keys: ["brecha_ccl", "brecha_mep"], names: ["CCL", "MEP"], unit: "%" },

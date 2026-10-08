@@ -160,8 +160,10 @@ IPD_BLOCKS = {
                             "label": "Suba del riesgo país"},
             "deval_implicita": {"transform": "level", "sign": +1, "weight": 1.0,
                                 "label": "Devaluación implícita en futuros"},
-            "depositos_usd": {"transform": "dlog", "sign": +1, "weight": 0.5,
-                              "label": "Suba de depósitos en USD"},
+            # Los depósitos en USD caen cuando sube la presión (fuga de
+            # depósitos) y suben con la confianza: su caída suma presión.
+            "depositos_usd": {"transform": "dlog", "sign": -1, "weight": 0.5,
+                              "label": "Caída de depósitos en USD"},
         },
     },
 }

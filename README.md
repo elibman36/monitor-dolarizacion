@@ -116,7 +116,7 @@ de peso cada uno:
 | | Volatilidad del CCL | desvío de variaciones diarias, 20 días, anualizado | + |
 | | Riesgo país | Δ 5 días | + |
 | | Devaluación implícita en futuros | nivel | + |
-| | Depósitos en USD (peso ½) | Δlog 5 días | + |
+| | Depósitos en USD (caída = presión) | Δlog 5 días | − |
 
 El cálculo sigue estos pasos:
 
