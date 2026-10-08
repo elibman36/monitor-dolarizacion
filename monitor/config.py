@@ -120,6 +120,16 @@ IPD_ZSCORE_METODO = "robusto"
 IPD_VOL_VENTANA = 20
 IPD_MIN_WEIGHT_SHARE = 0.4 # peso mínimo disponible para publicar el índice
 
+# Ponderación de los componentes dentro de cada bloque:
+#   "pca"  -> cargas del primer componente principal de los promedios mensuales
+#             de los z-scores del bloque (cargas negativas = 0). Se recalculan en
+#             cada corrida con toda la historia publicada.
+#   "fija" -> los `weight` de abajo.
+# Los bloques pesan siempre según su propio `weight` (50% / 50%).
+IPD_PONDERACION = "pca"
+IPD_PCA_FRECUENCIA = "ME"
+IPD_PCA_MIN_OBS = 24        # meses mínimos en común entre dos componentes
+
 IPD_BLOCKS = {
     "emp": {
         "label": "Presión cambiaria (EMP)",

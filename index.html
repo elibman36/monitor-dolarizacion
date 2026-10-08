@@ -202,6 +202,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <li><b>Dolarización de portafolios:</b> nivel de la brecha CCL/oficial, volatilidad del CCL (20 días), suba del riesgo país en 5 días, devaluación implícita en los futuros de A3 Mercados (TNA a 90 días) y crecimiento de los depósitos en dólares.</li>
     </ul>
     <p>El índice se publica desde 2003. Los datos de 1996–2002 sólo se usan como referencia para estandarizar: con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20 a 45 puntos por semana y se desplomó con el corralito, y hay huecos en los datos, así que el índice de esos años no es confiable. Desde 2003 hay 7 de los 9 componentes; la brecha se suma en 2011 (con el blue hasta 2012) y los futuros en 2020. El tooltip del gráfico del IPD indica cuántos componentes había cada día.</p>
+    <p><b>Ponderación.</b> Los dos bloques pesan 50% cada uno. Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable. Los pesos se recalculan en cada actualización con toda la historia.</p>
+    <div class="table-wrap"><table id="pesos-tbl"><thead><tr><th>Bloque</th><th>Componente</th><th class="num">Peso en el bloque</th><th class="num">Peso en el IPD</th></tr></thead><tbody></tbody></table></div>
+    <p class="note" id="pesos-nota"></p>
     <p>Si falta un componente, su peso se reparte entre los demás. El IPD se publica cuando hay datos para al menos el 40% del peso.</p>
     <p><b>Índice 0–100.</b> Para comunicarlo, el IPD se promedia en 10 días hábiles y se lleva a una escala de 0 a 100 con la distribución normal: Índice = 100 × Φ(IPD / σ), donde σ es el desvío histórico del IPD promediado. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 2003. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. Las compras de personas humanas se muestran aparte porque se publican mensualmente y con rezago.</p>
     <p class="note">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
@@ -542,7 +545,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         formatter: (p) => `${p.name}<br><b>${nf(p.value, 2)}</b> desvíos<br><span style="color:${css("--muted")}">al ${comps[p.dataIndex].last_date}</span>`,
       },
       xAxis: { type: "value", axisLabel: { color: css("--muted"), fontSize: 11 }, splitLine: { lineStyle: { color: css("--grid") } } },
-      yAxis: { type: "category", data: comps.map((x) => x.label), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--ink-2"), fontSize: 12 } },
+      yAxis: { type: "category", data: comps.map((x) => x.weight_ipd == null ? x.label : `${x.label} · ${nf(x.weight_ipd * 100, 0)}%`), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--ink-2"), fontSize: 12 } },
       series: [{
         type: "bar", barMaxWidth: 18,
         data: comps.map((x) => ({
@@ -610,7 +613,20 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     }
   }
 
+  function renderPesos() {
+    const tb = document.querySelector("#pesos-tbl tbody");
+    if (!tb) return;
+    const bl = Object.fromEntries(Object.entries(DATA.ipd.blocks).map(([k, b]) => [k, b.label]));
+    tb.innerHTML = DATA.ipd.components.map((c) =>
+      `<tr><td>${bl[c.block] || c.block}</td><td>${c.label}</td><td class="num">${c.weight == null ? "–" : nf(c.weight * 100, 0) + "%"}</td><td class="num">${c.weight_ipd == null ? "–" : nf(c.weight_ipd * 100, 1) + "%"}</td></tr>`).join("");
+    const pca = DATA.config.pca || {};
+    document.getElementById("pesos-nota").textContent = Object.keys(pca).length
+      ? "Varianza explicada por el primer componente: " + Object.entries(pca).map(([k, v]) => `${bl[k] || k}, ${nf(v.varianza_explicada * 100, 0)}%`).join("; ") + "."
+      : "";
+  }
+
   function renderTable() {
+    renderPesos();
     const tb = document.querySelector("#tbl tbody");
     tb.innerHTML = "";
     Object.entries(DATA.series).forEach(([k, s]) => {

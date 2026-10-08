@@ -371,6 +371,7 @@ table.vars .num { text-align: right; font-variant-numeric: tabular-nums; white-s
 .method p { margin: 0 0 6pt; color: #333; }
 .method table { width: 100%; border-collapse: collapse; font-size: 8pt; margin: 4pt 0 8pt; }
 .method td, .method th { border-bottom: 1px solid #eeede8; padding: 3pt 4pt; text-align: left; }
+.method .num { text-align: right; font-variant-numeric: tabular-nums; }
 a { color: #2a78d6; text-decoration: none; }
 """
 
@@ -386,6 +387,9 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
     _, ipd1 = _hasta(p["ipd"], semana.viernes)
 
     labels = {c: spec["label"] for b in config.IPD_BLOCKS.values() for c, spec in b["components"].items()}
+    meta = {c["key"]: c for c in payload["ipd"]["components"]}
+    labels_peso = {c: (f"{l} · {fmt(meta[c]['weight_ipd'] * 100, 0)}%" if meta.get(c, {}).get("weight_ipd") is not None else l)
+                   for c, l in labels.items()}
     z_cierre = {c: _hasta(p[f"z_{c}"], semana.viernes)[1] for c in labels if f"z_{c}" in p}
     z_prev = {c: _hasta(p[f"z_{c}"], semana.viernes - pd.Timedelta(days=7))[1] for c in labels if f"z_{c}" in p}
 
@@ -414,8 +418,12 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
     ph_ult = compras[-1] if compras else None
 
     comp_rows = "".join(
-        f"<tr><td>{html.escape(b['label'])}</td><td>{html.escape(spec['label'])}</td></tr>"
-        for b in config.IPD_BLOCKS.values() for spec in b["components"].values())
+        f"<tr><td>{html.escape(b['label'])}</td><td>{html.escape(spec['label'])}</td>"
+        f"<td class='num'>{fmt((meta.get(c, {}).get('weight') or 0) * 100, 0)}%</td>"
+        f"<td class='num'>{fmt((meta.get(c, {}).get('weight_ipd') or 0) * 100, 1)}%</td></tr>"
+        for b in config.IPD_BLOCKS.values() for c, spec in b["components"].items())
+    pca_txt = "; ".join(f"{config.IPD_BLOCKS[k]['label']}, {fmt(v['varianza_explicada'] * 100, 0)}%"
+                        for k, v in payload.get("config", {}).get("pca", {}).items())
     generado = pd.Timestamp.now(tz="America/Argentina/Buenos_Aires")
 
     return f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><style>{CSS}</style></head><body>
@@ -456,7 +464,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
   <div class="card">
     <h2>Qué explica el índice</h2>
     <p class="note">Contribución de cada componente al cierre (desvíos). Rojo presiona, azul alivia.</p>
-    <div class="chart">{chart_contribuciones(z_cierre, labels)}</div>
+    <div class="chart">{chart_contribuciones(z_cierre, labels_peso)}</div>
   </div>
   <div class="card">
     <h2>Índice desde 2003</h2>
@@ -484,8 +492,8 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
 
 <section class="page method">
   <h2>Metodología</h2>
-  <p>El Índice de Presión Cambiaria adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se estandariza contra los últimos dos años con mediana y desvío absoluto mediano, una versión robusta del z-score que evita que un episodio extremo infle la escala. Los componentes se promedian en dos bloques de igual peso:</p>
-  <table><thead><tr><th>Bloque</th><th>Componente</th></tr></thead><tbody>{comp_rows}</tbody></table>
+  <p>El Índice de Presión Cambiaria adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se estandariza contra los últimos dos años con mediana y desvío absoluto mediano, una versión robusta del z-score que evita que un episodio extremo infle la escala. Los componentes se promedian en dos bloques de igual peso. Dentro de cada bloque, los pesos salen de componentes principales: cada componente pesa según su carga en el primer componente principal de los promedios mensuales del bloque desde 2003 (las cargas negativas valen cero). Varianza explicada por el primer componente: {pca_txt}.</p>
+  <table><thead><tr><th>Bloque</th><th>Componente</th><th class="num">Peso en el bloque</th><th class="num">Peso en el IPD</th></tr></thead><tbody>{comp_rows}</tbody></table>
   <p>El resultado (IPD, en desvíos) se promedia en 10 días hábiles y se lleva a una escala de 0 a 100 con la normal acumulada: Índice = 100 × Φ(IPD / σ), donde σ es el desvío histórico. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Si falta un componente, su peso se reparte entre los demás.</p>
   <p><b>Fuentes:</b> BCRA (reservas, tipo de cambio A3500, BADLAR, depósitos en dólares y anexo del balance cambiario), ArgentinaDatos (dólar MEP, CCL y blue; riesgo país) y A3 Mercados (futuros de dólar). Todas las series se descargan automáticamente.</p>
   <p class="muted">Generado el {generado.day}/{generado.month}/{generado.year} a las {generado:%H:%M} (hora argentina). Tablero diario y datos: <a href="{DASHBOARD_URL}">{DASHBOARD_URL}</a></p>

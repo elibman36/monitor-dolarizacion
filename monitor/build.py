@@ -279,9 +279,12 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
         for ckey, spec in block["components"].items():
             z = ipd["components"].get(ckey)
             d, v = _last(z) if z is not None else (None, None)
+            w_bloque = ipd["pesos"].get(bkey, {}).get(ckey)
             components_meta.append({
                 "key": ckey, "block": bkey, "label": spec["label"],
-                "transform": spec["transform"], "weight": spec["weight"],
+                "transform": spec["transform"],
+                "weight": _clean(w_bloque),
+                "weight_ipd": _clean(w_bloque * block["weight"]) if w_bloque is not None else None,
                 "last_date": d, "z": v,
                 "data": _pairs(z) if z is not None else [],
             })
@@ -294,6 +297,9 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "config": {
+            "ponderacion": config.IPD_PONDERACION,
+            "pca": {b: {"varianza_explicada": _clean(v["varianza_explicada"])}
+                    for b, v in ipd["pesos_info"].items()},
             "horizon": config.IPD_HORIZON,
             "zscore_window": config.IPD_ZSCORE_WINDOW,
             "percentile_window": config.IPD_PERCENTILE_WINDOW,

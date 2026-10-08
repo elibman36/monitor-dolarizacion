@@ -126,9 +126,16 @@ El cálculo sigue estos pasos:
    dispersión, como en el EMP clásico, pero sin que un episodio extremo (la
    devaluación de dic-23) infle la escala durante dos años. La versión con
    media y desvío estándar sigue disponible (`IPD_ZSCORE_METODO = "clasico"`).
-2. **Promedio ponderado.** Se promedia dentro de cada bloque y después entre
-   bloques. Si falta un componente, su peso se reparte entre los demás. El
-   índice sólo se publica si está disponible al menos el 40% del peso.
+2. **Promedio ponderado.** Los bloques pesan 50% cada uno. Dentro de cada
+   bloque, los pesos salen de **componentes principales**: se calcula la matriz
+   de correlaciones de los promedios mensuales de los z-scores desde 2003 y cada
+   componente pesa según su carga en el primer componente principal (cuánto se
+   mueve junto con el resto). Las cargas negativas valen cero, para no invertir
+   el sentido económico de ninguna variable. Los pesos se recalculan en cada
+   corrida y se publican en `monitor.json`, el tablero y el reporte
+   (`IPD_PONDERACION = "fija"` vuelve a los pesos manuales). Si falta un
+   componente, su peso se reparte entre los demás; el índice sólo se publica si
+   está disponible al menos el 40% del peso.
 3. **Índice 0–100.** El IPD se promedia en 10 días hábiles y se lleva a una
    escala de 0 a 100 con la normal acumulada: Índice = 100 × Φ(IPD / σ), con σ el
    desvío histórico del IPD promediado. 50 es neutral; debajo, presión

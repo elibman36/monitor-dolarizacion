@@ -174,6 +174,8 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
     h = config.IPD_HORIZON
     components: dict[str, pd.Series] = {}
     block_series: dict[str, pd.Series] = {}
+    pesos: dict[str, dict[str, float]] = {}
+    pesos_info: dict[str, dict] = {}
     for bkey, block in config.IPD_BLOCKS.items():
         zs = {}
         for ckey, spec in block["components"].items():
@@ -187,6 +189,12 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
             components[ckey] = z
         if zs:
             weights = {k: block["components"][k]["weight"] for k in zs}
+            if config.IPD_PONDERACION == "pca":
+                pca = pca_weights(pd.DataFrame(zs))
+                if pca is not None:
+                    weights, var_expl = pca
+                    pesos_info[bkey] = {"varianza_explicada": var_expl}
+            pesos[bkey] = weights
             block_series[bkey] = _weighted_mean(pd.DataFrame(zs), weights)
     blocks = pd.DataFrame(block_series, index=df.index)
     ipd = _weighted_mean(blocks, {k: config.IPD_BLOCKS[k]["weight"] for k in blocks.columns})
@@ -201,6 +209,8 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
     n_comp = comps.notna().sum(axis=1).where(ipd.notna())
     indice, sigma = pressure_index(ipd)
     return {
+        "pesos": pesos,
+        "pesos_info": pesos_info,
         "ipd": ipd,
         "indice": indice,
         "indice_sigma": sigma,
@@ -209,6 +219,30 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
         "blocks": blocks,
         "components": comps,
     }
+
+
+def pca_weights(zs: pd.DataFrame) -> tuple[dict[str, float], float] | None:
+    """Pesos de un bloque según su primer componente principal.
+
+    Se usa la matriz de correlaciones de los promedios mensuales de los
+    z-scores (desde IPD_PUBLICAR_DESDE, con datos de a pares), para capturar
+    los ciclos comunes y no el ruido diario. Las cargas se orientan para que
+    sumen positivo; las negativas valen 0 (no se invierte el sentido económico
+    de ningún componente). Devuelve (pesos que suman 1, varianza explicada).
+    """
+    m = zs[zs.index >= pd.Timestamp(config.IPD_PUBLICAR_DESDE)].resample(config.IPD_PCA_FRECUENCIA).mean()
+    corr = m.corr(min_periods=config.IPD_PCA_MIN_OBS).dropna(how="all").dropna(axis=1, how="all")
+    if corr.shape[0] < 2 or corr.isna().any().any():
+        return None
+    vals, vecs = np.linalg.eigh(corr.to_numpy())
+    carga = pd.Series(vecs[:, -1], index=corr.columns)
+    if carga.sum() < 0:
+        carga = -carga
+    w = carga.clip(lower=0)
+    if w.sum() <= 0:
+        return None
+    w = (w / w.sum()).reindex(zs.columns).fillna(0.0)
+    return {k: float(v) for k, v in w.items()}, float(vals[-1] / vals.sum())
 
 
 def pressure_index(ipd: pd.Series) -> tuple[pd.Series, float]:

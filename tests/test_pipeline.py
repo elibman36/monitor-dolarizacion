@@ -233,3 +233,17 @@ def test_reporte_semanal_html(fake_api):
     html_txt = report.construir_html(semana, p, payload)
     assert "Reporte semanal" in html_txt and "/100" in html_txt
     assert "Variables de la semana" in html_txt and "<svg" in html_txt
+
+
+def test_pca_weights():
+    rng = np.random.default_rng(2)
+    idx = pd.bdate_range("2003-01-01", periods=2500)
+    f = np.repeat(rng.standard_normal(120), 21)[:2500]  # factor común mensual
+    zs = pd.DataFrame({
+        "a": f + 0.3 * rng.standard_normal(2500),
+        "b": f + 0.3 * rng.standard_normal(2500),
+        "c": -f + 0.3 * rng.standard_normal(2500),   # se mueve al revés
+    }, index=idx)
+    w, var = indicators.pca_weights(zs)
+    assert w["c"] == 0 and w["a"] == pytest.approx(0.5, abs=0.05)
+    assert sum(w.values()) == pytest.approx(1.0) and 0 < var <= 1
