@@ -64,6 +64,6 @@ jobs:
             echo "Sin cambios."
           else
             git commit -m "Reporte semanal: $(ls -t reportes/reporte-semanal-*.pdf | head -1 | xargs basename)"
-            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git pull --rebase -X theirs origin "${GITHUB_REF_NAME}"
             git push
           fi

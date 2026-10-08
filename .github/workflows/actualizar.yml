@@ -49,6 +49,6 @@ jobs:
             echo "Sin cambios en los datos."
           else
             git commit -m "Monitor de dolarización: datos al $(date -u +%Y-%m-%d)"
-            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git pull --rebase -X theirs origin "${GITHUB_REF_NAME}"
             git push
           fi
