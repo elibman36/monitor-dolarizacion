@@ -219,3 +219,17 @@ def test_realized_vol():
     s = pd.Series(np.exp(np.cumsum([0.01, -0.01] * 30)))
     v = indicators.realized_vol(s, 20)
     assert v.iloc[-1] == pytest.approx(0.01 * np.sqrt(20 / 19) * np.sqrt(252) * 100, rel=1e-6)
+
+
+def test_reporte_semanal_html(fake_api):
+    from datetime import date
+    from monitor import report
+    syn, tmp = fake_api
+    build.run()
+    semana = report.semana_anterior(date(2026, 6, 8))  # lunes
+    assert (semana.lunes.date(), semana.viernes.date()) == (date(2026, 6, 1), date(2026, 6, 5))
+    p = pd.read_csv(tmp / "panel_diario.csv", index_col=0, parse_dates=True)
+    payload = json.loads((tmp / "monitor.json").read_text())
+    html_txt = report.construir_html(semana, p, payload)
+    assert "Reporte semanal" in html_txt and "/100" in html_txt
+    assert "Variables de la semana" in html_txt and "<svg" in html_txt

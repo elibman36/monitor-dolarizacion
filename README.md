@@ -47,6 +47,28 @@ python -m monitor.build --offline   # recalcula con lo ya guardado
 python -m http.server               # y abrir http://localhost:8000
 ```
 
+## Reporte semanal en PDF
+
+Todos los lunes a las 07:47 (hora argentina) el workflow
+`.github/workflows/reporte-semanal.yml` actualiza los datos y genera un PDF de
+tres páginas con la semana hábil anterior (lunes a viernes):
+
+1. el índice al cierre de la semana, un resumen automático y los gráficos del
+   índice (18 meses y desde 2003) y de sus componentes;
+2. la tabla de variables con variación semanal y de 4 semanas, gráficos de los
+   últimos seis meses y compras de USD de personas humanas;
+3. la metodología.
+
+Queda en `reportes/reporte-semanal-AAAA-MM-DD.pdf` (fecha del viernes) y en
+`reportes/ultimo.pdf`, y también como artefacto de la corrida en *Actions*.
+Para regenerar una semana: *Actions → Reporte semanal (PDF) → Run workflow*
+con la fecha del lunes siguiente. Localmente:
+
+```bash
+pip install -r requirements-reporte.txt && python -m playwright install chromium
+python -m monitor.report --fecha 2026-10-05   # semana del 28/9 al 2/10
+```
+
 ## Variables y fuentes
 
 | Variable | Desde | Frecuencia | Fuente | Carga |
