@@ -245,5 +245,15 @@ def test_pca_weights():
         "c": -f + 0.3 * rng.standard_normal(2500),   # se mueve al revés
     }, index=idx)
     w, var = indicators.pca_weights(zs)
-    assert w["c"] == 0 and w["a"] == pytest.approx(0.5, abs=0.05)
+    # "c" tiene carga negativa: queda en el peso mínimo y el resto se reparte.
+    assert w["c"] == pytest.approx(config.IPD_PCA_PESO_MINIMO)
+    assert w["a"] == pytest.approx((1 - config.IPD_PCA_PESO_MINIMO) / 2, abs=0.05)
     assert sum(w.values()) == pytest.approx(1.0) and 0 < var <= 1
+
+
+def test_apply_min_weight():
+    w = pd.Series({"a": 0.5, "b": 0.45, "c": 0.05, "d": 0.0})
+    out = indicators.apply_min_weight(w, 0.10)
+    assert out.sum() == pytest.approx(1.0)
+    assert out["c"] == pytest.approx(0.10) and out["d"] == pytest.approx(0.10)
+    assert out["a"] / out["b"] == pytest.approx(0.5 / 0.45)

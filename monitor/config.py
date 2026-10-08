@@ -129,6 +129,9 @@ IPD_MIN_WEIGHT_SHARE = 0.4 # peso mínimo disponible para publicar el índice
 IPD_PONDERACION = "pca"
 IPD_PCA_FRECUENCIA = "ME"
 IPD_PCA_MIN_OBS = 24        # meses mínimos en común entre dos componentes
+# Peso mínimo de cada componente dentro de su bloque: ninguno queda afuera
+# aunque la PCA le asigne carga nula o negativa (p. ej. riesgo país).
+IPD_PCA_PESO_MINIMO = 0.10
 
 IPD_BLOCKS = {
     "emp": {

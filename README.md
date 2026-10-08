@@ -131,7 +131,8 @@ El cálculo sigue estos pasos:
    de correlaciones de los promedios mensuales de los z-scores desde 2003 y cada
    componente pesa según su carga en el primer componente principal (cuánto se
    mueve junto con el resto). Las cargas negativas valen cero, para no invertir
-   el sentido económico de ninguna variable. Los pesos se recalculan en cada
+   el sentido económico de ninguna variable, y ningún componente pesa menos del
+   10% de su bloque (`IPD_PCA_PESO_MINIMO`). Los pesos se recalculan en cada
    corrida y se publican en `monitor.json`, el tablero y el reporte
    (`IPD_PONDERACION = "fija"` vuelve a los pesos manuales). Si falta un
    componente, su peso se reparte entre los demás; el índice sólo se publica si

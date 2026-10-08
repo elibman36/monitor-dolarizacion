@@ -242,7 +242,30 @@ def pca_weights(zs: pd.DataFrame) -> tuple[dict[str, float], float] | None:
     if w.sum() <= 0:
         return None
     w = (w / w.sum()).reindex(zs.columns).fillna(0.0)
+    w = apply_min_weight(w, config.IPD_PCA_PESO_MINIMO)
     return {k: float(v) for k, v in w.items()}, float(vals[-1] / vals.sum())
+
+
+def apply_min_weight(w: pd.Series, minimo: float) -> pd.Series:
+    """Garantiza un peso mínimo a cada componente y reparte el resto en proporción.
+
+    Los componentes por debajo del mínimo quedan en el mínimo; el peso restante
+    se distribuye entre los demás según sus pesos originales. Se repite hasta
+    que ninguno quede por debajo (puede pasar al reescalar).
+    """
+    if not minimo or minimo * len(w) >= 1:
+        return w
+    fijos = pd.Series(False, index=w.index)
+    for _ in range(len(w)):
+        libres = ~fijos
+        resto = 1 - minimo * fijos.sum()
+        base = w[libres]
+        nuevo = base / base.sum() * resto if base.sum() > 0 else pd.Series(resto / libres.sum(), index=base.index)
+        bajo = nuevo < minimo
+        if not bajo.any():
+            return pd.concat([pd.Series(minimo, index=w.index[fijos]), nuevo]).reindex(w.index)
+        fijos[nuevo.index[bajo]] = True
+    return pd.Series(1 / len(w), index=w.index)
 
 
 def pressure_index(ipd: pd.Series) -> tuple[pd.Series, float]:
