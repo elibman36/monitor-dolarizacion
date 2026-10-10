@@ -121,7 +121,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </div>
     <div class="controls">
       <div class="seg" id="pais" role="group" aria-label="País">
-        <button data-p="ar">Argentina</button><button data-p="pe">Perú</button><button data-p="comparado">Comparar países</button>
+        <button data-p="ar">Argentina</button><button data-p="pe">Perú</button><button data-p="uy">Uruguay</button><button data-p="comparado">Comparar países</button>
       </div>
       <div class="seg" id="range" role="group" aria-label="Período">
         <button data-r="90">3M</button><button data-r="182">6M</button><button data-r="365" aria-pressed="true">1A</button><button data-r="730">2A</button><button data-r="1825">5A</button><button data-r="3650">10A</button><button data-r="0">Todo</button>
@@ -146,8 +146,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <table id="comp-tbl"><thead></thead><tbody></tbody></table>
     </section>
     <section class="card method">
-      <p><b>Cómo se calcula.</b> Siguiendo a Girton y Roper (1977), Weymark (1995) y Patnaik, Felman y Shah (2017), la presión sobre una moneda se ve en lo que se deprecia y en lo que el banco central vende para evitarlo: <i>presión = depreciación + ρ × intervención</i>. La intervención es la venta neta de dólares del banco central en el mes, en % de sus reservas del mes anterior: en Argentina, las compras y ventas de divisas del BCRA más el cambio en su posición vendida de futuros; en Perú, las operaciones de la mesa de negociación y los swaps cambiarios del BCRP. ρ convierte la intervención en puntos de depreciación y es el mismo para todos los países, para que las unidades sean comparables: se fija con la dispersión del panel (desvío absoluto mediano de la depreciación sobre el de la intervención), de modo que una intervención típica equivale a una depreciación típica. <span id="comp-rho"></span></p>
-      <p class="note">Límites: en Argentina, con cepo, buena parte de la presión se va a la brecha y no al oficial, así que esta medida la subestima en esos años (el índice 0–100 sí la captura). Sólo cuenta la intervención del banco central: las ventas de dólares del Tesoro argentino (por ejemplo, en septiembre y octubre de 2025) no entran. Las tasas de interés no se incluyen. Uruguay se suma cuando estén automatizadas sus series de intervención.</p>
+      <p><b>Cómo se calcula.</b> Siguiendo a Girton y Roper (1977), Weymark (1995) y Patnaik, Felman y Shah (2017), la presión sobre una moneda se ve en lo que se deprecia y en lo que el banco central vende para evitarlo: <i>presión = depreciación + ρ × intervención</i>. La intervención es la venta neta de dólares del banco central en el mes, en % de sus reservas del mes anterior: en Argentina, las compras y ventas de divisas del BCRA más el cambio en su posición vendida de futuros; en Perú, las operaciones de la mesa de negociación y los swaps cambiarios del BCRP; en Uruguay, a falta de una serie pública de operaciones del BCU, la caída de su posición en moneda extranjera (una aproximación que incluye efectos de valuación). ρ convierte la intervención en puntos de depreciación y es el mismo para todos los países, para que las unidades sean comparables: se fija con la dispersión del panel (desvío absoluto mediano de la depreciación sobre el de la intervención), de modo que una intervención típica equivale a una depreciación típica. <span id="comp-rho"></span></p>
+      <p class="note">Límites: en Argentina, con cepo, buena parte de la presión se va a la brecha y no al oficial, así que esta medida la subestima en esos años (el índice 0–100 sí la captura). Sólo cuenta la intervención del banco central: las ventas de dólares del Tesoro argentino (por ejemplo, en septiembre y octubre de 2025) no entran. Las tasas de interés no se incluyen. En Uruguay la intervención es una aproximación.</p>
     </section>
   </div>
 
@@ -226,6 +226,14 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </ul>
     <p>El índice se publica desde 2003; 1995–2002 sólo sirve de referencia. Fuente: estadísticas del BCRP (API pública).</p>
     </div>
+    <div data-metodo="uy" hidden>
+    <p>El índice de Uruguay usa el mismo método, con componentes propios. Uruguay es una economía muy dolarizada (más del 60% de los depósitos privados están en dólares) y sin restricciones cambiarias, así que la presión se ve en el precio, en el balance del Banco Central del Uruguay (BCU) y en la composición de los depósitos. Dos subíndices de igual peso:</p>
+    <ul>
+      <li><b>Presión cambiaria:</b> depreciación del peso en 5 días, volatilidad del tipo de cambio (20 días), caída de la posición en moneda extranjera del BCU (sus reservas netas de las obligaciones en dólares con el sector público y el financiero, para que los movimientos de encajes no se lean como presión) y caída de los activos de reserva.</li>
+      <li><b>Dolarización:</b> cambio en 3 meses de la dolarización de los depósitos privados y crecimiento en 3 meses de los depósitos privados en dólares (datos mensuales que entran unas 6 semanas después del cierre).</li>
+    </ul>
+    <p>Todavía no hay fuentes automáticas para la tasa de política monetaria reciente ni para el riesgo país (UBI), así que no forman parte del índice. Fuentes: BCU (servicio de cotizaciones, planilla diaria de activos de reserva y series de depósitos de la Superintendencia de Servicios Financieros).</p>
+    </div>
     <div data-metodo="ar">
     <p>El Índice de Presión de Dolarización (IPD) adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes) y se promedia dentro de tres subíndices:</p>
     <ul>
@@ -235,7 +243,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </ul>
     <p>El índice se publica desde 2003. Los datos de 1996–2002 sólo se usan como referencia para estandarizar: con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20 a 45 puntos por semana y se desplomó con el corralito, y hay huecos en los datos. No todos los componentes existen desde el inicio: la brecha se suma en 2011 (con el blue hasta 2012 y el CCL hasta que hay MEP, en 2018), la FAE en 2008, el canje en 2019 y los futuros en 2020. El tooltip del gráfico de la medida de base indica cuántos componentes había cada día.</p>
     </div>
-    <p><b>Ponderación.</b> Los subíndices pesan lo mismo (tres en Argentina, dos en Perú). Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así ninguna variable queda afuera aunque la PCA le asigne carga nula. Los pesos se recalculan en cada actualización con toda la historia.</p>
+    <p><b>Ponderación.</b> Los subíndices pesan lo mismo (tres en Argentina, dos en Perú y Uruguay). Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así ninguna variable queda afuera aunque la PCA le asigne carga nula. Los pesos se recalculan en cada actualización con toda la historia.</p>
     <div class="table-wrap"><table id="pesos-tbl"><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody></tbody></table></div>
     <p class="note" id="pesos-nota"></p>
     <p>Si falta un componente, su peso se reparte entre los demás de su subíndice. El índice se publica cuando hay datos para al menos el 40% del peso.</p>
@@ -281,6 +289,21 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         { title: "Dolarización de la liquidez y del crédito (fin de mes)", keys: ["dolarizacion_liquidez", "dolarizacion_credito"], names: ["Liquidez", "Crédito"], unit: "%" },
       ],
     },
+  };
+  PAISES.uy = {
+    json: "data/uy/monitor.json", csv: "data/uy/panel_diario.csv", pdf: "reportes/uy/ultimo.pdf",
+    sub: "Presión cambiaria y dolarización en Uruguay, con datos diarios.",
+    fuentes: "BCU",
+    tiles: ["tc", "reservas", "posicion_me", "vol_tc", "dolarizacion_depositos", "depositos_me_usd"],
+    up: { tc: 1, reservas: -1, posicion_me: -1, vol_tc: 1, dolarizacion_depositos: 1, depositos_me_usd: 1 },
+    mensuales: ["dolarizacion_depositos", "depositos_me_usd"],
+    multiples: [
+      { title: "Tipo de cambio interbancario", keys: ["tc"], unit: "$U por USD" },
+      { title: "Volatilidad del tipo de cambio (20 días)", keys: ["vol_tc"], unit: "% anualizada" },
+      { title: "Reservas y posición en moneda extranjera del BCU", keys: ["reservas", "posicion_me"], names: ["Activos de reserva", "Posición en ME"], unit: "millones de USD" },
+      { title: "Dolarización de los depósitos privados (fin de mes)", keys: ["dolarizacion_depositos"], unit: "%" },
+      { title: "Depósitos privados en dólares (fin de mes)", keys: ["depositos_me_usd"], unit: "millones de USD" },
+    ],
   };
   const COLOR_PAIS = { ar: "--s1", pe: "--s2", uy: "--s3" };
   let PAIS = new URLSearchParams(location.search).get("pais") || "ar";
@@ -806,7 +829,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const idx = Object.fromEntries(entries.map(([k, v]) => [k, new Map(v.data.map((r) => [r[0], r]))]));
     document.querySelector("#comp-tbl tbody").innerHTML = ult.map((m) => `<tr><td>${m}</td>${entries.map(([k]) => { const r = idx[k].get(m); return r ? `<td class="num"><b>${nf(r[1], 1)}%</b></td><td class="num">${nf(r[3], 1)}%</td><td class="num">${nf(r[4], 1)}%</td>` : "<td></td><td></td><td></td>"; }).join("")}</tr>`).join("");
     document.getElementById("comp-rho").textContent = COMP.rho != null ? `Con los datos actuales, vender el 1% de las reservas en un mes equivale a ${nf(COMP.rho, 2)} puntos de depreciación.` : "";
-    document.getElementById("foot").textContent = `Actualizado: ${new Date(COMP.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, BCRP.`;
+    document.getElementById("foot").textContent = `Actualizado: ${new Date(COMP.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, BCRP, BCU.`;
   }
 
   document.querySelectorAll("#pais button").forEach((b) => b.addEventListener("click", () => {

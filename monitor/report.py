@@ -602,7 +602,53 @@ def _perfil_pe() -> dict:
     }
 
 
-PERFILES = {"ar": lambda: PERFIL_AR, "pe": _perfil_pe}
+def _metodo_uy(pca_txt: str) -> str:
+    return f"""<p>El índice de Uruguay usa el mismo método que el de Argentina (una adaptación del <i>Exchange Market Pressure Index</i> de Girton y Roper, 1977, y Eichengreen, Rose y Wyplosz, 1996), con componentes propios: Uruguay es una economía muy dolarizada y sin restricciones cambiarias, así que la presión se ve en el tipo de cambio, en el balance del Banco Central del Uruguay (BCU) y en la composición de los depósitos. Cada componente se compara con los últimos dos años (mediana y desvío absoluto mediano). Dos subíndices de igual peso: <b>presión cambiaria</b> (depreciación del peso, su volatilidad, caída de la posición en moneda extranjera del BCU y de los activos de reserva) y <b>dolarización</b> (cambio en 3 meses de la dolarización de los depósitos privados y crecimiento de los depósitos en dólares). Los pesos salen de componentes principales, con cargas negativas en cero y un mínimo de 10% por componente. Varianza explicada por el primer componente: {pca_txt}. Todavía no hay fuentes automáticas para la tasa de política monetaria reciente ni para el riesgo país (UBI).</p>"""
+
+
+def _partes_uy(datos: dict) -> list[str]:
+    partes = []
+    if "tc" in datos:
+        partes.append(f"el peso {_txt_var(datos['tc']['d'], 'pct', 2)}")
+    if "posicion_me" in datos and np.isfinite(datos["posicion_me"]["d"]):
+        d = datos["posicion_me"]["d"]
+        partes.append(f"la posición en moneda extranjera del BCU {'subió' if d >= 0 else 'cayó'} USD {fmt(abs(d), 0)} M")
+    return partes
+
+
+def _minis_uy(p: pd.DataFrame, semana: Semana) -> list[str]:
+    return [
+        chart_mini([("Interbancario", p.get("tc"), S1)], "Tipo de cambio", "$U por USD", semana),
+        chart_mini([("Volatilidad", p.get("vol_tc"), S1)], "Volatilidad cambiaria", "% anualizada, 20 días", semana),
+        chart_mini([("Activos de reserva", p.get("reservas"), S1), ("Posición en ME", p.get("posicion_me"), S2)],
+                   "Reservas del BCU", "millones de USD", semana),
+        chart_mini([("Depósitos", p.get("dolarizacion_depositos"), S1)], "Dolarización de depósitos", "% (dato mensual)", semana),
+    ]
+
+
+VARIABLES_UY = [
+    ("tc", "Tipo de cambio interbancario", "$U por USD", 3, "pct"),
+    ("vol_tc", "Volatilidad del tipo de cambio (20 días)", "% anual", 1, "pp"),
+    ("reservas", "Activos de reserva del BCU", "M USD", 0, "abs"),
+    ("posicion_me", "Posición en moneda extranjera del BCU", "M USD", 0, "abs"),
+    ("dolarizacion_depositos", "Dolarización de los depósitos privados", "%, último fin de mes publicado", 1, "pp"),
+    ("depositos_me_usd", "Depósitos privados en dólares", "M USD, último fin de mes publicado", 0, "abs"),
+]
+
+
+def _perfil_uy() -> dict:
+    from . import uruguay
+    return {
+        "codigo": "uy", "titulo": " · Uruguay", "query": "?pais=uy", "blocks": uruguay.IPD_BLOCKS, "variables": VARIABLES_UY,
+        "minis": _minis_uy, "partes": _partes_uy, "fae": False, "metodo": _metodo_uy,
+        "metodo_extra": " Los depósitos son mensuales y entran al índice unas seis semanas después del cierre de cada mes.",
+        "nota_variables": "Los depósitos se publican una vez por mes, con unas seis semanas de rezago.",
+        "fuentes": "BCU: servicio de cotizaciones, planilla diaria de activos de reserva y series de depósitos de la Superintendencia de Servicios Financieros. Todas las series se descargan automáticamente.",
+        "panel": uruguay.DATA_DIR / "panel_diario.csv", "json": uruguay.OUTPUT_JSON, "salida": REPORTS_DIR / "uy",
+    }
+
+
+PERFILES = {"ar": lambda: PERFIL_AR, "pe": _perfil_pe, "uy": _perfil_uy}
 
 
 def html_a_pdf(html_txt: str, destino: Path, titulo: str = "Monitor de Dolarización") -> None:
