@@ -309,10 +309,18 @@ def _last(s: pd.Series, lag_days: int = 0):
 
 def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
                   fetch_status: dict[str, str],
-                  raw: dict[str, pd.Series] | None = None) -> dict:
+                  raw: dict[str, pd.Series] | None = None, *,
+                  series_meta: dict | None = None, blocks_cfg: dict | None = None,
+                  events: list | None = None, pais: dict | None = None) -> dict:
+    """Arma el JSON del tablero. Los parámetros con nombre permiten reusarlo
+    para otros países (por defecto, Argentina)."""
     raw = raw or {}
+    series_meta = series_meta or SERIES_META
+    blocks_cfg = blocks_cfg or config.IPD_BLOCKS
+    events = config.EVENTS if events is None else events
+    pais = pais or {"codigo": "ar", "nombre": "Argentina", "publicar_desde": config.IPD_PUBLICAR_DESDE}
     series_out = {}
-    for key, (label, unit, source) in SERIES_META.items():
+    for key, (label, unit, source) in series_meta.items():
         # Las series descargadas se publican sin el relleno del panel, para que
         # la fecha del último dato sea la real.
         if key == "ipd":
@@ -333,7 +341,7 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
         }
 
     components_meta = []
-    for bkey, block in config.IPD_BLOCKS.items():
+    for bkey, block in blocks_cfg.items():
         for ckey, spec in block["components"].items():
             z = ipd["components"].get(ckey)
             d, v = _last(z) if z is not None else (None, None)
@@ -356,6 +364,7 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "pais": pais,
         "config": {
             "ponderacion": config.IPD_PONDERACION,
             "pca": {b: {"varianza_explicada": _clean(v["varianza_explicada"])}
@@ -379,9 +388,9 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
             "percentile": _pairs(ipd["percentil"]),
             "indice": _pairs(ipd["indice"]),
             "n_components": _pairs(ipd["n_componentes"]),
-            "n_components_total": sum(len(b["components"]) for b in config.IPD_BLOCKS.values()),
+            "n_components_total": sum(len(b["components"]) for b in blocks_cfg.values()),
             "blocks": {
-                b: {"label": config.IPD_BLOCKS[b]["label"], "data": _pairs(ipd["blocks"][b])}
+                b: {"label": blocks_cfg[b]["label"], "data": _pairs(ipd["blocks"][b])}
                 for b in ipd["blocks"].columns
             },
             "components": components_meta,
@@ -393,9 +402,9 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
                      (_clean(v) if not isinstance(v, str) else v))
                  for k, v in row.items()}
                 for row in compras.to_dict("records")
-            ] if not compras.empty else [],
+            ] if compras is not None and not compras.empty else [],
         },
-        "events": config.EVENTS,
+        "events": events,
         "sources_status": fetch_status,
     }
 

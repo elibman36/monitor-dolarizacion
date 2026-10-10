@@ -306,3 +306,42 @@ def test_posicion_bcra_rezago():
     assert d[:"2025-03-06"].isna().all()
     assert d["2025-03-07"] == 100.0
     assert d["2025-04-30"] == 200.0
+
+
+def test_peru_parse_bcrp():
+    from monitor import peru
+    j = {"config": {"series": [{"name": "TC"}]}, "periods": [
+        {"name": "02.Ene.97", "values": ["2.6"]}, {"name": "30.Set.26", "values": ["3.4"]},
+        {"name": "01.Oct.26", "values": ["n.d."]}]}
+    s = peru.parse_bcrp(j, "tc")
+    assert list(s.index) == [pd.Timestamp("1997-01-02"), pd.Timestamp("2026-09-30")]
+    m = peru.parse_bcrp({"periods": [{"name": "Ago.2026", "values": ["26.0"]}]}, "x")
+    assert m.index[0] == pd.Timestamp("2026-08-31")
+
+
+def test_peru_intervencion_y_ipd():
+    from monitor import peru
+    idx = pd.bdate_range("2001-01-01", "2006-12-29")
+    rng = np.random.default_rng(1)
+    n = len(idx)
+    tc = pd.Series(3.4 * np.exp(np.cumsum(rng.normal(0, 0.003, n))), index=idx)
+    raw = {
+        "tc": tc, "rin": pd.Series(10000.0, index=idx), "posicion_cambio": pd.Series(np.linspace(5000, 8000, n), index=idx),
+        "mesa_compras_netas": pd.Series(rng.normal(0, 20, n), index=idx),
+        "sc_venta_pactado": pd.Series(0.0, index=idx), "sc_venta_vencido": pd.Series(0.0, index=idx),
+        "tasa_interbancaria": pd.Series(4 + rng.normal(0, 0.05, n).cumsum() * 0.01, index=idx),
+        "embig": pd.Series(200 + rng.normal(0, 3, n).cumsum(), index=idx),
+        "bono_10a": pd.Series(6 + rng.normal(0, 0.02, n).cumsum(), index=idx),
+        "dolarizacion_liquidez": pd.Series(np.linspace(70, 50, 72), index=pd.date_range("2001-01-31", periods=72, freq="ME")),
+    }
+    # Un día de ventas fuertes del BCRP (compras netas negativas) y un swap venta.
+    raw["mesa_compras_netas"].iloc[1000] = -500
+    raw["sc_venta_pactado"].iloc[1000] = 300
+    df = peru.derived_series(raw)
+    d = idx[1000]
+    assert df.loc[d, "intervencion_usd"] - df.loc[idx[999], "intervencion_usd"] == pytest.approx(
+        800 - (-raw["mesa_compras_netas"].iloc[1000 - peru.INTERVENCION_VENTANA]), abs=1e-6)
+    out = indicators.compute_ipd(df, peru.IPD_BLOCKS, "2003-01-01")
+    assert out["indice"].dropna().between(0, 100).all()
+    assert out["indice"][:"2002-12-31"].isna().all()
+    assert set(out["pesos"]) == {"cambiaria", "dolarizacion"}

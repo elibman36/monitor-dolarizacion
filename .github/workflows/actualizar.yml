@@ -40,6 +40,10 @@ jobs:
       - name: Descargar datos y recalcular el IPD
         run: python -m monitor.build
 
+      - name: Perú
+        continue-on-error: true
+        run: python -m monitor.peru
+
       - name: Publicar datos
         run: |
           git config user.name "monitor-dolarizacion[bot]"

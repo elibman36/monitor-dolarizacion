@@ -231,13 +231,18 @@ def rolling_percentile(x: pd.Series, window: int, min_obs: int) -> pd.Series:
     return x.rolling(window, min_periods=min_obs).apply(pct, raw=True)
 
 
-def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
+def compute_ipd(df: pd.DataFrame, blocks_cfg: dict | None = None,
+                publicar_desde: str | None = None) -> dict[str, pd.DataFrame | pd.Series]:
+    """IPD de un país. `blocks_cfg` y `publicar_desde` permiten usar el mismo
+    motor con otra configuración (por defecto, la de Argentina en config)."""
+    blocks_cfg = blocks_cfg or config.IPD_BLOCKS
+    publicar_desde = publicar_desde or config.IPD_PUBLICAR_DESDE
     h = config.IPD_HORIZON
     components: dict[str, pd.Series] = {}
     block_series: dict[str, pd.Series] = {}
     pesos: dict[str, dict[str, float]] = {}
     pesos_info: dict[str, dict] = {}
-    for bkey, block in config.IPD_BLOCKS.items():
+    for bkey, block in blocks_cfg.items():
         zs = {}
         for ckey, spec in block["components"].items():
             if ckey not in df or df[ckey].dropna().empty:
@@ -254,17 +259,17 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
         if zs:
             weights = {k: block["components"][k]["weight"] for k in zs}
             if config.IPD_PONDERACION == "pca":
-                pca = pca_weights(pd.DataFrame(zs))
+                pca = pca_weights(pd.DataFrame(zs), publicar_desde)
                 if pca is not None:
                     weights, var_expl = pca
                     pesos_info[bkey] = {"varianza_explicada": var_expl}
             pesos[bkey] = weights
             block_series[bkey] = _weighted_mean(pd.DataFrame(zs), weights, config.IPD_MIN_WEIGHT_SHARE_BLOQUE)
     blocks = pd.DataFrame(block_series, index=df.index)
-    ipd = _weighted_mean(blocks, {k: config.IPD_BLOCKS[k]["weight"] for k in blocks.columns})
+    ipd = _weighted_mean(blocks, {k: blocks_cfg[k]["weight"] for k in blocks.columns})
     ipd = ipd.reindex(df.index)
     # Antes de IPD_PUBLICAR_DESDE los datos sólo sirven de ventana de referencia.
-    publicar = df.index >= pd.Timestamp(config.IPD_PUBLICAR_DESDE)
+    publicar = df.index >= pd.Timestamp(publicar_desde)
     ipd = ipd.where(publicar)
     blocks.loc[~publicar] = np.nan
     components = {k: v.where(publicar) for k, v in components.items()}
@@ -272,7 +277,7 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
     comps = pd.DataFrame(components, index=df.index)
     n_comp = comps.notna().sum(axis=1).where(ipd.notna())
     indice, sigma = pressure_index(ipd)
-    aportes = contributions_points(comps, blocks, pesos, ipd, indice, sigma)
+    aportes = contributions_points(comps, blocks, pesos, ipd, indice, sigma, blocks_cfg)
     return {
         "aportes": aportes,
         "pesos": pesos,
@@ -288,7 +293,7 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
 
 
 def contributions_points(comps: pd.DataFrame, blocks: pd.DataFrame, pesos: dict, ipd: pd.Series,
-                         indice: pd.Series, sigma: float) -> pd.DataFrame:
+                         indice: pd.Series, sigma: float, blocks_cfg: dict | None = None) -> pd.DataFrame:
     """Aporte de cada componente al índice 0-100, en puntos respecto de 50.
 
     Cada día, el IPD es la suma de peso efectivo x z-score de cada componente
@@ -299,7 +304,8 @@ def contributions_points(comps: pd.DataFrame, blocks: pd.DataFrame, pesos: dict,
     if comps.empty:
         return comps
     aporte = pd.DataFrame(0.0, index=comps.index, columns=comps.columns)
-    bw = pd.Series({b: config.IPD_BLOCKS[b]["weight"] for b in blocks.columns})
+    blocks_cfg = blocks_cfg or config.IPD_BLOCKS
+    bw = pd.Series({b: blocks_cfg[b]["weight"] for b in blocks.columns})
     bw_avail = blocks.notna().mul(bw, axis=1)
     bw_eff = bw_avail.div(bw_avail.sum(axis=1).replace(0, np.nan), axis=0)
     for b in blocks.columns:
@@ -321,7 +327,7 @@ def contributions_points(comps: pd.DataFrame, blocks: pd.DataFrame, pesos: dict,
     return suav.mul(factor, axis=0).where(indice.notna())
 
 
-def pca_weights(zs: pd.DataFrame) -> tuple[dict[str, float], float] | None:
+def pca_weights(zs: pd.DataFrame, desde: str | None = None) -> tuple[dict[str, float], float] | None:
     """Pesos de un bloque según su primer componente principal.
 
     Se usa la matriz de correlaciones de los promedios mensuales de los
@@ -330,7 +336,7 @@ def pca_weights(zs: pd.DataFrame) -> tuple[dict[str, float], float] | None:
     sumen positivo; las negativas valen 0 (no se invierte el sentido económico
     de ningún componente). Devuelve (pesos que suman 1, varianza explicada).
     """
-    m = zs[zs.index >= pd.Timestamp(config.IPD_PUBLICAR_DESDE)].resample(config.IPD_PCA_FRECUENCIA).mean()
+    m = zs[zs.index >= pd.Timestamp(desde or config.IPD_PUBLICAR_DESDE)].resample(config.IPD_PCA_FRECUENCIA).mean()
     corr = m.corr(min_periods=config.IPD_PCA_MIN_OBS).dropna(how="all").dropna(axis=1, how="all")
     if corr.shape[0] < 2 or corr.isna().any().any():
         return None
