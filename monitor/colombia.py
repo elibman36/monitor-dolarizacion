@@ -39,7 +39,11 @@ SUAMECA_SERIES = {"tpm": 59, "reservas": 15050}
 # que cada serie suma a las compras netas del Banco (+ compra, − vende): las
 # subastas de NDF y FX swaps ya vienen con signo; las de opciones call y la
 # desacumulación son ventas aunque se publiquen en positivo.
-INTERVENCION = {16651: "+", 16650: "+", 16654: "+", 16652: "+", 16655: "-abs", 16653: "-abs", 16656: "+", 16657: "+"}
+INTERVENCION = {16651: "+", 16650: "+", 16654: "+", 16652: "+", 16655: "-abs", 16653: "-abs", 16656: "stock", 16657: "+"}
+# Los NDF del Banco eran de corto plazo y se renovaban en cada subasta: sumar
+# las subastas contaría varias veces la misma cobertura. Se aproxima el stock
+# vigente como lo subastado en esta ventana y se toma su variación.
+NDF_PLAZO = "30D"
 RESERVAS_REZAGO_DIAS = 10    # el dato mensual se publica a comienzos del mes siguiente
 VENTANA_INTERVENCION = 20
 EMBIG = "PD04715XD"
@@ -56,7 +60,9 @@ IPD_BLOCKS = {
                                   "la volatilidad del peso está por debajo de lo habitual")},
             "reservas": {"transform": "dlog", "horizonte": 21, "sign": -1, "weight": 1.0, "label": "Reservas internacionales",
                          "frases": ("las reservas cayeron más que lo habitual", "las reservas evolucionaron mejor que lo habitual")},
-            "intervencion": {"transform": "level", "sign": +1, "weight": 1.0, "label": "Ventas de dólares del Banco de la República",
+            # Intervención esporádica: recorte más estricto del z-score.
+            "intervencion": {"transform": "level", "sign": +1, "weight": 1.0, "clip": 2.0,
+                             "label": "Ventas de dólares del Banco de la República",
                              "frases": ("el Banco de la República vendió dólares", "el Banco de la República compró dólares")},
         },
     },
@@ -143,7 +149,13 @@ def intervencion(desde: pd.Timestamp, hasta: pd.Timestamp) -> pd.Series:
     partes = []
     for i, signo in INTERVENCION.items():
         s = parse_suameca(comun.get(SUAMECA.format(id=i), verify=_verify()).json(), "intervencion")
-        partes.append(-s.abs() if signo == "-abs" else s)
+        if signo == "-abs":
+            s = -s.abs()
+        elif signo == "stock":
+            diaria = s.resample("D").sum()
+            s = diaria.rolling(NDF_PLAZO).sum().diff().fillna(diaria)
+            s = s[s != 0]
+        partes.append(s)
     s = pd.concat(partes).groupby(level=0).sum()
     s.index.name = "fecha"
     return s.rename("compras_netas")

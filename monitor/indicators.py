@@ -251,7 +251,10 @@ def compute_ipd(df: pd.DataFrame, blocks_cfg: dict | None = None,
             if "piso" in spec:
                 serie = serie.clip(lower=spec["piso"])
             x = transform(serie, spec["transform"], spec.get("horizonte", h)) * spec["sign"]
-            z = rolling_z(x, config.IPD_ZSCORE_WINDOW, config.IPD_ZSCORE_MIN_OBS, config.IPD_Z_CLIP)
+            # Un componente puede pedir un recorte más estricto (p. ej. una
+            # intervención esporádica, que contra una ventana casi toda en cero
+            # da desvíos extremos).
+            z = rolling_z(x, config.IPD_ZSCORE_WINDOW, config.IPD_ZSCORE_MIN_OBS, spec.get("clip", config.IPD_Z_CLIP))
             if z.dropna().empty:
                 continue
             zs[ckey] = z

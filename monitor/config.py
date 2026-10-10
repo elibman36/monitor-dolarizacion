@@ -122,8 +122,9 @@ FUTUROS_PLAZO_MINIMO_DIAS = 20
 #   dlog  -> variación logarítmica en `horizon` días hábiles (x100)
 #   diff  -> diferencia simple en `horizon` días hábiles
 #   level -> nivel de la serie
-# Opcionales: horizonte (días hábiles, en lugar de IPD_HORIZON) y piso (valor
-# mínimo de la serie antes de transformarla).
+# Opcionales: horizonte (días hábiles, en lugar de IPD_HORIZON), piso (valor
+# mínimo de la serie antes de transformarla) y clip (recorte del z-score, en
+# lugar de IPD_Z_CLIP).
 # sign: +1 si un aumento implica más presión, -1 si implica menos.
 # Primer día que se publica el IPD. Antes de 2003 la serie no es confiable:
 # con la convertibilidad el tipo de cambio no se movía (faltan dos

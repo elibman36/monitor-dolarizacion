@@ -9,7 +9,8 @@ que el banco central vende para evitarlo. Cada mes:
 ρ convierte la intervención en puntos de depreciación. Es el mismo para todos
 los países (si no, las unidades dejarían de ser comparables) y se fija con la
 dispersión del panel: ρ = MAD(depreciación) / MAD(intervención), de modo que
-una intervención "típica" equivale a una depreciación "típica". Es la versión
+una intervención "típica" (de los meses en que hubo intervención) equivale a una
+depreciación "típica". Es la versión
 en unidades de tipo de cambio de la ponderación por precisión del EMP clásico.
 
 A diferencia del índice 0-100 de cada país, acá el nivel sí se compara: un 5%
@@ -134,7 +135,10 @@ def calcular(paises: dict[str, pd.DataFrame]) -> tuple[dict[str, pd.DataFrame], 
     paises = {k: v[v.index >= desde] for k, v in paises.items() if not v.empty}
     dep = pd.concat([v["depreciacion"] for v in paises.values()])
     x = pd.concat([v["intervencion"] for v in paises.values()])
-    rho = _mad(dep) / _mad(x) if _mad(x) > 0 else np.nan
+    # Sólo los meses con intervención: los países que intervienen poco (muchos
+    # meses en cero) achicarían la dispersión y cambiarían la escala de todos.
+    x_activa = x[x.abs() > 1e-9]
+    rho = _mad(dep) / _mad(x_activa) if _mad(x_activa) > 0 else np.nan
     out = {}
     for k, v in paises.items():
         v = v.copy()
