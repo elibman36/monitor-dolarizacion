@@ -832,14 +832,28 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     document.getElementById("foot").textContent = `Actualizado: ${new Date(COMP.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, BCRP, BCU.`;
   }
 
+  // Configuración por defecto (Argentina), para volver a ella al cambiar de país.
+  const AR_CFG = { tiles: TILES, up: UP_IS_PRESSURE, multiples: MULTIPLES, mensuales: [...MENSUALES], absolutos: [] };
+  if (!PAISES.ar.tiles) Object.assign(PAISES.ar, AR_CFG);
+  const cache = {};
+  function cargar() {
+    aplicarPais();
+    const src = (PAIS === "ar" && new URLSearchParams(location.search).get("data")) || (PAIS === "comparado" ? "data/comparado.json" : PAISES[PAIS].json);
+    const p = cache[src] ? Promise.resolve(cache[src]) : fetch(src, { cache: "no-store" })
+      .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then((d) => { cache[src] = d; return d; });
+    return p.then((d) => {
+      charts.forEach((c) => c.dispose && c.dispose()); charts.length = 0;
+      if (PAIS === "comparado") { COMP = d; renderComparado(); } else { DATA = d; renderAll(); }
+    });
+  }
+  // Cambiar de país no recarga la página (funciona igual dentro de un iframe).
   document.querySelectorAll("#pais button").forEach((b) => b.addEventListener("click", () => {
-    const u = new URL(location.href); u.searchParams.set("pais", b.dataset.p); location.href = u.toString();
+    PAIS = b.dataset.p;
+    try { const u = new URL(location.href); u.searchParams.set("pais", PAIS); history.replaceState(null, "", u.toString()); } catch (e) {}
+    cargar().catch(() => {});
   }));
-  aplicarPais();
-  const src = new URLSearchParams(location.search).get("data") || (PAIS === "comparado" ? "data/comparado.json" : PAISES[PAIS].json);
-  fetch(src, { cache: "no-store" })
-    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then((d) => { if (PAIS === "comparado") { COMP = d; renderComparado(); } else { DATA = d; renderAll(); } })
+  cargar()
     .catch(() => {
       const b = document.getElementById("banner");
       b.style.display = "block";
