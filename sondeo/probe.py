@@ -1,50 +1,21 @@
-import re, io, json, requests, urllib3, pandas as pd
-from playwright.sync_api import sync_playwright
+import io, requests, urllib3, pandas as pd
 urllib3.disable_warnings()
-B = "https://www.bcu.gub.uy"
-paginas = ["/Estadisticas-e-Indicadores/Paginas/Activos-de-reserva.aspx", "/Estadisticas-e-Indicadores/Paginas/Moneda-y-credito.aspx",
-           "/Estadisticas-e-Indicadores/Paginas/Cotizaciones.aspx", "/Politica-Economica-y-Mercados/Paginas/Tasa-1-Dia.aspx",
-           "/Estadisticas-e-Indicadores/Paginas/Default.aspx"]
-encontrados = {}
-with sync_playwright() as p:
-    b = p.chromium.launch()
-    ctx = b.new_context(ignore_https_errors=True)
-    for pg_url in paginas:
-        pg = ctx.new_page()
-        try:
-            pg.goto(B + pg_url, timeout=90000, wait_until="networkidle")
-            pg.wait_for_timeout(4000)
-            links = pg.eval_on_selector_all("a", "els => els.map(e => [e.href, (e.innerText||'').trim().slice(0,90)])")
-            print("\n=== ", pg_url, len(links), "links")
-            for h, t in links:
-                if re.search(r"\.(xlsx?|csv|pdf)(\?|$)", h, re.I) and "Seguros" not in h:
-                    print("  FILE", h[:170], "|", t)
-                    encontrados[h] = t
-        except Exception as e:
-            print("ERR", pg_url, str(e)[:200])
-        pg.close()
-    b.close()
+pd.set_option("display.width", 250)
 S = requests.Session(); S.headers["User-Agent"] = "Mozilla/5.0"
-n = 0
-for h, t in encontrados.items():
-    if not re.search(r"\.xlsx?", h, re.I) or not re.search(r"reserv|activ|base|interv|divisa|tasa|monet|cotiz|diari", h + t, re.I): continue
-    n += 1
-    if n > 8: break
-    r = S.get(h, verify=False, timeout=60); print("\n### GET", r.status_code, h[:150], len(r.content))
-    try:
-        x = pd.read_excel(io.BytesIO(r.content), sheet_name=None, header=None)
-        for sh, df in list(x.items())[:2]:
-            df = df.dropna(how="all").dropna(axis=1, how="all")
-            print("   HOJA", sh, df.shape); print(df.head(8).to_string(max_colwidth=30)[:1200]); print("   ...", df.tail(2).to_string(max_colwidth=25)[:500])
-    except Exception as e: print("   no excel", e)
-# DBnomics (FMI) para Uruguay
-for sid in ["IMF/IFS/M.UY.RAXG_USD", "IMF/IFS/M.UY.ENDE_XDC_USD_RATE", "IMF/IFS/M.UY.FPOLM_PA", "IMF/IFS/M.UY.FIDR_PA",
-            "IMF/IRFCL/M.UY.RAF_USD", "IMF/IFS/M.UY.RAFA_USD"]:
-    try:
-        r = S.get(f"https://api.db.nomics.world/v22/series/{sid}?observations=1", timeout=60)
-        d = r.json()["series"]["docs"]
-        if d:
-            per, val = d[0]["period"], d[0]["value"]
-            print("DBN", sid, d[0].get("series_name", "")[:80], "|", per[0], "->", per[-1], val[-1])
-        else: print("DBN", sid, "vacío")
-    except Exception as e: print("DBN", sid, "ERR", str(e)[:150])
+r = S.get("https://www.bcu.gub.uy/Estadisticas-e-Indicadores/MonedayCredito/Activos-de-Reserva/reservas.xls", verify=False, timeout=90)
+df = pd.read_excel(io.BytesIO(r.content), header=None)
+print(df.shape)
+for i in range(3, 12): print(i, [str(x)[:60] for x in df.iloc[i].tolist()])
+d = df[pd.to_datetime(df[3], errors="coerce").notna()]
+print("filas con fecha", len(d), d[3].iloc[0], "->", d[3].iloc[-1])
+print(d.head(3).to_string()); print(d.tail(5).to_string())
+print(df.iloc[-14:, 2:5].to_string())
+r = S.get("https://www.bcu.gub.uy/Servicios-Financieros-SSF/Series%20IF/Depositos.xlsx", verify=False, timeout=90)
+x = pd.read_excel(io.BytesIO(r.content), sheet_name=None, header=None)
+print("HOJAS", list(x))
+for sh in x:
+    if "total" in sh.lower() or "sist" in sh.lower():
+        t = x[sh]; print("=== ", sh, t.shape)
+        for i in range(0, 14): print(i, [str(v)[:28] for v in t.iloc[i].tolist()])
+        tt = t[pd.to_datetime(t[0], errors="coerce").notna()]
+        print("filas fecha", len(tt)); print(tt.head(2).to_string()[:1500]); print(tt.tail(3).to_string()[:1500])
