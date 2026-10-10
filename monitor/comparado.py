@@ -77,7 +77,20 @@ def peru_() -> pd.DataFrame:
     return _componentes(peru._cache("tc"), ventas, peru._cache("rin"))
 
 
-PAISES = {"ar": ("Argentina", argentina), "pe": ("Perú", peru_)}
+def uruguay_() -> pd.DataFrame:
+    """Peso uruguayo interbancario; intervención aproximada por la caída de la
+    posición en moneda extranjera del BCU (no hay serie pública de sus
+    operaciones cambiarias diarias). Incluye efectos de valuación y de
+    operaciones con el Tesoro, así que es una aproximación."""
+    from . import uruguay
+    pos = uruguay._cache("posicion_me")
+    if pos.empty:
+        return pd.DataFrame(columns=["depreciacion", "intervencion"])
+    ventas = -_fin_de_mes(pos).diff()
+    return _componentes(uruguay._cache("tc"), ventas, uruguay._cache("reservas"))
+
+
+PAISES = {"ar": ("Argentina", argentina), "pe": ("Perú", peru_), "uy": ("Uruguay", uruguay_)}
 
 
 def _mad(x: pd.Series) -> float:

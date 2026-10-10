@@ -359,3 +359,26 @@ def test_comparado_unidades_comunes():
     for v, src in [(res["ar"], a), (res["pe"], b)]:
         assert np.allclose(v["presion"], src["depreciacion"] + rho * src["intervencion"])
     assert res["ar"]["presion_3m"].iloc[:2].isna().all()
+
+
+def test_uruguay_lectores():
+    from monitor import uruguay
+    xml = ("<datoscotizaciones.dato><Fecha>2026-09-01</Fecha><TCV>40.236000</TCV></datoscotizaciones.dato>"
+           "<datoscotizaciones.dato><Fecha>2026-09-02</Fecha><TCV>40.233000</TCV></datoscotizaciones.dato>")
+    tc = uruguay.parse_cotizaciones(xml)
+    assert tc.iloc[-1] == pytest.approx(40.233) and len(tc) == 2
+    res = pd.DataFrame([[None, None, None, None, None, None],
+                        [None, "Fecha", "ACTIVOS DE RESERVA", "OTROS", "ACTIVOS DE RESERVA SIN CONTRAPARTIDAS", "POSICION EN MONEDA EXTRANJERA DEL B.C.U."],
+                        [None, None, "(a)", "(b)", "(e)", None],
+                        [None, pd.Timestamp("2002-06-26"), 1098.7, "n/d", "n/d", "n/d"],
+                        [None, pd.Timestamp("2026-10-08"), 18741.6, 0, 9133.4, 9564.5],
+                        [None, "NOTAS:", None, None, None, None]])
+    r = uruguay.parse_reservas(res)
+    assert list(r.index) == [pd.Timestamp("2002-06-26"), pd.Timestamp("2026-10-08")]
+    assert r.loc["2026-10-08", "posicion_me"] == pytest.approx(9564.5)
+    assert np.isnan(r.loc["2002-06-26", "posicion_me"])
+    dep = pd.DataFrame([["Mes", "SECTOR PRIVADO", None, None], [None, "MN", "ME", "Total"],
+                        [pd.Timestamp("2026-08-01"), 600.0, 1400.0, 2000.0], ["Notas", None, None, None]])
+    d = uruguay.parse_depositos(dep)
+    assert d.index[0] == pd.Timestamp("2026-08-31")
+    assert d["dolarizacion_depositos"].iloc[0] == pytest.approx(70.0)
