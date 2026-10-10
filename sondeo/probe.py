@@ -1,54 +1,56 @@
-import re, json, requests, urllib3
+import re, io, json, requests, urllib3, pandas as pd
 urllib3.disable_warnings()
+pd.set_option("display.width", 220)
 S = requests.Session(); S.headers["User-Agent"] = "Mozilla/5.0 (monitor-dolarizacion probe)"
 def get(u, **kw):
     kw.setdefault("timeout", 60)
     try:
-        r = S.get(u, **kw); print(f"\n=== {r.status_code} {u[:200]} ({len(r.content)} b, {r.headers.get('content-type','')[:30]})"); return r
+        r = S.get(u, **kw); print(f"\n=== {r.status_code} {u[:200]} ({len(r.content)} b, {r.headers.get('content-type','')[:35]})"); return r
     except Exception as e: print("\nERR", u[:150], str(e)[:150])
 def head(r, n=400):
     if r is not None: print("  ", r.text[:n].replace("\n", " "))
-# ---------------- BRASIL: SGS del BCB ----------------
+def js(r):
+    try: return r.json()
+    except Exception: head(r); return None
 SGS = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.{c}/dados?formato=json&dataInicial={d}&dataFinal={h}"
-for c, n in [(1, "PTAX venta"), (10813, "PTAX venta (otra)"), (13621, "Reservas diarias caja"), (3546, "Reservas liquidez internacional mensual"),
-             (432, "Meta Selic"), (11, "Selic diaria"), (4389, "CDI anual"), (22701, "?"), (22704, "?"), (22707, "?"), (13961, "?"),
-             (24364, "?"), (12070, "?"), (21633, "?"), (22850, "?"), (23013, "?"), (24305, "?"), (24306, "?")]:
-    r = get(SGS.format(c=c, d="01/08/2026", h="10/10/2026"))
-    if r is not None and r.ok:
-        try:
-            j = r.json(); print("  ", c, n, len(j), j[:1], j[-1:])
-        except Exception: head(r)
-# metadatos de series (catálogo)
-r = get("https://dadosabertos.bcb.gov.br/api/3/action/package_search?q=swap%20cambial&rows=10")
-if r is not None and r.ok:
-    for p in r.json()["result"]["results"]: print("  PKG", p["name"], "|", p["title"][:90])
-for q in ["interven%C3%A7%C3%B5es%20mercado%20de%20c%C3%A2mbio", "fluxo%20cambial", "leil%C3%A3o%20d%C3%B3lar"]:
-    r = get(f"https://dadosabertos.bcb.gov.br/api/3/action/package_search?q={q}&rows=10")
-    if r is not None and r.ok:
-        for p in r.json()["result"]["results"]: print("  PKG", q[:12], p["name"], "|", p["title"][:90])
+for c in [29722, 29723, 29724, 1, 13621]:
+    for d, h in [("01/01/2000", "31/12/2009"), ("01/01/2010", "31/12/2019"), ("01/09/2026", "10/10/2026")]:
+        r = get(SGS.format(c=c, d=d, h=h)); j = js(r)
+        if j: print("  ", c, d, len(j), j[:1], j[-1:])
+# BCB datos abiertos: atuações
+for q in ["atuacoes", "atua%C3%A7%C3%B5es%20c%C3%A2mbio", "historico%20atuacoes%20mercado%20cambio", "leiloes%20cambio"]:
+    r = get(f"https://dadosabertos.bcb.gov.br/api/3/action/package_search?q={q}&rows=8"); j = js(r)
+    if j:
+        for p in j["result"]["results"]:
+            print("  PKG", p["name"], "|", p["title"][:80])
+            for res in p.get("resources", [])[:4]: print("     RES", res.get("format"), res.get("url", "")[:160])
 # ---------------- CHILE ----------------
-r = get("https://mindicador.cl/api/dolar/2026"); head(r, 300)
-r = get("https://mindicador.cl/api/tpm/2026"); head(r, 300)
-r = get("https://mindicador.cl/api"); head(r, 600)
-r = get("https://si3.bcentral.cl/SieteRestWS/SieteRestWS.ashx?user=x&pass=y&function=GetSeries&timeseries=F073.TCO.PRE.Z.D"); head(r, 300)
-r = get("https://si3.bcentral.cl/Siete/ES/Siete/Cuadro/CAP_EI/MN_EI11/EI_EXTERNO1/637185066927145616"); 
+for u in ["https://mindicador.cl/api/dolar/2008", "https://mindicador.cl/api/dolar/2026", "https://mindicador.cl/api/tpm/2026", "https://mindicador.cl/api/libra_cobre/2026"]:
+    r = get(u); j = js(r)
+    if j: print("  ", j.get("nombre"), len(j.get("serie", [])), j.get("serie", [])[:1])
 # ---------------- COLOMBIA ----------------
-r = get("https://www.datos.gov.co/resource/32sa-8pi3.json?$order=vigenciadesde%20DESC&$limit=3"); head(r, 400)
-r = get("https://www.datos.gov.co/api/catalog/v1?q=reservas%20internacionales&limit=10")
-if r is not None and r.ok:
-    for x in r.json().get("results", []): print("  DS", x["resource"]["id"], "|", x["resource"]["name"][:90], "|", x["resource"].get("attribution"))
-for q in ["banco%20de%20la%20republica%20compras%20divisas", "tasa%20de%20politica%20monetaria", "IBR", "tasa%20interbancaria"]:
-    r = get(f"https://www.datos.gov.co/api/catalog/v1?q={q}&limit=8")
-    if r is not None and r.ok:
-        for x in r.json().get("results", []): print("  DS", q[:12], x["resource"]["id"], "|", x["resource"]["name"][:90], "|", x["resource"].get("attribution"))
-r = get("https://suameca.banrep.gov.co/estadisticas-economicas/"); head(r, 200)
-r = get("https://www.banrep.gov.co/es/estadisticas/reservas-internacionales"); 
-if r is not None:
-    for m in re.findall(r'href="([^"]+\.(?:xlsx?|csv))"', r.text)[:15]: print("  FILE", m)
-r = get("https://totoro.banrep.gov.co/analytics/saw.dll?Download&Format=excel2007&Extension=.xlsx&BypassCache=true&path=%2Fshared%2FSeries%20Estad%C3%ADsticas_T%2F1.%20Tasa%20de%20Cambio%20Peso%20Colombiano%2F1.1%20TRM%20-%20Disponible%20desde%20el%2027%20de%20noviembre%20de%201991%2F1.1.1.TCM_Serie%20historica%20IQY&lang=es")
-# ---------------- EMBIG en el BCRP ----------------
-API = "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/{}/json/2026-09-01/2026-10-09"
+r = get("https://www.datos.gov.co/resource/32sa-8pi3.json?$order=vigenciadesde%20ASC&$limit=2"); head(r, 300)
+r = get("https://www.datos.gov.co/resource/32sa-8pi3.json?$order=vigenciadesde%20DESC&$limit=2"); head(r, 300)
+r = get("https://www.datos.gov.co/resource/32sa-8pi3.json?$select=count(*)"); head(r, 100)
+r = get("https://www.banrep.gov.co/sites/default/files/resumen-semanal%E2%80%93estadisticas-monetarias-y-cambiarias.xlsx")
+if r is not None and r.ok and r.content[:2] == b"PK":
+    x = pd.read_excel(io.BytesIO(r.content), sheet_name=None, header=None)
+    print("HOJAS", list(x)[:30])
+    for sh, df in list(x.items())[:6]:
+        df = df.dropna(how="all").dropna(axis=1, how="all")
+        print("   HOJA", sh, df.shape); print(df.head(12).to_string(max_colwidth=28)[:1600])
+else: head(r, 200)
+for u in ["https://www.banrep.gov.co/es/estadisticas/reservas-internacionales", "https://www.banrep.gov.co/es/estadisticas/trm",
+          "https://www.banrep.gov.co/es/estadisticas/tasas-interes-politica-monetaria", "https://www.banrep.gov.co/es/estadisticas/intervencion-cambiaria"]:
+    r = get(u)
+    if r is not None:
+        for m in sorted(set(re.findall(r'(?:href|src)="([^"]+\.(?:xlsx?|csv|json)[^"]*)"', r.text)))[:12]: print("  FILE", m[:170])
+        for m in sorted(set(re.findall(r'(https?://[a-z]+\.banrep\.gov\.co/[^"\' ]{0,120})', r.text)))[:12]: print("  URL", m)
+# EMBIG en el BCRP
+API = "https://estadisticas.bcrp.gob.pe/estadisticas/series/api/{}/json/1998-01-01/2026-10-09"
 for c in ["PD04711XD", "PD38581XD", "PD04715XD"]:
     r = get(API.format(c))
-    try: j = json.loads(r.text); print("  ", c, j["config"]["series"][0]["name"], j["periods"][-1])
+    try:
+        j = json.loads(r.text); p = [x for x in j["periods"] if x["values"] and x["values"][0] not in ("n.d.", "")]
+        print("  ", c, j["config"]["series"][0]["name"], len(p), p[0]["name"], "->", p[-1]["name"])
     except Exception as e: print("  fallo", e)
