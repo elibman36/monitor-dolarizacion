@@ -43,6 +43,43 @@ def save_series(key: str, s: pd.Series) -> None:
     s.to_frame().to_csv(_cache_path(key), date_format="%Y-%m-%d", float_format="%.6g")
 
 
+# Registro de hasta qué fecha hacia atrás ya se pidió cada serie, para que las
+# corridas diarias sólo descarguen lo nuevo y la historia se pida una sola vez.
+_DOWNLOADS_META = "_descargas.json"
+
+
+def _downloads_meta() -> dict:
+    path = config.SERIES_DIR / _DOWNLOADS_META
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def _save_downloads_meta(meta: dict) -> None:
+    config.SERIES_DIR.mkdir(parents=True, exist_ok=True)
+    (config.SERIES_DIR / _DOWNLOADS_META).write_text(json.dumps(meta, indent=1, sort_keys=True))
+
+
+def incremental_start(key: str, start: str, overlap_days: int = 60) -> str:
+    """Fecha desde la que hay que descargar `key`.
+
+    Si la historia desde `start` ya se pidió alguna vez, se re-descargan sólo
+    los últimos `overlap_days` (las fuentes revisan datos recientes).
+    """
+    cached = load_cached(key) if key != "futuros_dolar" else None
+    requested = _downloads_meta().get(key)
+    if requested and requested <= start:
+        if cached is None:
+            return start
+        if not cached.empty:
+            return (cached.index.max() - pd.Timedelta(days=overlap_days)).strftime("%Y-%m-%d")
+    return start
+
+
+def mark_downloaded(key: str, start: str) -> None:
+    meta = _downloads_meta()
+    meta[key] = start
+    _save_downloads_meta(meta)
+
+
 def refresh(key: str, fetch) -> tuple[pd.Series, str]:
     """Descarga una serie y la combina con la copia guardada.
 
@@ -60,6 +97,116 @@ def refresh(key: str, fetch) -> tuple[pd.Series, str]:
     except Exception as exc:  # noqa: BLE001 - una fuente caída no frena el resto
         log.warning("%s: fallo la descarga (%s); uso copia guardada (%d obs)", key, exc, len(cached))
         return cached, f"error: {exc}"
+
+
+FUTURES_CACHE = "futuros_dolar"
+
+
+def load_futures(offline: bool) -> pd.DataFrame:
+    """Futuros de A3 (descarga incremental)."""
+    path = config.SERIES_DIR / f"{FUTURES_CACHE}.csv"
+    cached = pd.read_csv(path) if path.exists() else pd.DataFrame()
+    fut = cached
+    if not offline:
+        requested = _downloads_meta().get(FUTURES_CACHE)
+        if requested and requested <= config.FUTUROS_START_DATE and not cached.empty:
+            # Se re-descargan los últimos 10 días por si A3 corrige ajustes.
+            desde = (pd.to_datetime(cached["fecha"]).max() - pd.Timedelta(days=10)).strftime("%Y-%m-%d")
+        else:
+            desde = config.FUTUROS_START_DATE
+        try:
+            fresh = sources.a3_futuros_dolar(desde)
+            fut = pd.concat([cached, fresh]).drop_duplicates(["fecha", "contrato"], keep="last")
+            fut = fut.sort_values(["fecha", "vencimiento"])
+            config.SERIES_DIR.mkdir(parents=True, exist_ok=True)
+            fut.to_csv(path, index=False)
+            mark_downloaded(FUTURES_CACHE, config.FUTUROS_START_DATE)
+            log.info("A3: %d filas de futuros (%d descargadas desde %s)", len(fut), len(fresh), desde)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("A3 no disponible (%s); uso copia guardada (%d filas)", exc, len(cached))
+    return fut
+
+
+PH_CACHE = "compras_personas_humanas"
+
+
+def load_compras_personas_humanas(offline: bool) -> pd.DataFrame:
+    """Compras de USD de personas humanas (anexo del BCRA)."""
+    path = config.SERIES_DIR / f"{PH_CACHE}.csv"
+    cached = pd.read_csv(path, dtype={"fecha": str}) if path.exists() else pd.DataFrame()
+    data = cached
+    last = _downloads_meta().get(f"{PH_CACHE}_ultima_descarga")
+    due = (last is None or cached.empty or
+           (datetime.now(timezone.utc).date() - datetime.fromisoformat(last).date()).days
+           >= config.BCRA_ANEXO_DIAS_ENTRE_DESCARGAS)
+    if not offline and due:
+        try:
+            fresh = sources.bcra_compras_personas_humanas()
+            data = pd.concat([cached, fresh]).drop_duplicates("fecha", keep="last").sort_values("fecha")
+            config.SERIES_DIR.mkdir(parents=True, exist_ok=True)
+            data.to_csv(path, index=False)
+            meta = _downloads_meta()
+            meta[f"{PH_CACHE}_ultima_descarga"] = datetime.now(timezone.utc).date().isoformat()
+            _save_downloads_meta(meta)
+            log.info("BCRA anexo: %d meses de compras de personas humanas", len(data))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("Anexo del BCRA no disponible (%s); uso copia guardada (%d meses)", exc, len(cached))
+    return data
+
+
+POSICION_BCRA_CACHE = "posicion_futuros_bcra"
+
+
+def _meses_planilla(hoy: pd.Timestamp) -> list[str]:
+    """Meses cerrados desde BCRA_PLANILLA_DESDE hasta el anterior a `hoy`."""
+    fin = (hoy.to_period("M") - 1)
+    return [str(p) for p in pd.period_range(config.BCRA_PLANILLA_DESDE, fin, freq="M")]
+
+
+def load_posicion_bcra(offline: bool) -> pd.DataFrame:
+    """Posición del BCRA en futuros de dólar (planilla mensual de reservas).
+
+    Se baja sólo lo que falta: la primera corrida recorre toda la historia y
+    las siguientes, el mes nuevo. Los meses sin PDF se reintentan mientras
+    sean recientes; los huecos viejos quedan anotados y no se vuelven a pedir.
+    """
+    path = config.SERIES_DIR / f"{POSICION_BCRA_CACHE}.csv"
+    cached = pd.read_csv(path, dtype={"fecha": str}) if path.exists() else pd.DataFrame()
+    if offline:
+        return cached
+    meta = _downloads_meta()
+    no_disponibles = set(meta.get(f"{POSICION_BCRA_CACHE}_no_disponibles", []))
+    tengo = set(cached["fecha"]) if not cached.empty else set()
+    hoy = pd.Timestamp(datetime.now(timezone.utc).date())
+    meses = _meses_planilla(hoy)
+    recientes = set(meses[-config.BCRA_PLANILLA_REINTENTAR_MESES:])
+    pendientes = [m for m in meses if m not in tengo and (m not in no_disponibles or m in recientes)]
+    nuevos, errores = [], 0
+    for mes in pendientes:
+        try:
+            fila = sources.bcra_planilla_reservas(mes)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("planilla de reservas %s: %s", mes, exc)
+            errores += 1
+            if errores >= 5:  # el BCRA está caído: se sigue en la próxima corrida
+                break
+            continue
+        if fila is None:
+            if mes not in recientes:
+                no_disponibles.add(mes)
+            continue
+        nuevos.append(fila)
+    if nuevos:
+        data = pd.concat([cached, pd.DataFrame(nuevos)]).drop_duplicates("fecha", keep="last")
+        data = data.sort_values("fecha")
+        config.SERIES_DIR.mkdir(parents=True, exist_ok=True)
+        data.to_csv(path, index=False)
+        log.info("BCRA planilla de reservas: %d meses nuevos (%d en total)", len(nuevos), len(data))
+        cached = data
+    meta = _downloads_meta()
+    meta[f"{POSICION_BCRA_CACHE}_no_disponibles"] = sorted(no_disponibles)
+    _save_downloads_meta(meta)
+    return cached
 
 
 def fetch_all(offline: bool) -> tuple[dict[str, pd.Series], dict[str, str]]:
@@ -84,9 +231,12 @@ def fetch_all(offline: bool) -> tuple[dict[str, pd.Series], dict[str, str]]:
         base, ids = None, {}
     for key in config.BCRA_VARIABLES:
         if base and key in ids:
+            desde = incremental_start(key, config.START_DATE)
             series[key], status[key] = refresh(
-                key, lambda k=key: sources.bcra_series(base, ids[k], k)
+                key, lambda k=key, d=desde: sources.bcra_series(base, ids[k], k, start=d)
             )
+            if status[key] == "ok":
+                mark_downloaded(key, config.START_DATE)
         elif base:
             series[key], status[key] = load_cached(key), "n/d: variable no encontrada en el catálogo"
         else:
@@ -115,13 +265,18 @@ SERIES_META = {
     "usd_blue": ("Dólar blue", "$ por USD", "ArgentinaDatos"),
     "brecha_ccl": ("Brecha CCL / oficial", "%", "Cálculo propio"),
     "brecha_mep": ("Brecha MEP / oficial", "%", "Cálculo propio"),
+    "canje": ("Canje (CCL / MEP)", "%", "Cálculo propio"),
+    "vol_oficial": ("Volatilidad del oficial (20 días, anualizada)", "%", "Cálculo propio"),
+    "vol_ccl": ("Volatilidad del CCL (20 días, anualizada)", "%", "Cálculo propio"),
     "riesgo_pais": ("Riesgo país", "pb", "ArgentinaDatos (JP Morgan EMBI)"),
     "reservas": ("Reservas internacionales brutas", "millones de USD", "BCRA"),
-    "tasa": ("Tasa de referencia (TAMAR / BADLAR privados)", "% n.a.", "BCRA"),
+    "tasa": ("Tasa BADLAR bancos privados", "% n.a.", "BCRA"),
     "depositos_usd": ("Depósitos en dólares", "millones de USD", "BCRA"),
-    "deval_implicita": ("Devaluación implícita en futuros (anualizada)", "% e.a.", "A3 Mercados / cálculo propio"),
-    "deval_implicita_mensual": ("Devaluación implícita en futuros (mensual)", "%", "A3 Mercados / cálculo propio"),
-    "futuros_interes_abierto": ("Interés abierto futuros de dólar", "contratos", "A3 Mercados"),
+    "deval_implicita": ("Devaluación implícita en futuros a 90 días", "% TNA", "A3 Mercados"),
+    "deval_implicita_mensual": ("Devaluación mensual implícita en futuros (90 días)", "% mensual", "A3 Mercados"),
+    "futuros_interes_abierto": ("Posición abierta en futuros de dólar", "contratos (USD 1.000 c/u)", "A3 Mercados"),
+    "posicion_bcra": ("Posición vendida neta del BCRA en futuros de dólar", "millones de USD (fin de mes)",
+                      "BCRA, Planilla de Reservas Internacionales y Liquidez en Moneda Extranjera"),
 }
 
 
@@ -153,7 +308,7 @@ def _last(s: pd.Series, lag_days: int = 0):
 
 
 def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
-                  licitaciones: pd.DataFrame, fetch_status: dict[str, str],
+                  fetch_status: dict[str, str],
                   raw: dict[str, pd.Series] | None = None) -> dict:
     raw = raw or {}
     series_out = {}
@@ -182,33 +337,49 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
         for ckey, spec in block["components"].items():
             z = ipd["components"].get(ckey)
             d, v = _last(z) if z is not None else (None, None)
+            w_bloque = ipd["pesos"].get(bkey, {}).get(ckey)
+            pts = ipd["aportes"].get(ckey)
+            _, pts_last = _last(pts) if pts is not None else (None, None)
             components_meta.append({
                 "key": ckey, "block": bkey, "label": spec["label"],
-                "transform": spec["transform"], "weight": spec["weight"],
-                "last_date": d, "z": v,
+                "transform": spec["transform"],
+                "weight": _clean(w_bloque),
+                "weight_ipd": _clean(w_bloque * block["weight"]) if w_bloque is not None else None,
+                "last_date": d, "z": v, "puntos": pts_last,
                 "data": _pairs(z) if z is not None else [],
             })
 
     d_ipd, v_ipd = _last(ipd["ipd"])
     _, pct = _last(ipd["percentil"])
-    st_key, st_label = indicators.status_for(pct)
+    d_ind, v_ind = _last(ipd["indice"])
+    st_key, st_label = indicators.status_for(v_ind)
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "config": {
+            "ponderacion": config.IPD_PONDERACION,
+            "pca": {b: {"varianza_explicada": _clean(v["varianza_explicada"])}
+                    for b, v in ipd["pesos_info"].items()},
             "horizon": config.IPD_HORIZON,
             "zscore_window": config.IPD_ZSCORE_WINDOW,
             "percentile_window": config.IPD_PERCENTILE_WINDOW,
-            "status_thresholds": [{"pct": p, "key": k, "label": l} for p, k, l in config.IPD_STATUS],
+            "indice_suavizado": config.INDICE_SUAVIZADO,
+            "indice_sigma": _clean(ipd["indice_sigma"]),
+            "tramos": [{"from": lo, "to": min(hi, 100), "key": k, "label": l}
+                       for lo, hi, k, l in config.INDICE_TRAMOS],
         },
         "headline": {
             "date": d_ipd, "ipd": v_ipd, "percentile": pct,
+            "indice": v_ind, "indice_7d": _last(ipd["indice"], 7)[1], "indice_30d": _last(ipd["indice"], 30)[1],
             "status": st_key, "status_label": st_label,
             "ipd_7d": _last(ipd["ipd"], 7)[1], "ipd_30d": _last(ipd["ipd"], 30)[1],
         },
         "ipd": {
             "data": _pairs(ipd["ipd"]),
             "percentile": _pairs(ipd["percentil"]),
+            "indice": _pairs(ipd["indice"]),
+            "n_components": _pairs(ipd["n_componentes"]),
+            "n_components_total": sum(len(b["components"]) for b in config.IPD_BLOCKS.values()),
             "blocks": {
                 b: {"label": config.IPD_BLOCKS[b]["label"], "data": _pairs(ipd["blocks"][b])}
                 for b in ipd["blocks"].columns
@@ -223,13 +394,6 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
                  for k, v in row.items()}
                 for row in compras.to_dict("records")
             ] if not compras.empty else [],
-            "licitaciones": [
-                {"fecha": r["fecha"].strftime("%Y-%m-%d"),
-                 "total_millones_ars": _clean(r["total_millones_ars"]),
-                 "cobertura_millones_ars": _clean(r["cobertura_millones_ars"]),
-                 "share_cobertura": _clean(r["share_cobertura"])}
-                for r in licitaciones.to_dict("records")
-            ] if not licitaciones.empty else [],
         },
         "events": config.EVENTS,
         "sources_status": fetch_status,
@@ -244,28 +408,34 @@ def run(offline: bool = False) -> dict:
     index = indicators.business_days(daily)
     panel = indicators.align(daily, index)
 
-    futuros = sources.manual_source("futuros_dolar")
-    panel = indicators.derived_series(panel, futuros)
+    futuros = load_futures(offline)
+    compras = indicators.monthly_fx_purchases(load_compras_personas_humanas(offline))
+    posicion_bcra = load_posicion_bcra(offline)
+    panel = indicators.derived_series(panel, futuros, compras, posicion_bcra)
     ipd = indicators.compute_ipd(panel)
 
-    compras = indicators.monthly_fx_purchases(sources.manual_source("compras_personas_humanas"))
-    licitaciones = indicators.auction_dollar_share(sources.manual_source("licitaciones_tesoro"))
-
-    payload = build_payload(panel, ipd, compras, licitaciones, status, daily)
+    # La posición del BCRA se publica con su fecha real (fin de mes), no con
+    # la de entrada al índice.
+    publicar = {**daily, "posicion_bcra": indicators.posicion_bcra_mensual(posicion_bcra)}
+    payload = build_payload(panel, ipd, compras, status, publicar)
 
     # Panel diario completo, útil para análisis en Excel / R / Stata.
     out_panel = panel.copy()
     out_panel["ipd"] = ipd["ipd"]
+    out_panel["indice_0_100"] = ipd["indice"]
     out_panel["ipd_percentil"] = ipd["percentil"]
+    out_panel["ipd_n_componentes"] = ipd["n_componentes"]
     for b in ipd["blocks"].columns:
         out_panel[f"ipd_bloque_{b}"] = ipd["blocks"][b]
     for c in ipd["components"].columns:
         out_panel[f"z_{c}"] = ipd["components"][c]
+    for c in ipd["aportes"].columns:
+        out_panel[f"pts_{c}"] = ipd["aportes"][c]
     out_panel.to_csv(config.DATA_DIR / "panel_diario.csv", date_format="%Y-%m-%d", float_format="%.6g")
 
     config.OUTPUT_JSON.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     h = payload["headline"]
-    log.info("IPD %s = %s (percentil %s, %s)", h["date"], h["ipd"], h["percentile"], h["status_label"])
+    log.info("IPD %s = %s | índice 0-100 = %s (%s)", h["date"], h["ipd"], h["indice"], h["status_label"])
     return payload
 
 
