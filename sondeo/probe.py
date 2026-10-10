@@ -1,36 +1,44 @@
-import re, io, requests, collections
+import re, io, requests
 S = requests.Session(); S.headers["User-Agent"] = "Mozilla/5.0 (monitor-dolarizacion probe)"
-def get(u, **k):
+B = "https://www.bcra.gob.ar"
+def get(u):
     try:
-        r = S.get(u, timeout=90, **k); print(f"\n=== {r.status_code} {u} {k.get('params','')} ({len(r.content)} bytes)"); return r
-    except Exception as e:
-        print(f"\n=== ERROR {u}: {e}"); return None
-# ArgentinaDatos coverage
-for casa in ["oficial","mayorista","bolsa","contadoconliqui","blue"]:
-    r = get(f"https://api.argentinadatos.com/v1/cotizaciones/dolares/{casa}")
-    if r is not None and r.ok:
-        d = r.json(); print(casa, len(d), d[0], d[-1])
-r = get("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais")
-if r is not None and r.ok: d = r.json(); print("riesgo", len(d), d[0], d[-1])
-# A3 history variants
-A3 = "https://apicem.matbarofex.com.ar/api/v2/closing-prices"
-for a, b in [("2020-01-01","2020-12-31"),("2019-06-01","2019-12-31"),("2015-01-01","2015-12-31"),("2010-01-01","2010-12-31"),("2003-01-01","2003-12-31")]:
-    for params in [{"product":"DLR","segment":"Monedas","type":"FUT"},{"product":"DLR"},{"segment":"Monedas","type":"FUT"}]:
-        p = dict(params, **{"excludeEmptyVol":"false","from":a,"to":b,"_ds":"1","pageSize":1000})
-        r = get(A3, params=p)
-        if r is not None and r.ok:
-            d = r.json(); data = d.get("data", [])
-            print("total", d.get("totalEntries"), "pageSize", d.get("pageSize"), "rows", len(data), collections.Counter(x.get("symbol","")[:8] for x in data).most_common(6))
-# BCRA anexo
-r = get("https://www.bcra.gob.ar/archivos/Pdfs/PublicacionesEstadisticas/informes/anexo-estadistico-mercado-cambios-balance-cambiario.xlsx")
-if r is not None and r.ok:
-    import openpyxl
-    wb = openpyxl.load_workbook(io.BytesIO(r.content), read_only=True, data_only=True)
-    for ws in wb.worksheets:
-        print("\n--- HOJA", ws.title, ws.max_row, ws.max_column)
-        for i, row in enumerate(ws.iter_rows(values_only=True)):
-            vals = [v for v in row if v is not None]
-            txt = " | ".join(str(v)[:40] for v in row[:12])
-            if i < 12 or any(isinstance(v, str) and re.search(r"humana|formaci|atesor|billete|FAE|persona", v, re.I) for v in vals):
-                print(i, txt)
-            if i > 400: break
+        r = S.get(u, timeout=90); print(f"\n=== {r.status_code} {u} ({len(r.content)} bytes, {r.headers.get('content-type')})"); return r
+    except Exception as e: print("ERR", u, e)
+def links(r, pat):
+    if r is None: return []
+    hs = sorted(set(re.findall(r'href=["\']([^"\']+)["\']', r.text)))
+    out = [h for h in hs if re.search(pat, h, re.I)]
+    for h in out[:60]: print("  ", h)
+    return out
+found = []
+for u in [B + "/estadisticas-indicadores/", B + "/publicaciones-estadisticas/", B]:
+    r = get(u); found += links(r, r"reserv|liquidez|fmi|sdds")
+cands = [h if h.startswith("http") else B + h for h in found if not h.endswith((".pdf",))]
+xls = []
+for u in dict.fromkeys(cands):
+    if re.search(r"\.xls", u, re.I): xls.append(u); continue
+    r = get(u); xls += [h if h.startswith("http") else B + h for h in links(r, r"\.xls|\.xlsx|\.zip")]
+print("\nXLS:", xls[:30])
+import openpyxl, xlrd
+for u in list(dict.fromkeys(xls))[:6]:
+    r = get(u)
+    if r is None or not r.ok: continue
+    try:
+        if u.lower().endswith(".xls"):
+            wb = xlrd.open_workbook(file_contents=r.content)
+            for sh in wb.sheets()[:6]:
+                print("--- HOJA", sh.name, sh.nrows, sh.ncols)
+                for i in range(min(sh.nrows, 400)):
+                    row = [str(v)[:30] for v in sh.row_values(i)[:10]]
+                    txt = " | ".join(row)
+                    if i < 8 or re.search(r"futur|forward|derivad|short|long", txt, re.I): print(i, txt)
+        else:
+            wb = openpyxl.load_workbook(io.BytesIO(r.content), read_only=True, data_only=True)
+            for ws in wb.worksheets[:6]:
+                print("--- HOJA", ws.title)
+                for i, row in enumerate(ws.iter_rows(values_only=True)):
+                    txt = " | ".join(str(v)[:30] for v in row[:10])
+                    if i < 8 or re.search(r"futur|forward|derivad|short|long", txt, re.I): print(i, txt)
+                    if i > 400: break
+    except Exception as e: print("parse err", e)
