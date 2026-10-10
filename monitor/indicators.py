@@ -81,7 +81,23 @@ def implied_devaluation(futuros: pd.DataFrame, spot: pd.Series) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=["fecha", *cols]).set_index("fecha").sort_index()
 
 
-def derived_series(df: pd.DataFrame, futuros: pd.DataFrame) -> pd.DataFrame:
+def fae_daily(compras: pd.DataFrame, index: pd.DatetimeIndex) -> pd.Series:
+    """Compras netas mensuales de personas humanas llevadas al calendario diario.
+
+    El dato de cada mes entra FAE_REZAGO_DIAS después de su cierre (cuando el
+    BCRA ya lo publicó) y se mantiene hasta el siguiente, para no usar
+    información que en esa fecha todavía no existía.
+    """
+    if compras is None or compras.empty or "netas_usd_millones" not in compras:
+        return pd.Series(np.nan, index=index)
+    fechas = pd.to_datetime(compras["fecha"].astype(str).str[:7] + "-01") + pd.offsets.MonthEnd(0) \
+        + pd.Timedelta(days=config.FAE_REZAGO_DIAS)
+    s = pd.Series(pd.to_numeric(compras["netas_usd_millones"], errors="coerce").values, index=fechas)
+    s = s[~s.index.duplicated(keep="last")].sort_index()
+    return s.reindex(index.union(s.index)).ffill(limit=80).reindex(index)
+
+
+def derived_series(df: pd.DataFrame, futuros: pd.DataFrame, compras: pd.DataFrame | None = None) -> pd.DataFrame:
     out = df.copy()
     oficial = official_rate(df)
     out["tc_oficial_ref"] = oficial
@@ -98,6 +114,16 @@ def derived_series(df: pd.DataFrame, futuros: pd.DataFrame) -> pd.DataFrame:
         out["vol_ccl"] = realized_vol(df["usd_ccl"], config.IPD_VOL_VENTANA)
     if "usd_mep" in df:
         out["brecha_mep"] = (df["usd_mep"] / oficial - 1) * 100
+        # Antes de que haya MEP (2018) se usa la brecha CCL (o blue): con
+        # canje casi nulo, son equivalentes.
+        if "brecha_ccl" in out:
+            primer_mep = df["usd_mep"].first_valid_index()
+            if primer_mep is not None:
+                antes = out.index < primer_mep
+                out.loc[antes, "brecha_mep"] = out.loc[antes, "brecha_ccl"]
+        if "usd_ccl" in df:
+            # Canje: cuánto más vale el dólar afuera (CCL) que adentro (MEP).
+            out["canje"] = (df["usd_ccl"] / df["usd_mep"] - 1) * 100
     if "usd_blue" in df:
         out["brecha_blue"] = (df["usd_blue"] / oficial - 1) * 100
     # Tasa de referencia: BADLAR (serie larga y homogénea desde 1999); TAMAR
@@ -113,6 +139,10 @@ def derived_series(df: pd.DataFrame, futuros: pd.DataFrame) -> pd.DataFrame:
         dev = dev.reindex(out.index.union(dev.index)).ffill(limit=3).reindex(out.index)
         for c in dev.columns:
             out[c] = dev[c]
+        if "futuros_interes_abierto" in out:
+            out["futuros_oi"] = out["futuros_interes_abierto"].rolling(
+                config.FUTUROS_OI_SUAVIZADO, min_periods=10).mean()
+    out["compras_ph"] = fae_daily(compras, out.index)
     return out
 
 
@@ -127,6 +157,10 @@ def transform(s: pd.Series, kind: str, horizon: int) -> pd.Series:
         return s.diff(horizon)
     if kind == "level":
         return s
+    if kind == "desvio_12m":
+        # Distancia al promedio de los últimos 12 meses: útil cuando un cambio
+        # de régimen (p. ej. la salida del cepo) mueve el nivel de la serie.
+        return s - s.rolling(252, min_periods=120).mean()
     raise ValueError(f"transform desconocida: {kind}")
 
 
@@ -147,7 +181,7 @@ def realized_vol(s: pd.Series, window: int) -> pd.Series:
     return r.rolling(window, min_periods=max(5, int(window * 0.75))).std() * math.sqrt(252) * 100
 
 
-def _weighted_mean(frame: pd.DataFrame, weights: dict[str, float]) -> pd.Series:
+def _weighted_mean(frame: pd.DataFrame, weights: dict[str, float], min_share: float | None = None) -> pd.Series:
     """Promedio ponderado renormalizando por los componentes disponibles."""
     if frame.empty:
         return pd.Series(dtype=float)
@@ -157,7 +191,8 @@ def _weighted_mean(frame: pd.DataFrame, weights: dict[str, float]) -> pd.Series:
     num = frame.fillna(0.0).mul(w, axis=1).sum(axis=1)
     den = avail.sum(axis=1)
     out = num / den.replace(0, np.nan)
-    out[den < config.IPD_MIN_WEIGHT_SHARE * total] = np.nan
+    share = config.IPD_MIN_WEIGHT_SHARE if min_share is None else min_share
+    out[(den <= 0) | (den < share * total)] = np.nan
     return out
 
 
@@ -195,7 +230,7 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
                     weights, var_expl = pca
                     pesos_info[bkey] = {"varianza_explicada": var_expl}
             pesos[bkey] = weights
-            block_series[bkey] = _weighted_mean(pd.DataFrame(zs), weights)
+            block_series[bkey] = _weighted_mean(pd.DataFrame(zs), weights, config.IPD_MIN_WEIGHT_SHARE_BLOQUE)
     blocks = pd.DataFrame(block_series, index=df.index)
     ipd = _weighted_mean(blocks, {k: config.IPD_BLOCKS[k]["weight"] for k in blocks.columns})
     ipd = ipd.reindex(df.index)
@@ -208,7 +243,9 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
     comps = pd.DataFrame(components, index=df.index)
     n_comp = comps.notna().sum(axis=1).where(ipd.notna())
     indice, sigma = pressure_index(ipd)
+    aportes = contributions_points(comps, blocks, pesos, ipd, indice, sigma)
     return {
+        "aportes": aportes,
         "pesos": pesos,
         "pesos_info": pesos_info,
         "ipd": ipd,
@@ -219,6 +256,40 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
         "blocks": blocks,
         "components": comps,
     }
+
+
+def contributions_points(comps: pd.DataFrame, blocks: pd.DataFrame, pesos: dict, ipd: pd.Series,
+                         indice: pd.Series, sigma: float) -> pd.DataFrame:
+    """Aporte de cada componente al índice 0-100, en puntos respecto de 50.
+
+    Cada día, el IPD es la suma de peso efectivo x z-score de cada componente
+    (los pesos se renormalizan cuando falta alguno). Esos aportes se promedian
+    con la misma ventana que el índice y se reparte la distancia del índice a
+    50 en proporción: los aportes suman exactamente (índice - 50).
+    """
+    if comps.empty:
+        return comps
+    aporte = pd.DataFrame(0.0, index=comps.index, columns=comps.columns)
+    bw = pd.Series({b: config.IPD_BLOCKS[b]["weight"] for b in blocks.columns})
+    bw_avail = blocks.notna().mul(bw, axis=1)
+    bw_eff = bw_avail.div(bw_avail.sum(axis=1).replace(0, np.nan), axis=0)
+    for b in blocks.columns:
+        cols = [c for c in pesos.get(b, {}) if c in comps]
+        if not cols:
+            continue
+        w = pd.Series({c: pesos[b][c] for c in cols})
+        avail = comps[cols].notna().mul(w, axis=1)
+        w_eff = avail.div(avail.sum(axis=1).replace(0, np.nan), axis=0)
+        aporte[cols] = w_eff.mul(comps[cols].fillna(0.0)).mul(bw_eff[b], axis=0).fillna(0.0)
+    aporte = aporte.where(ipd.notna(), np.nan)
+    n = config.INDICE_SUAVIZADO
+    suav = aporte.rolling(n, min_periods=n).mean()
+    total = suav.sum(axis=1, min_count=1)
+    gap = indice - 50
+    # Factor puntos por desvío; cerca de 0 se usa la pendiente de la normal en 0.
+    lineal = 100 / math.sqrt(2 * math.pi) / sigma if sigma and np.isfinite(sigma) else np.nan
+    factor = (gap / total).where(total.abs() > 1e-3, lineal)
+    return suav.mul(factor, axis=0).where(indice.notna())
 
 
 def pca_weights(zs: pd.DataFrame) -> tuple[dict[str, float], float] | None:
@@ -303,4 +374,6 @@ def monthly_fx_purchases(df: pd.DataFrame) -> pd.DataFrame:
             out[c] = pd.to_numeric(out[c], errors="coerce")
     if {"compras_usd_millones", "ventas_usd_millones"} <= set(out.columns):
         out["netas_usd_millones"] = out["compras_usd_millones"] - out["ventas_usd_millones"].fillna(0)
+        out = out.sort_values("fecha")
+        out["netas_prom_12m"] = out["netas_usd_millones"].rolling(12, min_periods=12).mean()
     return out.sort_values("fecha")

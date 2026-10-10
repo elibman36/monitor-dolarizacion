@@ -116,7 +116,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 <div class="wrap">
   <header class="top">
     <div>
-      <h1>Monitor de Dolarización de Portafolios</h1>
+      <h1>Monitor de Dolarización</h1>
       <p class="sub">Presión cambiaria y demanda de cobertura en Argentina, con datos diarios.</p>
     </div>
     <div class="controls">
@@ -133,7 +133,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <section class="hero">
     <div class="card" id="hero">
-      <h2>Índice de Presión Cambiaria</h2>
+      <h2>Índice de Presión de Dolarización</h2>
       <p class="note">De 0 a 100. 50 es neutral; debajo, presión apreciatoria (alivio); arriba, presión depreciatoria.</p>
       <div class="hero-num" id="hero-num">–</div>
       <span class="pill" id="hero-pill"><span class="dot"></span><span>Cargando…</span></span>
@@ -150,7 +150,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
           <button data-f="d" aria-pressed="true">Diario</button><button data-f="w">Semanal</button><button data-f="m">Mensual</button>
         </div>
       </div>
-      <p class="note" id="idx-note">Promedio de 10 días hábiles del IPD llevado a escala 0–100. El color de la línea indica el tramo; las verticales marcan elecciones y episodios cambiarios.</p>
+      <p class="note" id="idx-note">Promedio de 20 días hábiles llevado a escala 0–100. El color de la línea indica el tramo; las verticales marcan elecciones y episodios cambiarios.</p>
       <div class="chart tall" id="c-idx" role="img" aria-label="Índice de presión cambiaria 0 a 100"></div>
     </div>
   </section>
@@ -159,20 +159,20 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <section class="grid2">
     <div class="card">
-      <h2>Qué explica el IPD hoy</h2>
-      <p class="note">Contribución de cada componente (z-score). Rojo = presiona; azul = alivia.</p>
+      <h2>Qué explica el índice hoy</h2>
+      <p class="note">Aporte de cada componente, en puntos del índice: los aportes suman la distancia a 50. Rojo suma presión; azul la resta. Al lado del nombre, el peso del componente.</p>
       <div class="chart" id="c-contrib" role="img" aria-label="Contribución por componente"></div>
     </div>
     <div class="card">
-      <h2>Bloques del índice</h2>
-      <p class="note">Presión cambiaria clásica (EMP) vs. dolarización de portafolios y expectativas.</p>
+      <h2>Subíndices</h2>
+      <p class="note">Presión cambiaria, dolarización de portafolios y extranjerización de portafolios (en desvíos respecto de lo habitual).</p>
       <div class="chart" id="c-blocks" role="img" aria-label="Sub-índices por bloque"></div>
     </div>
   </section>
 
   <section class="card" style="margin-bottom:16px">
-    <h2>IPD en desvíos estándar</h2>
-    <p class="note">La medida de base del índice. Mayor a 0 = más presión que lo habitual en los últimos 2 años. Línea fina: dato diario; línea gruesa: promedio de 20 días hábiles.</p>
+    <h2>Medida de base del índice (desvíos)</h2>
+    <p class="note">Para analistas: el promedio ponderado de los componentes estandarizados, antes de llevarlo a 0–100. Mayor a 0 = más presión que lo habitual en los últimos 2 años. Línea fina: dato diario; línea gruesa: promedio de 20 días hábiles.</p>
     <div class="chart" id="c-ipd" role="img" aria-label="Serie diaria del IPD en desvíos"></div>
   </section>
 
@@ -196,17 +196,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <h2 class="section-title">Metodología</h2>
   <section class="card method">
-    <p>El IPD adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes) y se promedia dentro de dos bloques:</p>
+    <p>El Índice de Presión de Dolarización (IPD) adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes) y se promedia dentro de tres subíndices:</p>
     <ul>
-      <li><b>Presión cambiaria (EMP):</b> depreciación del oficial A3500 en 5 días, volatilidad del oficial (20 días), pérdida de reservas brutas en 5 días y suba de la tasa BADLAR en 5 días, como medida de la defensa del peso.</li>
-      <li><b>Dolarización de portafolios:</b> nivel de la brecha CCL/oficial, volatilidad del CCL (20 días), suba del riesgo país en 5 días, devaluación implícita en los futuros de A3 Mercados (TNA a 90 días) y caída de los depósitos en dólares del sector privado (cuando bajan, suma presión; cuando suben, alivia).</li>
+      <li><b>Presión cambiaria:</b> depreciación del oficial A3500 en 5 días, volatilidad del oficial (20 días), evolución de las reservas brutas en 5 días, suba de la tasa BADLAR en 5 días (defensa del peso) y brecha MEP / oficial, que mide cuánto pesan las restricciones para comprar al oficial.</li>
+      <li><b>Dolarización de portafolios:</b> devaluación implícita en los futuros de A3 Mercados (TNA a 90 días), posición abierta en futuros de dólar (demanda de cobertura, promedio de 21 días para sacar el efecto de los vencimientos), depósitos en dólares del sector privado (cuando caen suma presión; cuando crecen, alivia) y compras netas de dólares de personas humanas (FAE, dato mensual que entra un mes después de su cierre, medido contra su promedio de 12 meses para no confundir la salida del cepo con presión).</li>
+      <li><b>Extranjerización de portafolios:</b> canje (CCL / MEP), que mide la preferencia por tener dólares afuera del país; volatilidad del CCL, y suba del riesgo país en 5 días.</li>
     </ul>
-    <p>El índice se publica desde 2003. Los datos de 1996–2002 sólo se usan como referencia para estandarizar: con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20 a 45 puntos por semana y se desplomó con el corralito, y hay huecos en los datos, así que el índice de esos años no es confiable. Desde 2003 hay 7 de los 9 componentes; la brecha se suma en 2011 (con el blue hasta 2012) y los futuros en 2020. El tooltip del gráfico del IPD indica cuántos componentes había cada día.</p>
-    <p><b>Ponderación.</b> Los dos bloques pesan 50% cada uno. Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así el riesgo país y los depósitos en dólares no quedan afuera aunque la PCA les asigne carga nula. Los pesos se recalculan en cada actualización con toda la historia.</p>
-    <div class="table-wrap"><table id="pesos-tbl"><thead><tr><th>Bloque</th><th>Componente</th><th class="num">Peso en el bloque</th><th class="num">Peso en el IPD</th></tr></thead><tbody></tbody></table></div>
+    <p>El índice se publica desde 2003. Los datos de 1996–2002 sólo se usan como referencia para estandarizar: con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20 a 45 puntos por semana y se desplomó con el corralito, y hay huecos en los datos. No todos los componentes existen desde el inicio: la brecha se suma en 2011 (con el blue hasta 2012 y el CCL hasta que hay MEP, en 2018), la FAE en 2008, el canje en 2019 y los futuros en 2020. El tooltip del gráfico de la medida de base indica cuántos componentes había cada día.</p>
+    <p><b>Ponderación.</b> Los tres subíndices pesan lo mismo (un tercio cada uno). Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así ninguna variable queda afuera aunque la PCA le asigne carga nula. Los pesos se recalculan en cada actualización con toda la historia.</p>
+    <div class="table-wrap"><table id="pesos-tbl"><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody></tbody></table></div>
     <p class="note" id="pesos-nota"></p>
-    <p>Si falta un componente, su peso se reparte entre los demás. El IPD se publica cuando hay datos para al menos el 40% del peso.</p>
-    <p><b>Índice 0–100.</b> Para comunicarlo, el IPD se promedia en 10 días hábiles y se lleva a una escala de 0 a 100 con la distribución normal: Índice = 100 × Φ(IPD / σ), donde σ es el desvío histórico del IPD promediado. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 2003. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. Las compras de personas humanas se muestran aparte porque se publican mensualmente y con rezago.</p>
+    <p>Si falta un componente, su peso se reparte entre los demás de su subíndice. El índice se publica cuando hay datos para al menos el 40% del peso.</p>
+    <p><b>Índice 0–100.</b> Para comunicarlo, la medida de base se promedia en 20 días hábiles (un mes, para que el índice no salte de una semana a otra) y se lleva a una escala de 0 a 100 con la distribución normal: Índice = 100 × Φ(IPD / σ), donde σ es el desvío histórico del IPD promediado. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 2003. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. <b>Aportes en puntos:</b> la distancia del índice a 50 se reparte entre los componentes según su aporte a la medida de base, así que los aportes suman exactamente esa distancia.</p>
     <p class="note">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
   </section>
   <p class="note" id="foot" style="margin-top:16px"></p>
@@ -222,12 +223,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     deprec_fuerte: { color: "var(--dv-deprec_fuerte)", icon: "▲" },
     unknown: { color: "var(--muted)", icon: "?" },
   };
-  const TILES = ["tc_oficial_ref", "usd_ccl", "brecha_ccl", "brecha_mep", "riesgo_pais", "reservas", "tasa", "deval_implicita", "depositos_usd"];
+  const TILES = ["tc_oficial_ref", "usd_mep", "usd_ccl", "brecha_mep", "canje", "riesgo_pais", "reservas", "tasa", "deval_implicita", "futuros_interes_abierto", "depositos_usd"];
   // Variables donde una suba es "mala" (más presión): se colorea el delta.
-  const UP_IS_PRESSURE = { tc_oficial_ref: 1, usd_ccl: 1, usd_mep: 1, brecha_ccl: 1, brecha_mep: 1, riesgo_pais: 1, reservas: -1, deval_implicita: 1, depositos_usd: -1 };
+  const UP_IS_PRESSURE = { tc_oficial_ref: 1, usd_ccl: 1, usd_mep: 1, brecha_ccl: 1, brecha_mep: 1, canje: 1, futuros_interes_abierto: 1, riesgo_pais: 1, reservas: -1, deval_implicita: 1, depositos_usd: -1 };
   const MULTIPLES = [
     { title: "Tipo de cambio", keys: ["tc_oficial_ref", "usd_mep", "usd_ccl"], names: ["Oficial (A3500)", "MEP", "CCL"], unit: "$ por USD" },
-    { title: "Brecha cambiaria contra el oficial", keys: ["brecha_ccl", "brecha_mep"], names: ["CCL", "MEP"], unit: "%" },
+    { title: "Brecha MEP / oficial y canje (CCL / MEP)", keys: ["brecha_mep", "canje"], names: ["Brecha MEP / oficial", "Canje CCL / MEP"], unit: "%" },
     { title: "Volatilidad cambiaria (20 días)", keys: ["vol_oficial", "vol_ccl"], names: ["Oficial", "CCL"], unit: "% anualizada" },
     { title: "Riesgo país", keys: ["riesgo_pais"], unit: "pb" },
     { title: "Reservas internacionales brutas", keys: ["reservas"], unit: "millones de USD" },
@@ -238,7 +239,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   ];
 
   const nf = (v, d = 1) => v == null ? "–" : v.toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
-  const digitsFor = (unit, v) => unit && unit.includes("$") ? (Math.abs(v) >= 100 ? 0 : 2) : (unit && unit.startsWith("millones") || unit === "pb" || unit === "contratos") ? 0 : 1;
+  const digitsFor = (unit, v) => unit && unit.includes("$") ? (Math.abs(v) >= 100 ? 0 : 2) : (unit && unit.startsWith("millones") || unit === "pb" || unit.startsWith("contratos")) ? 0 : 1;
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const charts = [];
   let DATA = null;
@@ -379,8 +380,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <span>Fecha</span><b>${h.date || "–"}</b>
       <span>Cambio en 7 días</span><b>${d(h.indice, h.indice_7d, 0)} pts</b>
       <span>Cambio en 30 días</span><b>${d(h.indice, h.indice_30d, 0)} pts</b>
-      <span>IPD (desvíos)</span><b>${h.ipd == null ? "–" : (h.ipd > 0 ? "+" : "") + nf(h.ipd, 2)}</b>
-      <span>Percentil del IPD (2 años)</span><b>${h.percentile == null ? "–" : nf(h.percentile, 0)}</b>`;
+`;
   }
 
   function renderTiles() {
@@ -450,7 +450,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   function renderIndex() {
     let data = idxFullHistory ? (DATA.ipd.indice || []) : cut(DATA.ipd.indice || []);
     if (!data.length) return emptyState("c-idx", "Todavía no hay historia suficiente para calcular el índice.");
-    // Diario: el dato publicado (promedio de 10 días hábiles). Semanal y mensual: promedios.
+    // Diario: el dato publicado (promedio de 20 días hábiles). Semanal y mensual: promedios.
     const keyOf = { w: (d) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return x.toISOString().slice(0, 10); },
                     m: (d) => d.slice(0, 7) + "-01" }[idxFreq];
     if (keyOf) {
@@ -459,7 +459,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       data = [...acc].map(([k, [s, n]]) => [k, s / n]);
     }
     const notas = {
-      d: "Dato diario: promedio de 10 días hábiles del IPD llevado a escala 0–100.",
+      d: "Dato diario: promedio de 20 días hábiles llevado a escala 0–100.",
       w: "Promedio semanal del índice (cada punto es la semana que empieza ese lunes).",
       m: "Promedio mensual del índice.",
     };
@@ -515,7 +515,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     o.grid.top = 36;
     o.tooltip.valueFormatter = (v) => nf(v, 2);
     o.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } };
-    const cols = [css("--s1"), css("--s2")];
+    const cols = [css("--s1"), css("--s2"), css("--s3")];
     const long = isLong(cut(DATA.ipd.data));
     if (long) o.grid.top = 56;
     o.series = keys.map((k, i) => {
@@ -530,9 +530,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
 
   function renderContrib() {
-    const comps = DATA.ipd.components.filter((x) => x.z != null);
+    const comps = DATA.ipd.components.filter((x) => x.puntos != null);
     if (!comps.length) return emptyState("c-contrib", "Sin componentes disponibles.");
-    comps.sort((a, b) => a.z - b.z);
+    comps.sort((a, b) => a.puntos - b.puntos);
     const c = mount("c-contrib");
     const pos = css("--div-pos"), neg = css("--div-neg");
     c.setOption({
@@ -542,17 +542,17 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       tooltip: {
         trigger: "item", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"),
         textStyle: { color: css("--ink"), fontSize: 12 },
-        formatter: (p) => `${p.name}<br><b>${nf(p.value, 2)}</b> desvíos<br><span style="color:${css("--muted")}">al ${comps[p.dataIndex].last_date}</span>`,
+        formatter: (p) => `${p.name}<br><b>${p.value > 0 ? "+" : ""}${nf(p.value, 1)}</b> puntos del índice<br><span style="color:${css("--muted")}">al ${comps[p.dataIndex].last_date}</span>`,
       },
       xAxis: { type: "value", axisLabel: { color: css("--muted"), fontSize: 11 }, splitLine: { lineStyle: { color: css("--grid") } } },
       yAxis: { type: "category", data: comps.map((x) => x.weight_ipd == null ? x.label : `${x.label} · ${nf(x.weight_ipd * 100, 0)}%`), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--ink-2"), fontSize: 12 } },
       series: [{
         type: "bar", barMaxWidth: 18,
         data: comps.map((x) => ({
-          value: x.z,
-          itemStyle: { color: x.z >= 0 ? pos : neg, borderRadius: x.z >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4] },
+          value: x.puntos,
+          itemStyle: { color: x.puntos >= 0 ? pos : neg, borderRadius: x.puntos >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4] },
         })),
-        label: { show: true, position: "right", color: css("--ink-2"), fontSize: 11, formatter: (p) => nf(p.value, 1) },
+        label: { show: true, position: "right", color: css("--ink-2"), fontSize: 11, formatter: (p) => (p.value > 0 ? "+" : "") + nf(p.value, 1) },
       }],
     });
   }
@@ -597,18 +597,23 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       const byM = new Map(ph.map((r) => [r.fecha, r]));
       c.setOption({
         animation: false, textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
-        grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
+        grid: { left: 8, right: 16, top: 36, bottom: 8, containLabel: true },
         tooltip: {
           trigger: "axis", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 },
           formatter: (ps) => {
             const r = byM.get(ps[0].name);
             return `${ps[0].name}<br><b>Netas: ${nf(r.netas_usd_millones, 0)} M USD</b>` +
-              `<br><span style="color:${css("--muted")}">Compras ${nf(r.compras_usd_millones, 0)} · Ventas ${nf(r.ventas_usd_millones, 0)}</span>`;
+              `<br><span style="color:${css("--muted")}">Compras ${nf(r.compras_usd_millones, 0)} · Ventas ${nf(r.ventas_usd_millones, 0)}</span>` +
+              (r.netas_prom_12m != null ? `<br>Promedio 12 meses: ${nf(r.netas_prom_12m, 0)} M USD` : "");
           },
         },
         xAxis: { type: "category", data: ph.map((r) => r.fecha), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--muted"), fontSize: 11, hideOverlap: true } },
         yAxis: { type: "value", axisLabel: { color: css("--muted"), fontSize: 11 }, splitLine: { lineStyle: { color: css("--grid") } } },
-        series: [{ name: "Compras netas", type: "bar", barMaxWidth: 24, data: ph.map((r) => r.netas_usd_millones), itemStyle: { color: css("--s1"), borderRadius: [4, 4, 0, 0] } }],
+        legend: { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } },
+        series: [
+          { name: "Compras netas", type: "bar", barMaxWidth: 24, data: ph.map((r) => r.netas_usd_millones), itemStyle: { color: css("--s1"), borderRadius: [4, 4, 0, 0] } },
+          { name: "Promedio móvil 12 meses", type: "line", showSymbol: false, data: ph.map((r) => r.netas_prom_12m), lineStyle: { width: 2, color: css("--s2") }, itemStyle: { color: css("--s2") }, z: 3 },
+        ],
       });
     }
   }

@@ -1,4 +1,4 @@
-# Monitor de Dolarización de Portafolios (Argentina)
+# Monitor de Dolarización (Argentina)
 
 Tablero diario para seguir la presión cambiaria y la dolarización de
 portafolios en Argentina, pensado para hacer incidencia en el ciclo electoral
@@ -103,20 +103,23 @@ de forma silenciosa. Si el certificado del BCRA falla en CI, existe la opción
 ## Metodología del IPD
 
 Se parte del EMP de Girton y Roper (1977) y Eichengreen, Rose y Wyplosz (1996):
-*EMP = Δe/σₑ − Δr/σᵣ + Δi/σᵢ*. La versión argentina tiene dos bloques, con 50%
-de peso cada uno:
+*EMP = Δe/σₑ − Δr/σᵣ + Δi/σᵢ*. La versión argentina tiene tres subíndices de
+igual peso:
 
-| Bloque | Componente | Transformación | Signo |
+| Subíndice (1/3 cada uno) | Componente | Transformación | Signo |
 |---|---|---|---|
-| Presión cambiaria (EMP) | Tipo de cambio A3500 | Δlog 5 días | + |
+| Presión cambiaria | Tipo de cambio A3500 | Δlog 5 días | + |
 | | Volatilidad del oficial | desvío de variaciones diarias, 20 días, anualizado | + |
 | | Reservas brutas | Δlog 5 días | − |
 | | Tasa BADLAR | Δ 5 días | + |
-| Dolarización de portafolios | Brecha CCL / oficial | nivel | + |
+| | Brecha MEP / oficial | nivel (antes de 2018, brecha CCL; antes de 2013, blue) | + |
+| Dolarización de portafolios | Devaluación implícita en futuros | nivel (TNA a 90 días) | + |
+| | Posición abierta en futuros de dólar | nivel, promedio de 21 días | + |
+| | Depósitos en USD del sector privado | Δlog 5 días | − |
+| | Compras netas de USD de personas humanas (FAE) | desvío respecto de su promedio de 12 meses; entra 30 días después del cierre de cada mes | + |
+| Extranjerización de portafolios | Canje (CCL / MEP) | nivel | + |
 | | Volatilidad del CCL | desvío de variaciones diarias, 20 días, anualizado | + |
 | | Riesgo país | Δ 5 días | + |
-| | Devaluación implícita en futuros | nivel | + |
-| | Depósitos en USD (caída = presión) | Δlog 5 días | − |
 
 El cálculo sigue estos pasos:
 
@@ -126,7 +129,7 @@ El cálculo sigue estos pasos:
    dispersión, como en el EMP clásico, pero sin que un episodio extremo (la
    devaluación de dic-23) infle la escala durante dos años. La versión con
    media y desvío estándar sigue disponible (`IPD_ZSCORE_METODO = "clasico"`).
-2. **Promedio ponderado.** Los bloques pesan 50% cada uno. Dentro de cada
+2. **Promedio ponderado.** Los subíndices pesan un tercio cada uno. Dentro de cada
    bloque, los pesos salen de **componentes principales**: se calcula la matriz
    de correlaciones de los promedios mensuales de los z-scores desde 2003 y cada
    componente pesa según su carga en el primer componente principal (cuánto se
@@ -137,7 +140,7 @@ El cálculo sigue estos pasos:
    (`IPD_PONDERACION = "fija"` vuelve a los pesos manuales). Si falta un
    componente, su peso se reparte entre los demás; el índice sólo se publica si
    está disponible al menos el 40% del peso.
-3. **Índice 0–100.** El IPD se promedia en 10 días hábiles y se lleva a una
+3. **Índice 0–100.** El IPD se promedia en 20 días hábiles y se lleva a una
    escala de 0 a 100 con la normal acumulada: Índice = 100 × Φ(IPD / σ), con σ el
    desvío histórico del IPD promediado. 50 es neutral; debajo, presión
    apreciatoria (alivio); arriba, presión depreciatoria. Tramos:
@@ -147,7 +150,8 @@ El cálculo sigue estos pasos:
    - 65–90: presión depreciatoria;
    - 90–100: fuerte presión depreciatoria.
 
-   También se publica el percentil del IPD en los últimos 2 años.
+   También se publica el percentil del IPD en los últimos 2 años y el aporte de
+   cada componente en puntos del índice (los aportes suman la distancia a 50).
 
 Todo es configurable en `monitor/config.py`: horizonte, ventanas, pesos,
 componentes, suavizado y tramos del índice, y eventos.

@@ -210,6 +210,7 @@ SERIES_META = {
     "usd_blue": ("Dólar blue", "$ por USD", "ArgentinaDatos"),
     "brecha_ccl": ("Brecha CCL / oficial", "%", "Cálculo propio"),
     "brecha_mep": ("Brecha MEP / oficial", "%", "Cálculo propio"),
+    "canje": ("Canje (CCL / MEP)", "%", "Cálculo propio"),
     "vol_oficial": ("Volatilidad del oficial (20 días, anualizada)", "%", "Cálculo propio"),
     "vol_ccl": ("Volatilidad del CCL (20 días, anualizada)", "%", "Cálculo propio"),
     "riesgo_pais": ("Riesgo país", "pb", "ArgentinaDatos (JP Morgan EMBI)"),
@@ -218,7 +219,7 @@ SERIES_META = {
     "depositos_usd": ("Depósitos en dólares", "millones de USD", "BCRA"),
     "deval_implicita": ("Devaluación implícita en futuros a 90 días", "% TNA", "A3 Mercados"),
     "deval_implicita_mensual": ("Devaluación mensual implícita en futuros (90 días)", "% mensual", "A3 Mercados"),
-    "futuros_interes_abierto": ("Interés abierto futuros de dólar", "contratos", "A3 Mercados"),
+    "futuros_interes_abierto": ("Posición abierta en futuros de dólar", "contratos (USD 1.000 c/u)", "A3 Mercados"),
 }
 
 
@@ -280,12 +281,14 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
             z = ipd["components"].get(ckey)
             d, v = _last(z) if z is not None else (None, None)
             w_bloque = ipd["pesos"].get(bkey, {}).get(ckey)
+            pts = ipd["aportes"].get(ckey)
+            _, pts_last = _last(pts) if pts is not None else (None, None)
             components_meta.append({
                 "key": ckey, "block": bkey, "label": spec["label"],
                 "transform": spec["transform"],
                 "weight": _clean(w_bloque),
                 "weight_ipd": _clean(w_bloque * block["weight"]) if w_bloque is not None else None,
-                "last_date": d, "z": v,
+                "last_date": d, "z": v, "puntos": pts_last,
                 "data": _pairs(z) if z is not None else [],
             })
 
@@ -349,10 +352,9 @@ def run(offline: bool = False) -> dict:
     panel = indicators.align(daily, index)
 
     futuros = load_futures(offline)
-    panel = indicators.derived_series(panel, futuros)
-    ipd = indicators.compute_ipd(panel)
-
     compras = indicators.monthly_fx_purchases(load_compras_personas_humanas(offline))
+    panel = indicators.derived_series(panel, futuros, compras)
+    ipd = indicators.compute_ipd(panel)
 
     payload = build_payload(panel, ipd, compras, status, daily)
 
@@ -366,6 +368,8 @@ def run(offline: bool = False) -> dict:
         out_panel[f"ipd_bloque_{b}"] = ipd["blocks"][b]
     for c in ipd["components"].columns:
         out_panel[f"z_{c}"] = ipd["components"][c]
+    for c in ipd["aportes"].columns:
+        out_panel[f"pts_{c}"] = ipd["aportes"][c]
     out_panel.to_csv(config.DATA_DIR / "panel_diario.csv", date_format="%Y-%m-%d", float_format="%.6g")
 
     config.OUTPUT_JSON.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

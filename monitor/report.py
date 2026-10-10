@@ -149,7 +149,7 @@ def _linea_tramos(ax, s: pd.Series, lw=1.8):
 
 def chart_indice_anual(indice: pd.Series, semana: Semana, eventos: list[dict]) -> str:
     s = indice[semana.viernes - pd.DateOffset(months=18): semana.viernes]
-    fig, ax = plt.subplots(figsize=(7.2, 2.25))
+    fig, ax = plt.subplots(figsize=(7.2, 2.0))
     _bandas(ax)
     ax.axvspan(semana.lunes, semana.viernes + pd.Timedelta(days=1), color=INK, alpha=0.08, lw=0, zorder=2)
     _linea_tramos(ax, s)
@@ -188,15 +188,17 @@ def chart_contribuciones(z: dict[str, float], labels: dict[str, str]) -> str:
     lim = max(1.0, max(abs(v) for v in vals) * 1.25)
     ax.set_xlim(-lim, lim)
     for y, v in zip(ys, vals):
-        ax.text(v + (0.06 * lim if v >= 0 else -0.06 * lim), y, fmt(v, 1), va="center",
+        ax.text(v + (0.06 * lim if v >= 0 else -0.06 * lim), y, fmt(v, 1, signo=True), va="center",
                 ha="left" if v >= 0 else "right", fontsize=7, color=INK2)
     return _svg(fig)
 
 
 def chart_mini(series: list[tuple[str, pd.Series, str]], titulo: str, unidad: str, semana: Semana) -> str:
-    fig, ax = plt.subplots(figsize=(2.35, 1.3))
+    fig, ax = plt.subplots(figsize=(1.85, 1.2))
     desde = semana.viernes - pd.DateOffset(months=6)
     for nombre, s, color in series:
+        if s is None:
+            continue
         s = s[desde: semana.viernes].dropna()
         if s.empty:
             continue
@@ -204,12 +206,12 @@ def chart_mini(series: list[tuple[str, pd.Series, str]], titulo: str, unidad: st
     ax.axvspan(semana.lunes, semana.viernes + pd.Timedelta(days=1), color=INK, alpha=0.07, lw=0)
     ax.set_title(titulo, loc="left", fontsize=8, color=INK, fontweight="bold", pad=10)
     ax.text(0, 1.02, unidad, transform=ax.transAxes, fontsize=6.5, color=MUTED)
-    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
+    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%y"))
-    ax.tick_params(labelsize=6.5)
+    ax.tick_params(labelsize=6)
     if len(series) > 1:
-        ax.legend(fontsize=6, frameon=False, loc="lower right", ncol=len(series), handlelength=1.0,
-                  columnspacing=0.8, handletextpad=0.4, bbox_to_anchor=(1.0, 1.0), borderaxespad=0.1)
+        ax.legend(fontsize=5.8, frameon=False, loc="upper left", ncol=len(series), handlelength=1.0,
+                  columnspacing=0.7, handletextpad=0.3, bbox_to_anchor=(-0.02, -0.2), borderaxespad=0)
     return _svg(fig)
 
 
@@ -217,10 +219,13 @@ def chart_compras_ph(compras: list[dict]) -> str:
     df = pd.DataFrame(compras)
     if df.empty or "netas_usd_millones" not in df:
         return ""
-    df = df.tail(24)
-    fig, ax = plt.subplots(figsize=(7.2, 1.45))
-    ax.bar(range(len(df)), df["netas_usd_millones"], color=S1, width=0.7, zorder=3)
-    ax.set_xticks(range(len(df)), [f"{MESES[int(f[5:7]) - 1]}\n{f[2:4]}" for f in df["fecha"]], fontsize=6.5)
+    df = df.tail(36)
+    fig, ax = plt.subplots(figsize=(7.2, 1.3))
+    ax.bar(range(len(df)), df["netas_usd_millones"], color=S1, width=0.7, zorder=3, label="Compras netas")
+    if "netas_prom_12m" in df:
+        ax.plot(range(len(df)), df["netas_prom_12m"], color=S2, lw=1.8, zorder=4, label="Promedio móvil 12 meses")
+        ax.legend(fontsize=6.5, frameon=False, loc="upper left", ncol=2, handlelength=1.2)
+    ax.set_xticks(range(0, len(df), 2), [f"{MESES[int(f[5:7]) - 1]}\n{f[2:4]}" for f in df["fecha"]][::2], fontsize=6.5)
     ax.axhline(0, color=AXIS, lw=0.8)
     ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: fmt(v, 0)))
     return _svg(fig)
@@ -236,12 +241,13 @@ VARIABLES = [
     ("usd_mep", "Dólar MEP", "$ por USD", 1, "pct"),
     ("usd_ccl", "Dólar CCL", "$ por USD", 1, "pct"),
     ("brecha_mep", "Brecha MEP / oficial", "%", 1, "pp"),
-    ("brecha_ccl", "Brecha CCL / oficial", "%", 1, "pp"),
+    ("canje", "Canje (CCL / MEP)", "%", 1, "pp"),
     ("vol_oficial", "Volatilidad del oficial (20 días)", "% anual", 1, "pp"),
     ("riesgo_pais", "Riesgo país", "pb", 0, "pb"),
     ("reservas", "Reservas internacionales brutas", "M USD", 0, "abs"),
     ("tasa", "Tasa BADLAR privados", "% n.a.", 2, "pp"),
     ("deval_implicita", "Devaluación implícita en futuros (90 días)", "% TNA", 1, "pp"),
+    ("futuros_interes_abierto", "Posición abierta en futuros de dólar", "contratos de USD 1.000", 0, "pct"),
     ("depositos_usd", "Depósitos en USD del sector privado", "M USD", 0, "abs"),
 ]
 
@@ -285,47 +291,54 @@ def _minus(txt: str) -> str:
     return txt[:1].lower() + txt[1:]
 
 
-def resumen(indice, p, semana, z_cierre, z_prev, labels, datos) -> list[str]:
+FRASES = {c: spec["frases"] for b in config.IPD_BLOCKS.values() for c, spec in b["components"].items()}
+
+
+def _frase(comp: str, pts: float) -> str:
+    sube, baja = FRASES.get(comp, (comp, comp))
+    return f"{sube if pts > 0 else baja} ({fmt(pts, 0, signo=True)} pts)"
+
+
+def resumen(indice, semana, pts_cierre, datos) -> list[str]:
+    """Resumen en palabras: cuánto se movió el índice y qué lo explica, en puntos."""
     _, i1 = _hasta(indice, semana.viernes)
     _, i0 = _hasta(indice, semana.viernes - pd.Timedelta(days=7))
-    sem = indice[semana.lunes: semana.viernes].dropna()
     tramo = indicators.status_for(i1)[1].lower()
     puntos = []
     if np.isfinite(i1):
+        txt = f"El índice cerró la semana en <b>{fmt(i1, 0)}/100</b> ({tramo})"
         if np.isfinite(i0):
             dif = i1 - i0
-            mov = "subió" if dif > 1 else "bajó" if dif < -1 else "se mantuvo estable"
-            extra = f" {fmt(abs(dif), 0)} puntos" if abs(dif) > 1 else ""
-            puntos.append(f"El índice cerró la semana en <b>{fmt(i1, 0)}/100</b> ({tramo}): {mov}{extra} "
-                          f"respecto del viernes anterior ({fmt(i0, 0)}).")
-        if not sem.empty:
-            puntos.append(f"Durante la semana se movió entre {fmt(sem.min(), 0)} y {fmt(sem.max(), 0)}.")
-    zc = {k: v for k, v in z_cierre.items() if np.isfinite(v)}
-    if zc:
-        presion = [k for k, v in sorted(zc.items(), key=lambda t: -t[1]) if v > 0.5][:2]
-        alivio = [k for k, v in sorted(zc.items(), key=lambda t: t[1]) if v < -0.5][:2]
+            if abs(dif) < 1.5:
+                txt += f", sin cambios relevantes respecto del viernes anterior ({fmt(i0, 0)})"
+            else:
+                txt += f", {fmt(abs(dif), 0)} puntos {'por encima' if dif > 0 else 'por debajo'} del viernes anterior ({fmt(i0, 0)})"
+        puntos.append(txt + ".")
+    pc = {k: v for k, v in pts_cierre.items() if np.isfinite(v)}
+    if pc:
+        presion = [k for k, v in sorted(pc.items(), key=lambda t: -t[1]) if v >= 1][:3]
+        alivio = [k for k, v in sorted(pc.items(), key=lambda t: t[1]) if v <= -1][:3]
         if presion:
-            puntos.append("Presionan: " + " y ".join(_minus(labels[k]) for k in presion) + ".")
+            puntos.append("En el último mes sumaron presión: " + "; ".join(_frase(k, pc[k]) for k in presion) + ".")
         if alivio:
-            puntos.append("Alivian: " + " y ".join(_minus(labels[k]) for k in alivio) + ".")
-        cambios = {k: zc[k] - z_prev.get(k, np.nan) for k in zc if np.isfinite(z_prev.get(k, np.nan))}
-        if cambios:
-            k = max(cambios, key=lambda c: abs(cambios[c]))
-            if abs(cambios[k]) >= 0.5:
-                sentido = "más presión" if cambios[k] > 0 else "más alivio"
-                puntos.append(f"Lo que más cambió en la semana: {_minus(labels[k])} ({sentido}, "
-                              f"{fmt(cambios[k], 1, signo=True)} desvíos).")
+            puntos.append("En el último mes restaron presión: " + "; ".join(_frase(k, pc[k]) for k in alivio) + ".")
+        puntos.append('<span class="muted">"Habitual" se refiere a los últimos dos años. Los puntos indican cuánto aporta '
+                      "cada factor a la distancia del índice respecto de 50, en promedio de las últimas cuatro semanas "
+                      "(el mismo período con que se calcula el índice).</span>")
     partes = []
     if "tc_oficial_ref" in datos:
         partes.append(f"el oficial {_txt_var(datos['tc_oficial_ref']['d'], 'pct', 2)}")
+    if "usd_mep" in datos:
+        partes.append(f"el MEP {_txt_var(datos['usd_mep']['d'], 'pct', 1)}")
     if "usd_ccl" in datos:
         partes.append(f"el CCL {_txt_var(datos['usd_ccl']['d'], 'pct', 1)}")
     if "riesgo_pais" in datos:
         partes.append(f"el riesgo país {_txt_var(datos['riesgo_pais']['d'], 'pb', 0)}")
-    if "reservas" in datos:
-        partes.append(f"las reservas {fmt(datos['reservas']['d'], 0, signo=True)} M USD")
+    if "reservas" in datos and np.isfinite(datos["reservas"]["d"]):
+        d = datos["reservas"]["d"]
+        partes.append(f"las reservas {'subieron' if d >= 0 else 'cayeron'} USD {fmt(abs(d), 0)} M")
     if partes:
-        puntos.append("En la semana: " + ", ".join(partes) + ".")
+        puntos.append("Variaciones de la semana: " + ", ".join(partes) + ".")
     return puntos
 
 
@@ -359,10 +372,10 @@ ul.res { margin: 4pt 0 0; padding-left: 13pt; } ul.res li { margin-bottom: 3pt; 
 .note { color: #898781; font-size: 7.5pt; margin: 0 0 4pt; }
 table.vars { width: 100%; border-collapse: collapse; font-size: 8.3pt; }
 table.vars th { text-align: left; color: #52514e; font-weight: 600; border-bottom: 1px solid #c3c2b7; padding: 4pt 4pt; }
-table.vars td { border-bottom: 1px solid #eeede8; padding: 2.6pt 4pt; vertical-align: top; }
+table.vars td { border-bottom: 1px solid #eeede8; padding: 2.1pt 4pt; vertical-align: top; }
 table.vars .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
-.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6pt; }
+.grid3 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5pt; }
 .grid3 .card { padding: 4pt 6pt; }
 .section { margin-top: 8pt; break-inside: avoid; }
 .page { break-before: page; }
@@ -384,17 +397,15 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
     _, i0 = _hasta(indice, semana.viernes - pd.Timedelta(days=7))
     _, i4 = _hasta(indice, semana.viernes - pd.Timedelta(days=28))
     tramo_key, tramo_label = indicators.status_for(i1)
-    _, ipd1 = _hasta(p["ipd"], semana.viernes)
 
     labels = {c: spec["label"] for b in config.IPD_BLOCKS.values() for c, spec in b["components"].items()}
     meta = {c["key"]: c for c in payload["ipd"]["components"]}
     labels_peso = {c: (f"{l} · {fmt(meta[c]['weight_ipd'] * 100, 0)}%" if meta.get(c, {}).get("weight_ipd") is not None else l)
                    for c, l in labels.items()}
-    z_cierre = {c: _hasta(p[f"z_{c}"], semana.viernes)[1] for c in labels if f"z_{c}" in p}
-    z_prev = {c: _hasta(p[f"z_{c}"], semana.viernes - pd.Timedelta(days=7))[1] for c in labels if f"z_{c}" in p}
+    pts_cierre = {c: _hasta(p[f"pts_{c}"], semana.viernes)[1] for c in labels if f"pts_{c}" in p}
 
     tabla, datos = tabla_variables(p, semana)
-    puntos = resumen(indice, p, semana, z_cierre, z_prev, labels, datos)
+    puntos = resumen(indice, semana, pts_cierre, datos)
 
     gauge = "".join(f"<span style='flex:{min(hi, 100) - lo};background:{TRAMO_COLOR[k]}'></span>"
                     for lo, hi, k, _ in config.INDICE_TRAMOS)
@@ -405,11 +416,14 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
     minis = [
         chart_mini([("Oficial", p["tc_oficial_ref"], S1), ("MEP", p.get("usd_mep"), S2), ("CCL", p.get("usd_ccl"), S3)],
                    "Tipo de cambio", "$ por USD", semana),
-        chart_mini([("CCL", p.get("brecha_ccl"), S1), ("MEP", p.get("brecha_mep"), S2)],
-                   "Brecha contra el oficial", "%", semana),
+        chart_mini([("Brecha MEP", p.get("brecha_mep"), S1), ("Canje", p.get("canje"), S2)],
+                   "Brecha MEP / oficial y canje", "%", semana),
         chart_mini([("Riesgo país", p["riesgo_pais"], S1)], "Riesgo país", "pb", semana),
         chart_mini([("Reservas", p["reservas"], S1)], "Reservas brutas", "millones de USD", semana),
         chart_mini([("Futuros", p.get("deval_implicita"), S1)], "Devaluación implícita", "% TNA a 90 días", semana),
+        chart_mini([("Posición abierta", p.get("futuros_interes_abierto") / 1000 if "futuros_interes_abierto" in p else None, S1)],
+                   "Futuros de dólar", "posición abierta, miles de contratos", semana),
+        chart_mini([("Depósitos", p.get("depositos_usd"), S1)], "Depósitos en USD", "millones de USD", semana),
         chart_mini([("Oficial", p.get("vol_oficial"), S1), ("CCL", p.get("vol_ccl"), S2)],
                    "Volatilidad cambiaria", "% anualizada, 20 días", semana),
     ]
@@ -428,14 +442,14 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
 
     return f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><style>{CSS}</style></head><body>
 <header class="top">
-  <div><h1>Monitor de Dolarización de Portafolios</h1>
+  <div><h1>Monitor de Dolarización</h1>
   <p class="sub">Reporte semanal · semana del {semana.etiqueta}</p></div>
   <div class="meta">Datos al {fecha_larga(f_cierre)}<br><a href="{DASHBOARD_URL}">Tablero diario</a></div>
 </header>
 
 <section class="hero">
   <div class="card">
-    <h2>Índice de Presión Cambiaria</h2>
+    <h2>Índice de Presión de Dolarización</h2>
     <div class="muted">0 a 100 · 50 = neutral</div>
     <div class="num-big">{fmt(i1, 0)}<small>/100</small></div>
     <span class="pill" style="background:{TRAMO_COLOR.get(tramo_key, MUTED)}">{html.escape(tramo_label)}</span>
@@ -444,7 +458,6 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
     <div class="kv">
       <span>Semana anterior</span><b>{fmt(i0, 0)} ({fmt(i1 - i0, 0, signo=True)} pts)</b>
       <span>Hace 4 semanas</span><b>{fmt(i4, 0)} ({fmt(i1 - i4, 0, signo=True)} pts)</b>
-      <span>IPD (desvíos)</span><b>{fmt(ipd1, 2, signo=True)}</b>
     </div>
   </div>
   <div class="card">
@@ -455,7 +468,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
 
 <section class="card">
   <h2>Índice en los últimos 18 meses</h2>
-  <p class="note">Dato diario (promedio de 10 días hábiles del IPD). La franja gris marca la semana informada.</p>
+  <p class="note">Dato diario (promedio de 20 días hábiles). La franja gris marca la semana informada. <a href="{DASHBOARD_URL}">Ver la versión interactiva, con el período a elección</a>.</p>
   <div class="chart">{chart_indice_anual(indice, semana, payload.get("events", []))}</div>
   <div class="legend">{leyenda}</div>
 </section>
@@ -463,8 +476,8 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
 <section class="section grid2">
   <div class="card">
     <h2>Qué explica el índice</h2>
-    <p class="note">Contribución de cada componente al cierre (desvíos). Rojo presiona, azul alivia.</p>
-    <div class="chart">{chart_contribuciones(z_cierre, labels_peso)}</div>
+    <p class="note">Aporte de cada componente al cierre, en puntos del índice (suman la distancia a 50). Rojo suma presión; azul la resta.</p>
+    <div class="chart">{chart_contribuciones(pts_cierre, labels_peso)}</div>
   </div>
   <div class="card">
     <h2>Índice desde 2003</h2>
@@ -484,17 +497,17 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
     <div class="grid3">{"".join(f"<div class='card chart'>{m}</div>" for m in minis)}</div>
   </div>
   {"" if not ph_svg else f'''<div class="section card">
-    <h2>Compras netas de USD de personas humanas</h2>
-    <p class="note">Billetes y divisas sin fines específicos, millones de USD por mes. Último dato: {ph_ult["fecha"]} ({fmt(ph_ult.get("netas_usd_millones"), 0)} M USD netos; {fmt(ph_ult.get("compras_usd_millones"), 0)} M de compras brutas). BCRA, balance cambiario.</p>
+    <h2>Compras netas de USD de personas humanas (FAE)</h2>
+    <p class="note">Formación de activos externos (billetes y divisas sin fines específicos), millones de USD por mes, con su promedio móvil de 12 meses. Último dato: {ph_ult["fecha"]} ({fmt(ph_ult.get("netas_usd_millones"), 0)} M USD netos; {fmt(ph_ult.get("compras_usd_millones"), 0)} M de compras brutas). BCRA, balance cambiario.</p>
     <div class="chart">{ph_svg}</div>
   </div>'''}
 </section>
 
 <section class="page method">
   <h2>Metodología</h2>
-  <p>El Índice de Presión Cambiaria adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se estandariza contra los últimos dos años con mediana y desvío absoluto mediano, una versión robusta del z-score que evita que un episodio extremo infle la escala. Los componentes se promedian en dos bloques de igual peso. Dentro de cada bloque, los pesos salen de componentes principales: cada componente pesa según su carga en el primer componente principal de los promedios mensuales del bloque desde 2003. Las cargas negativas valen cero y ningún componente pesa menos del 10% de su bloque. Varianza explicada por el primer componente: {pca_txt}.</p>
-  <table><thead><tr><th>Bloque</th><th>Componente</th><th class="num">Peso en el bloque</th><th class="num">Peso en el IPD</th></tr></thead><tbody>{comp_rows}</tbody></table>
-  <p>El resultado (IPD, en desvíos) se promedia en 10 días hábiles y se lleva a una escala de 0 a 100 con la normal acumulada: Índice = 100 × Φ(IPD / σ), donde σ es el desvío histórico. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Si falta un componente, su peso se reparte entre los demás.</p>
+  <p>El Índice de Presión de Dolarización adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano, para que un episodio extremo no infle la escala). Los componentes se agrupan en tres subíndices de igual peso: <b>presión cambiaria</b> (tipo de cambio oficial, su volatilidad, reservas, tasa en pesos y brecha MEP / oficial), <b>dolarización de portafolios</b> (devaluación implícita y posición abierta en futuros de dólar, depósitos en dólares y compras de dólares de personas humanas) y <b>extranjerización de portafolios</b> (canje CCL / MEP, volatilidad del CCL y riesgo país). Dentro de cada subíndice, los pesos salen de componentes principales: cada componente pesa según cuánto se mueve junto con el resto (cargas del primer componente principal de los promedios mensuales desde 2003). Las cargas negativas valen cero y ningún componente pesa menos del 10% de su subíndice. Varianza explicada por el primer componente: {pca_txt}.</p>
+  <table><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody>{comp_rows}</tbody></table>
+  <p>El promedio ponderado se promedia en 20 días hábiles (un mes, para que el índice no salte de una semana a otra) y se lleva a una escala de 0 a 100 con la normal acumulada. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Los aportes en puntos reparten la distancia del índice a 50 entre los componentes, así que suman exactamente esa distancia. Si falta un componente, su peso se reparte entre los demás de su subíndice. Las compras de dólares de personas humanas son mensuales, entran al índice un mes después del cierre de cada mes (cuando el BCRA las publica) y se miden contra su promedio de 12 meses, para no confundir la salida del cepo con presión.</p>
   <p><b>Fuentes:</b> BCRA (reservas, tipo de cambio A3500, BADLAR, depósitos en dólares y anexo del balance cambiario), ArgentinaDatos (dólar MEP, CCL y blue; riesgo país) y A3 Mercados (futuros de dólar). Todas las series se descargan automáticamente.</p>
   <p class="muted">Generado el {generado.day}/{generado.month}/{generado.year} a las {generado:%H:%M} (hora argentina). Tablero diario y datos: <a href="{DASHBOARD_URL}">{DASHBOARD_URL}</a></p>
 </section>
@@ -505,8 +518,8 @@ def html_a_pdf(html_txt: str, destino: Path) -> None:
     from playwright.sync_api import sync_playwright
 
     footer = ("<div style='font-family:Inter,DejaVu Sans,sans-serif;font-size:7px;color:#898781;width:100%;"
-              "padding:0 14mm;display:flex;justify-content:space-between'><span>Monitor de Dolarización de "
-              "Portafolios · Reporte semanal</span><span><span class='pageNumber'></span> / "
+              "padding:0 14mm;display:flex;justify-content:space-between'><span>Monitor de Dolarización · "
+              "Reporte semanal</span><span><span class='pageNumber'></span> / "
               "<span class='totalPages'></span></span></div>")
     with sync_playwright() as pw:
         kwargs = {}

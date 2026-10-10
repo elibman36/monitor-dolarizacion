@@ -133,40 +133,90 @@ IPD_PCA_MIN_OBS = 24        # meses mínimos en común entre dos componentes
 # aunque la PCA le asigne carga nula o negativa (p. ej. riesgo país).
 IPD_PCA_PESO_MINIMO = 0.10
 
+# Cada componente lleva dos frases para el resumen escrito del reporte: qué
+# está pasando cuando suma presión y cuándo resta ("habitual" = últimos 2 años).
 IPD_BLOCKS = {
-    "emp": {
-        "label": "Presión cambiaria (EMP)",
-        "weight": 0.5,
+    "cambiaria": {
+        "label": "Presión cambiaria",
+        "weight": 1 / 3,
         "components": {
             "tc_a3500":  {"transform": "dlog",  "sign": +1, "weight": 1.0,
-                          "label": "Depreciación del oficial"},
+                          "label": "Depreciación del oficial",
+                          "frases": ("el oficial se depreció más que lo habitual",
+                                     "el oficial se depreció menos que lo habitual")},
             "vol_oficial": {"transform": "level", "sign": +1, "weight": 1.0,
-                            "label": "Volatilidad del oficial"},
+                            "label": "Volatilidad del oficial",
+                            "frases": ("la volatilidad del oficial está por encima de lo habitual",
+                                       "la volatilidad del oficial está por debajo de lo habitual")},
             "reservas":  {"transform": "dlog",  "sign": -1, "weight": 1.0,
-                          "label": "Pérdida de reservas"},
+                          "label": "Reservas internacionales",
+                          "frases": ("las reservas cayeron más que lo habitual",
+                                     "las reservas evolucionaron mejor que lo habitual")},
             "tasa":      {"transform": "diff",  "sign": +1, "weight": 1.0,
-                          "label": "Suba de tasas (defensa del peso)"},
+                          "label": "Tasa BADLAR (defensa del peso)",
+                          "frases": ("subió la tasa en pesos", "bajó la tasa en pesos")},
+            "brecha_mep":  {"transform": "level", "sign": +1, "weight": 1.0,
+                            "label": "Brecha MEP / oficial",
+                            "frases": ("la brecha MEP / oficial está por encima de lo habitual",
+                                       "la brecha MEP / oficial está por debajo de lo habitual")},
         },
     },
-    "portafolio": {
-        "label": "Dolarización de portafolios y expectativas",
-        "weight": 0.5,
+    "dolarizacion": {
+        "label": "Dolarización de portafolios",
+        "weight": 1 / 3,
         "components": {
-            "brecha_ccl":  {"transform": "level", "sign": +1, "weight": 1.0,
-                            "label": "Brecha CCL / oficial"},
-            "vol_ccl":     {"transform": "level", "sign": +1, "weight": 1.0,
-                            "label": "Volatilidad del CCL"},
-            "riesgo_pais": {"transform": "diff",  "sign": +1, "weight": 1.0,
-                            "label": "Suba del riesgo país"},
             "deval_implicita": {"transform": "level", "sign": +1, "weight": 1.0,
-                                "label": "Devaluación implícita en futuros"},
+                                "label": "Devaluación implícita en futuros",
+                                "frases": ("los futuros anticipan más devaluación que lo habitual",
+                                           "los futuros anticipan menos devaluación que lo habitual")},
+            "futuros_oi": {"transform": "level", "sign": +1, "weight": 1.0,
+                           "label": "Posición abierta en futuros de dólar",
+                           "frases": ("hay más posiciones abiertas en futuros de dólar (demanda de cobertura)",
+                                      "hay menos posiciones abiertas en futuros de dólar")},
             # Los depósitos en USD caen cuando sube la presión (fuga de
             # depósitos) y suben con la confianza: su caída suma presión.
-            "depositos_usd": {"transform": "dlog", "sign": -1, "weight": 0.5,
-                              "label": "Caída de depósitos en USD"},
+            "depositos_usd": {"transform": "dlog", "sign": -1, "weight": 1.0,
+                              "label": "Depósitos en USD",
+                              "frases": ("cayeron los depósitos en dólares",
+                                         "crecieron los depósitos en dólares")},
+            # Formación de activos externos de personas humanas: dato mensual,
+            # que entra recién cuando el BCRA lo publica (ver FAE_REZAGO_DIAS).
+            # Se mide contra su promedio de 12 meses: con el cepo las compras
+            # eran casi nulas y la salida (abr-25) no es presión en sí misma.
+            "compras_ph": {"transform": "desvio_12m", "sign": +1, "weight": 1.0,
+                           "label": "Compras de USD de personas humanas (FAE)",
+                           "frases": ("las compras de dólares de personas humanas superan su promedio de 12 meses",
+                                      "las compras de dólares de personas humanas están por debajo de su promedio de 12 meses")},
+        },
+    },
+    "extranjerizacion": {
+        "label": "Extranjerización de portafolios",
+        "weight": 1 / 3,
+        "components": {
+            "canje": {"transform": "level", "sign": +1, "weight": 1.0,
+                      "label": "Canje (CCL / MEP)",
+                      "frases": ("el canje está por encima de lo habitual: más preferencia por dólares afuera",
+                                 "el canje está por debajo de lo habitual")},
+            "vol_ccl":     {"transform": "level", "sign": +1, "weight": 1.0,
+                            "label": "Volatilidad del CCL",
+                            "frases": ("la volatilidad del CCL está por encima de lo habitual",
+                                       "la volatilidad del CCL está por debajo de lo habitual")},
+            "riesgo_pais": {"transform": "diff",  "sign": +1, "weight": 1.0,
+                            "label": "Riesgo país",
+                            "frases": ("subió el riesgo país", "bajó el riesgo país")},
         },
     },
 }
+
+# Rezago con que se incorpora la FAE mensual: el dato de un mes entra este
+# número de días después del fin de mes (el BCRA lo publica ~4 semanas
+# después) y se mantiene hasta el siguiente.
+FAE_REZAGO_DIAS = 30
+# La posición abierta en futuros cae cada fin de mes por el vencimiento del
+# contrato más corto: se suaviza con un promedio de este número de días hábiles.
+FUTUROS_OI_SUAVIZADO = 21
+# Peso mínimo de un bloque para calcularlo: 0 = alcanza con un componente.
+IPD_MIN_WEIGHT_SHARE_BLOQUE = 0.0
 
 # Percentil del IPD dentro de su propia historia reciente (dato complementario).
 IPD_PERCENTILE_WINDOW = 504
@@ -174,8 +224,9 @@ IPD_PERCENTILE_WINDOW = 504
 # Índice 0-100: 100 * Φ(IPD suavizado / σ), con Φ la normal acumulada y σ el
 # desvío histórico del IPD suavizado. 50 = neutral; < 50 presión apreciatoria
 # (alivio); > 50 presión depreciatoria. Se suaviza con un promedio de
-# INDICE_SUAVIZADO días hábiles para que el titular no salte día a día.
-INDICE_SUAVIZADO = 10
+# INDICE_SUAVIZADO días hábiles para que el titular no salte día a día
+# (con 20 días el cambio semanal promedio es de unos 6 puntos).
+INDICE_SUAVIZADO = 20  # un mes hábil
 INDICE_SIGMA = None  # None = desvío histórico calculado en cada corrida
 INDICE_TRAMOS = [
     # (desde, hasta, clave, etiqueta) - escala divergente, de azul a rojo
