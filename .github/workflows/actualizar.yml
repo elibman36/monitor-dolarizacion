@@ -61,6 +61,9 @@ jobs:
 
       - name: Colombia
         continue-on-error: true
+        # El portal de estadísticas del Banco de la República tiene la cadena de certificados incompleta.
+        env:
+          SUAMECA_SSL_VERIFY: "0"
         run: python -m monitor.colombia
 
       - name: Núcleo comparable entre países

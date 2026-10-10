@@ -739,19 +739,24 @@ def _perfil_co() -> dict:
     variables = [
         ("tc", "Tasa representativa del mercado (TRM)", "$ por USD", 2, "pct"),
         ("vol_tc", "Volatilidad del tipo de cambio (20 días)", "% anual", 1, "pp"),
+        ("reservas", "Reservas internacionales brutas", "M USD, último fin de mes publicado", 0, "abs"),
+        ("intervencion_usd", "Ventas netas de dólares del Banco (20 días)", "M USD", 0, "abs"),
+        ("tpm", "Tasa de política monetaria", "% e.a.", 2, "pp"),
         ("embig", "Riesgo país (EMBIG)", "pb", 0, "pb"),
     ]
     minis = lambda p, sem: [  # noqa: E731
         chart_mini([("TRM", p.get("tc"), S1)], "Tipo de cambio", "$ por USD", sem),
         chart_mini([("Volatilidad", p.get("vol_tc"), S1)], "Volatilidad cambiaria", "% anualizada, 20 días", sem),
+        chart_mini([("Reservas", p.get("reservas"), S1)], "Reservas", "millones de USD (mensual)", sem),
+        chart_mini([("TPM", p.get("tpm"), S1)], "Tasa de política monetaria", "% e.a.", sem),
         chart_mini([("EMBIG", p.get("embig"), S1)], "Riesgo país", "pb", sem),
     ]
     return _perfil_modulo(colombia, "co", "Colombia", "el peso", variables, minis,
-                          "Por ahora tiene dos subíndices de igual peso: <b>presión cambiaria</b> (depreciación de la TRM y su "
-                          "volatilidad) y <b>riesgo</b> (EMBIG). Las reservas, la intervención y la tasa de política del Banco "
-                          "de la República se suman cuando estén automatizadas.",
-                          "El EMBIG se publica con algunos días de rezago.",
-                          "Superintendencia Financiera (TRM, vía datos.gov.co) y BCRP (EMBIG).")
+                          "Dos subíndices de igual peso: <b>presión cambiaria</b> (depreciación de la TRM, su volatilidad, caída "
+                          "de las reservas y ventas netas de dólares del Banco de la República) y <b>riesgo y tasas</b> (EMBIG y "
+                          "tasa de política monetaria).",
+                          "Las reservas son mensuales; el EMBIG se publica con algunos días de rezago.",
+                          "Banco de la República (reservas, operaciones cambiarias y tasa de política), Superintendencia Financiera (TRM, vía datos.gov.co) y BCRP (EMBIG).")
 
 
 PERFILES = {"ar": lambda: PERFIL_AR, "pe": _perfil_pe, "uy": _perfil_uy, "br": _perfil_br, "cl": _perfil_cl, "co": _perfil_co}

@@ -401,3 +401,9 @@ def test_lectores_brasil_chile_colombia():
     assert list(m.index) == [pd.Timestamp("2026-10-10"), pd.Timestamp("2026-10-13")]
     t = colombia.parse_trm([{"valor": "3194.44", "vigenciadesde": "2026-10-10T00:00:00.000", "vigenciahasta": "2026-10-13T00:00:00.000"}])
     assert t.index[0] == pd.Timestamp("2026-10-10") and t.iloc[0] == pytest.approx(3194.44)
+
+
+def test_colombia_suameca():
+    from monitor import colombia
+    s = colombia.parse_suameca([{"id": 59, "data": [[1760331600000, 12.25], [1760418000000, 12.0]]}], "tpm")
+    assert s.index[0] == pd.Timestamp("2025-10-13") and s.iloc[-1] == 12.0

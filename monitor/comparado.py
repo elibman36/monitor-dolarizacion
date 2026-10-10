@@ -107,7 +107,21 @@ def brasil_() -> pd.DataFrame:
     return _componentes(c("tc"), ventas, c("reservas"))
 
 
-PAISES = {"ar": ("Argentina", argentina), "pe": ("Perú", peru_), "uy": ("Uruguay", uruguay_), "br": ("Brasil", brasil_)}
+def colombia_() -> pd.DataFrame:
+    """TRM; intervención: ventas netas del Banco de la República en el mercado
+    cambiario (compras directas, opciones, NDF y swaps; − compras)."""
+    from . import colombia, comun
+    c = lambda k: comun.cache(colombia.SERIES_DIR, k)  # noqa: E731
+    compras = c("compras_netas")
+    if compras.empty:
+        return pd.DataFrame(columns=["depreciacion", "intervencion"])
+    ventas = -compras.resample("ME").sum()
+    ventas = ventas.reindex(pd.date_range("2000-01-31", ventas.index.max(), freq="ME")).fillna(0.0)
+    return _componentes(c("tc"), ventas, c("reservas"))
+
+
+PAISES = {"ar": ("Argentina", argentina), "pe": ("Perú", peru_), "uy": ("Uruguay", uruguay_), "br": ("Brasil", brasil_),
+          "co": ("Colombia", colombia_)}
 
 
 def _mad(x: pd.Series) -> float:

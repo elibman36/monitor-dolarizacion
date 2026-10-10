@@ -43,7 +43,7 @@ jobs:
           python -m monitor.build
           python -m monitor.peru || echo "Perú: no se pudo actualizar; uso los datos guardados"
           BCU_SSL_VERIFY=0 python -m monitor.uruguay || echo "Uruguay: no se pudo actualizar; uso los datos guardados"
-          for M in brasil chile colombia; do python -m monitor.$M || echo "$M: no se pudo actualizar"; done
+          for M in brasil chile colombia; do SUAMECA_SSL_VERIFY=0 python -m monitor.$M || echo "$M: no se pudo actualizar"; done
 
       - name: Generar el PDF
         run: |
