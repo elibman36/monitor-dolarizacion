@@ -117,19 +117,41 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   <header class="top">
     <div>
       <h1>Monitor de Dolarización</h1>
-      <p class="sub">Presión cambiaria y demanda de cobertura en Argentina, con datos diarios.</p>
+      <p class="sub" id="sub">Presión cambiaria y demanda de cobertura en Argentina, con datos diarios.</p>
     </div>
     <div class="controls">
+      <div class="seg" id="pais" role="group" aria-label="País">
+        <button data-p="ar">Argentina</button><button data-p="pe">Perú</button><button data-p="comparado">Comparar países</button>
+      </div>
       <div class="seg" id="range" role="group" aria-label="Período">
         <button data-r="90">3M</button><button data-r="182">6M</button><button data-r="365" aria-pressed="true">1A</button><button data-r="730">2A</button><button data-r="1825">5A</button><button data-r="3650">10A</button><button data-r="0">Todo</button>
       </div>
-      <a class="btn" href="https://github.com/elibman36/monitor-dolarizacion/blob/main/reportes/ultimo.pdf" target="_blank" rel="noopener">Reporte semanal (PDF)</a>
-      <a class="btn" href="https://github.com/elibman36/monitor-dolarizacion/blob/main/data/panel_diario.csv" target="_blank" rel="noopener">Datos (CSV)</a>
+      <a class="btn" id="lnk-pdf" href="https://github.com/elibman36/monitor-dolarizacion/blob/main/reportes/ultimo.pdf" target="_blank" rel="noopener">Reporte semanal (PDF)</a>
+      <a class="btn" id="lnk-csv" href="https://github.com/elibman36/monitor-dolarizacion/blob/main/data/panel_diario.csv" target="_blank" rel="noopener">Datos (CSV)</a>
       <button class="btn" id="theme" type="button" aria-label="Cambiar tema">◐</button>
     </div>
   </header>
 
   <div id="banner" class="card empty"></div>
+
+  <div id="vista-comparado" hidden>
+    <section class="card" style="margin-bottom:16px">
+      <h2>Presión cambiaria comparable entre países</h2>
+      <p class="note">Depreciación más intervención vendedora del banco central convertida a puntos de depreciación, en % por mes (promedio móvil de 3 meses). A diferencia del índice 0–100 de cada país, este nivel sí se compara: un 5% en un país es la misma presión que un 5% en otro.</p>
+      <div class="chart tall" id="c-comp" role="img" aria-label="Presión cambiaria comparable por país"></div>
+    </section>
+    <section class="grid2" id="comp-desc"></section>
+    <section class="card table-wrap" style="margin-bottom:16px">
+      <h2>Últimos 12 meses</h2>
+      <table id="comp-tbl"><thead></thead><tbody></tbody></table>
+    </section>
+    <section class="card method">
+      <p><b>Cómo se calcula.</b> Siguiendo a Girton y Roper (1977), Weymark (1995) y Patnaik, Felman y Shah (2017), la presión sobre una moneda se ve en lo que se deprecia y en lo que el banco central vende para evitarlo: <i>presión = depreciación + ρ × intervención</i>. La intervención es la venta neta de dólares del banco central en el mes, en % de sus reservas del mes anterior: en Argentina, las compras y ventas de divisas del BCRA más el cambio en su posición vendida de futuros; en Perú, las operaciones de la mesa de negociación y los swaps cambiarios del BCRP. ρ convierte la intervención en puntos de depreciación y es el mismo para todos los países, para que las unidades sean comparables: se fija con la dispersión del panel (desvío absoluto mediano de la depreciación sobre el de la intervención), de modo que una intervención típica equivale a una depreciación típica. <span id="comp-rho"></span></p>
+      <p class="note">Límites: en Argentina, con cepo, buena parte de la presión se va a la brecha y no al oficial, así que esta medida la subestima en esos años (el índice 0–100 sí la captura). Sólo cuenta la intervención del banco central: las ventas de dólares del Tesoro argentino (por ejemplo, en septiembre y octubre de 2025) no entran. Las tasas de interés no se incluyen. Uruguay se suma cuando estén automatizadas sus series de intervención.</p>
+    </section>
+  </div>
+
+  <div id="vista-pais">
 
   <section class="hero">
     <div class="card" id="hero">
@@ -165,7 +187,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </div>
     <div class="card">
       <h2>Subíndices</h2>
-      <p class="note">Presión cambiaria, dolarización de portafolios y extranjerización de portafolios (en desvíos respecto de lo habitual).</p>
+      <p class="note" id="blocks-note">En desvíos respecto de lo habitual.</p>
       <div class="chart" id="c-blocks" role="img" aria-label="Sub-índices por bloque"></div>
     </div>
   </section>
@@ -179,8 +201,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   <h2 class="section-title">Variables</h2>
   <section class="grid3" id="multiples"></section>
 
-  <h2 class="section-title">Indicadores de menor frecuencia</h2>
-  <section class="grid1">
+  <h2 class="section-title solo-ar">Indicadores de menor frecuencia</h2>
+  <section class="grid1 solo-ar">
     <div class="card">
       <h2>Compras de USD de personas humanas</h2>
       <p class="note">Compras netas de billetes y divisas sin fines específicos, mensual, millones de USD. BCRA, balance cambiario.</p>
@@ -196,6 +218,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <h2 class="section-title">Metodología</h2>
   <section class="card method">
+    <div data-metodo="pe" hidden>
+    <p>El índice de Perú usa el mismo método que el de Argentina, con componentes propios: en Perú no hay brecha ni canje, así que la presión se ve en el tipo de cambio, en la intervención del Banco Central de Reserva (BCRP) y en la dolarización de la liquidez. Dos subíndices de igual peso:</p>
+    <ul>
+      <li><b>Presión cambiaria:</b> depreciación del sol en 5 días, volatilidad del tipo de cambio (20 días), intervención vendedora del BCRP (ventas en la mesa de negociación y swaps cambiarios netos en 20 días, en % de las reservas netas: presión que el BCRP absorbe y que no se ve en el precio), caída de la posición de cambio del BCRP (sus reservas propias, sin los encajes de los bancos) y suba de la tasa interbancaria en soles.</li>
+      <li><b>Dolarización y riesgo:</b> cambio en 3 meses del coeficiente de dolarización de la liquidez (dato mensual que entra un mes después; se mide el cambio porque la serie baja desde hace 30 años por la desdolarización), suba del riesgo país (EMBIG Perú) y suba de la tasa del bono soberano en soles a 10 años.</li>
+    </ul>
+    <p>El índice se publica desde 2003; 1995–2002 sólo sirve de referencia. Fuente: estadísticas del BCRP (API pública).</p>
+    </div>
+    <div data-metodo="ar">
     <p>El Índice de Presión de Dolarización (IPD) adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes) y se promedia dentro de tres subíndices:</p>
     <ul>
       <li><b>Presión cambiaria:</b> depreciación del oficial A3500 en 5 días, volatilidad del oficial (20 días), evolución de las reservas brutas en 5 días, suba de la tasa BADLAR en 5 días (defensa del peso) y brecha MEP / oficial, que mide cuánto pesan las restricciones para comprar al oficial.</li>
@@ -203,13 +234,16 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <li><b>Extranjerización de portafolios:</b> canje (CCL / MEP), que mide la preferencia por tener dólares afuera del país; volatilidad del CCL, y suba del riesgo país en 5 días.</li>
     </ul>
     <p>El índice se publica desde 2003. Los datos de 1996–2002 sólo se usan como referencia para estandarizar: con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20 a 45 puntos por semana y se desplomó con el corralito, y hay huecos en los datos. No todos los componentes existen desde el inicio: la brecha se suma en 2011 (con el blue hasta 2012 y el CCL hasta que hay MEP, en 2018), la FAE en 2008, el canje en 2019 y los futuros en 2020. El tooltip del gráfico de la medida de base indica cuántos componentes había cada día.</p>
-    <p><b>Ponderación.</b> Los tres subíndices pesan lo mismo (un tercio cada uno). Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así ninguna variable queda afuera aunque la PCA le asigne carga nula. Los pesos se recalculan en cada actualización con toda la historia.</p>
+    </div>
+    <p><b>Ponderación.</b> Los subíndices pesan lo mismo (tres en Argentina, dos en Perú). Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así ninguna variable queda afuera aunque la PCA le asigne carga nula. Los pesos se recalculan en cada actualización con toda la historia.</p>
     <div class="table-wrap"><table id="pesos-tbl"><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody></tbody></table></div>
     <p class="note" id="pesos-nota"></p>
     <p>Si falta un componente, su peso se reparte entre los demás de su subíndice. El índice se publica cuando hay datos para al menos el 40% del peso.</p>
     <p><b>Índice 0–100.</b> Para comunicarlo, la medida de base se promedia en 20 días hábiles (un mes, para que el índice no salte de una semana a otra) y se lleva a una escala de 0 a 100 con la distribución normal: Índice = 100 × Φ(IPD / σ), donde σ es el desvío histórico del IPD promediado. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 2003. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. <b>Aportes en puntos:</b> la distancia del índice a 50 se reparte entre los componentes según su aporte a la medida de base, así que los aportes suman exactamente esa distancia.</p>
-    <p class="note">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
+    <p class="note" data-metodo="pe" hidden>Advertencias: las reservas netas incluyen los encajes en dólares de los bancos (por eso el índice usa la posición de cambio); el EMBIG se publica con algunos días de rezago.</p>
+    <p class="note" data-metodo="ar">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
   </section>
+  </div>
   <p class="note" id="foot" style="margin-top:16px"></p>
 </div>
 
@@ -223,12 +257,42 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     deprec_fuerte: { color: "var(--dv-deprec_fuerte)", icon: "▲" },
     unknown: { color: "var(--muted)", icon: "?" },
   };
-  const TILES = ["tc_oficial_ref", "usd_mep", "usd_ccl", "brecha_mep", "canje", "riesgo_pais", "reservas", "tasa", "deval_implicita", "futuros_interes_abierto", "posicion_bcra", "depositos_usd"];
+  const PAISES = {
+    ar: {
+      json: "data/monitor.json", csv: "data/panel_diario.csv", pdf: "reportes/ultimo.pdf",
+      sub: "Presión cambiaria y demanda de cobertura en Argentina, con datos diarios.",
+      fuentes: "BCRA, ArgentinaDatos, A3 Mercados",
+    },
+    pe: {
+      json: "data/pe/monitor.json", csv: "data/pe/panel_diario.csv", pdf: "reportes/pe/ultimo.pdf",
+      sub: "Presión cambiaria y dolarización en Perú, con datos diarios.",
+      fuentes: "BCRP",
+      tiles: ["tc", "embig", "rin", "posicion_cambio", "intervencion_usd", "tasa_interbancaria", "bono_10a", "dolarizacion_liquidez"],
+      up: { tc: 1, embig: 1, rin: -1, posicion_cambio: -1, intervencion_usd: 1, tasa_interbancaria: 1, bono_10a: 1, dolarizacion_liquidez: 1, dolarizacion_credito: 1 },
+      mensuales: ["dolarizacion_liquidez", "dolarizacion_credito"],
+      absolutos: ["intervencion_usd"],
+      multiples: [
+        { title: "Tipo de cambio interbancario", keys: ["tc"], unit: "S/ por USD" },
+        { title: "Volatilidad del tipo de cambio (20 días)", keys: ["vol_tc"], unit: "% anualizada" },
+        { title: "Intervención vendedora neta del BCRP (20 días)", keys: ["intervencion_usd"], unit: "millones de USD" },
+        { title: "Reservas netas y posición de cambio", keys: ["rin", "posicion_cambio"], names: ["Reservas netas", "Posición de cambio"], unit: "millones de USD" },
+        { title: "Riesgo país (EMBIG)", keys: ["embig"], unit: "pb" },
+        { title: "Tasas en soles", keys: ["tasa_interbancaria", "bono_10a"], names: ["Interbancaria", "Bono a 10 años"], unit: "%" },
+        { title: "Dolarización de la liquidez y del crédito (fin de mes)", keys: ["dolarizacion_liquidez", "dolarizacion_credito"], names: ["Liquidez", "Crédito"], unit: "%" },
+      ],
+    },
+  };
+  const COLOR_PAIS = { ar: "--s1", pe: "--s2", uy: "--s3" };
+  let PAIS = new URLSearchParams(location.search).get("pais") || "ar";
+  if (!PAISES[PAIS] && PAIS !== "comparado") PAIS = "ar";
+  let TILES = ["tc_oficial_ref", "usd_mep", "usd_ccl", "brecha_mep", "canje", "riesgo_pais", "reservas", "tasa", "deval_implicita", "futuros_interes_abierto", "posicion_bcra", "depositos_usd"];
   // Series de fin de mes: el delta se mide contra el mes anterior, en valor absoluto.
-  const MENSUALES = new Set(["posicion_bcra"]);
+  let MENSUALES = new Set(["posicion_bcra"]);
+  // Flujos (pueden cambiar de signo): el delta en 7 días se muestra en valor absoluto.
+  let ABSOLUTOS = new Set();
   // Variables donde una suba es "mala" (más presión): se colorea el delta.
-  const UP_IS_PRESSURE = { tc_oficial_ref: 1, usd_ccl: 1, usd_mep: 1, brecha_ccl: 1, brecha_mep: 1, canje: 1, futuros_interes_abierto: 1, posicion_bcra: 1, riesgo_pais: 1, reservas: -1, deval_implicita: 1, depositos_usd: -1 };
-  const MULTIPLES = [
+  let UP_IS_PRESSURE = { tc_oficial_ref: 1, usd_ccl: 1, usd_mep: 1, brecha_ccl: 1, brecha_mep: 1, canje: 1, futuros_interes_abierto: 1, posicion_bcra: 1, riesgo_pais: 1, reservas: -1, deval_implicita: 1, depositos_usd: -1 };
+  let MULTIPLES = [
     { title: "Tipo de cambio", keys: ["tc_oficial_ref", "usd_mep", "usd_ccl"], names: ["Oficial (A3500)", "MEP", "CCL"], unit: "$ por USD" },
     { title: "Brecha MEP / oficial y canje (CCL / MEP)", keys: ["brecha_mep", "canje"], names: ["Brecha MEP / oficial", "Canje CCL / MEP"], unit: "%" },
     { title: "Volatilidad cambiaria (20 días)", keys: ["vol_oficial", "vol_ccl"], names: ["Oficial", "CCL"], unit: "% anualizada" },
@@ -242,7 +306,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   ];
 
   const nf = (v, d = 1) => v == null ? "–" : v.toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
-  const digitsFor = (unit, v) => unit && unit.includes("$") ? (Math.abs(v) >= 100 ? 0 : 2) : (unit && unit.startsWith("millones") || unit === "pb" || unit.startsWith("contratos")) ? 0 : 1;
+  const digitsFor = (unit, v) => unit && unit.startsWith("S/") ? 3 : unit && unit.includes("$") ? (Math.abs(v) >= 100 ? 0 : 2) : (unit && unit.startsWith("millones") || unit === "pb" || unit.startsWith("contratos")) ? 0 : 1;
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const charts = [];
   let DATA = null;
@@ -261,9 +325,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const next = dark ? "light" : "dark";
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem("md-theme", next); } catch (e) {}
-    renderAll();
+    renderAll(); renderComparado();
   });
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", renderAll);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderAll(); renderComparado(); });
 
   // ---- rango ------------------------------------------------------------
   document.querySelectorAll("#range button").forEach((b) => b.addEventListener("click", () => {
@@ -271,7 +335,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     b.setAttribute("aria-pressed", "true");
     rangeDays = +b.dataset.r;
     idxFullHistory = false;
-    renderCharts();
+    if (PAIS === "comparado") renderComparado(); else renderCharts();
   }));
 
   let idxFreq = "d";
@@ -400,14 +464,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         const cls = sign > 0 ? "up" : sign < 0 ? "down" : "";
         const arrow = ch > 0 ? "▲" : ch < 0 ? "▼" : "•";
         const mes = new Date(s.last_date + "T12:00:00").toLocaleDateString("es-AR", { month: "short", year: "2-digit" });
-        delta = `<div class="delta"><span class="${cls}">${arrow} ${ch > 0 ? "+" : ""}${nf(ch, 0)}</span> vs. mes anterior (dato a ${mes})</div>`;
+        delta = `<div class="delta"><span class="${cls}">${arrow} ${ch > 0 ? "+" : ""}${s.unit.startsWith("%") ? nf(ch, 1) + " pp" : nf(ch, 0)}</span> vs. mes anterior (dato a ${mes})</div>`;
       } else if (s.prev_7d != null && s.last != null) {
-        const isPct = s.unit.startsWith("%") || s.unit === "pb";
+        const isPct = s.unit.startsWith("%") || s.unit === "pb" || ABSOLUTOS.has(k);
         const ch = isPct ? s.last - s.prev_7d : (s.last / s.prev_7d - 1) * 100;
         const sign = Math.sign(ch) * (UP_IS_PRESSURE[k] || 0);
         const cls = sign > 0 ? "up" : sign < 0 ? "down" : "";
         const arrow = ch > 0 ? "▲" : ch < 0 ? "▼" : "•";
-        const txt = isPct ? `${ch > 0 ? "+" : ""}${nf(ch, s.unit === "pb" ? 0 : 1)} ${s.unit === "pb" ? "pb" : "pp"}` : `${ch > 0 ? "+" : ""}${nf(ch, 1)}%`;
+        const txt = ABSOLUTOS.has(k) ? `${ch > 0 ? "+" : ""}${nf(ch, 0)} M USD`
+          : isPct ? `${ch > 0 ? "+" : ""}${nf(ch, s.unit === "pb" ? 0 : 1)} ${s.unit === "pb" ? "pb" : "pp"}` : `${ch > 0 ? "+" : ""}${nf(ch, 1)}%`;
         delta = `<div class="delta"><span class="${cls}">${arrow} ${txt}</span> en 7 días</div>`;
       }
       const el = document.createElement("div");
@@ -517,6 +582,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
 
   function renderBlocks() {
+    const labels = Object.values(DATA.ipd.blocks).map((b) => b.label);
+    document.getElementById("blocks-note").textContent = labels.join(", ").replace(/, ([^,]*)$/, " y $1") + " (en desvíos respecto de lo habitual).";
     const keys = Object.keys(DATA.ipd.blocks);
     if (!keys.length) return emptyState("c-blocks", "Sin datos.");
     const c = mount("c-blocks");
@@ -600,6 +667,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
 
   function renderMonthly() {
+    if (PAIS !== "ar") return;
     const phAll = DATA.monthly.compras_personas_humanas || [];
     if (!phAll.length) {
       emptyState("c-ph", "Sin datos todavía. Se descargan solos del anexo del balance cambiario del BCRA.");
@@ -659,7 +727,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const st = document.getElementById("src-status");
     st.innerHTML = Object.entries(DATA.sources_status || {}).map(([k, v]) =>
       { const bad = v.startsWith("error") || v.startsWith("fallo"); return `<span class="${bad ? "err" : ""}" title="${v}">${v === "ok" ? "✓" : bad ? "✕" : "•"} ${k}</span>`; }).join("");
-    document.getElementById("foot").textContent = `Actualizado: ${new Date(DATA.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, ArgentinaDatos, A3 Mercados.`;
+    document.getElementById("foot").textContent = `Actualizado: ${new Date(DATA.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: ${PAISES[PAIS].fuentes}.`;
   }
 
   function renderCharts() {
@@ -674,10 +742,81 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   window.addEventListener("resize", () => charts.forEach((c) => c.resize()));
 
-  const src = new URLSearchParams(location.search).get("data") || "data/monitor.json";
+  // ---- países y vista comparada ---------------------------------------------
+  const GH = "https://github.com/elibman36/monitor-dolarizacion/blob/main/";
+  function aplicarPais() {
+    document.querySelectorAll("#pais button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p === PAIS)));
+    const comp = PAIS === "comparado";
+    document.getElementById("vista-comparado").hidden = !comp;
+    document.getElementById("vista-pais").hidden = comp;
+    const cfg = PAISES[comp ? "ar" : PAIS];
+    document.getElementById("sub").textContent = comp ? "Presión cambiaria comparable entre países, en % de depreciación equivalente." : cfg.sub;
+    document.getElementById("lnk-csv").href = GH + (comp ? "data/comparado.json" : cfg.csv);
+    document.getElementById("lnk-pdf").href = GH + cfg.pdf;
+    document.getElementById("lnk-pdf").style.display = comp ? "none" : "";
+    document.querySelectorAll(".solo-ar").forEach((el) => { el.hidden = PAIS !== "ar"; });
+    document.querySelectorAll("[data-metodo]").forEach((el) => { el.hidden = el.dataset.metodo !== PAIS; });
+    if (cfg.tiles) { TILES = cfg.tiles; UP_IS_PRESSURE = cfg.up; MULTIPLES = cfg.multiples; MENSUALES = new Set(cfg.mensuales); ABSOLUTOS = new Set(cfg.absolutos || []); }
+  }
+
+  let COMP = null;
+  function renderComparado() {
+    if (!COMP) return;
+    const entries = Object.entries(COMP.paises);
+    const cut3 = (rows) => {
+      if (!rangeDays || !rows.length) return rows;
+      const last = new Date(rows[rows.length - 1][0] + "-01");
+      const from = new Date(last - Math.max(rangeDays, 730) * 864e5).toISOString().slice(0, 7);
+      return rows.filter((r) => r[0] >= from);
+    };
+    const c = mount("c-comp");
+    const o = base();
+    o.xAxis.type = "category";
+    const meses = [...new Set(entries.flatMap(([, v]) => cut3(v.data).map((r) => r[0])))].sort();
+    o.xAxis.data = meses;
+    o.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 1) + "%";
+    o.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } };
+    o.grid.top = 32;
+    o.series = entries.map(([k, v]) => {
+      const m = new Map(v.data.map((r) => [r[0], r[2]]));
+      return lineSeries(v.nombre, meses.map((x) => m.get(x) ?? null), css(COLOR_PAIS[k]), { connectNulls: false, markLine: k === entries[0][0] ? { symbol: "none", silent: true, lineStyle: { color: css("--axis"), type: "solid", width: 1 }, label: { show: false }, data: [{ yAxis: 0 }] } : undefined });
+    });
+    c.setOption(o, true);
+    // Descomposición por país: depreciación e intervención (equivalente), últimos 24 meses.
+    const box = document.getElementById("comp-desc");
+    box.innerHTML = entries.map(([k, v]) => `<div class="card"><h2>${v.nombre}: de dónde viene la presión</h2><p class="note">Por mes, en puntos de depreciación. Últimos 24 meses.</p><div class="chart" id="cd-${k}"></div></div>`).join("");
+    entries.forEach(([k, v]) => {
+      const rows = v.data.slice(-24);
+      const ch = mount(`cd-${k}`);
+      const ob = base();
+      ob.xAxis.type = "category"; ob.xAxis.data = rows.map((r) => r[0]);
+      ob.tooltip.valueFormatter = (x) => x == null ? "–" : nf(x, 1) + "%";
+      ob.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 8, textStyle: { color: css("--ink-2"), fontSize: 12 } };
+      ob.grid.top = 32;
+      ob.series = [
+        { name: "Depreciación", type: "bar", stack: "p", data: rows.map((r) => r[3]), itemStyle: { color: css("--ink-2"), borderColor: css("--surface"), borderWidth: 1 }, barMaxWidth: 14 },
+        { name: "Intervención (equivalente)", type: "bar", stack: "p", data: rows.map((r) => r[4]), itemStyle: { color: css("--axis"), borderColor: css("--surface"), borderWidth: 1 }, barMaxWidth: 14 },
+        { name: "Presión total", type: "line", data: rows.map((r) => r[1]), showSymbol: true, symbol: "circle", symbolSize: 8, lineStyle: { width: 0 }, itemStyle: { color: css(COLOR_PAIS[k]), borderColor: css("--surface"), borderWidth: 2 }, z: 4 },
+      ];
+      ch.setOption(ob, true);
+    });
+    // Tabla
+    const ult = [...new Set(entries.flatMap(([, v]) => v.data.slice(-12).map((r) => r[0])))].sort().reverse();
+    document.querySelector("#comp-tbl thead").innerHTML = `<tr><th>Mes</th>${entries.map(([, v]) => `<th class="num">${v.nombre}: presión</th><th class="num">depreciación</th><th class="num">intervención</th>`).join("")}</tr>`;
+    const idx = Object.fromEntries(entries.map(([k, v]) => [k, new Map(v.data.map((r) => [r[0], r]))]));
+    document.querySelector("#comp-tbl tbody").innerHTML = ult.map((m) => `<tr><td>${m}</td>${entries.map(([k]) => { const r = idx[k].get(m); return r ? `<td class="num"><b>${nf(r[1], 1)}%</b></td><td class="num">${nf(r[3], 1)}%</td><td class="num">${nf(r[4], 1)}%</td>` : "<td></td><td></td><td></td>"; }).join("")}</tr>`).join("");
+    document.getElementById("comp-rho").textContent = COMP.rho != null ? `Con los datos actuales, vender el 1% de las reservas en un mes equivale a ${nf(COMP.rho, 2)} puntos de depreciación.` : "";
+    document.getElementById("foot").textContent = `Actualizado: ${new Date(COMP.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, BCRP.`;
+  }
+
+  document.querySelectorAll("#pais button").forEach((b) => b.addEventListener("click", () => {
+    const u = new URL(location.href); u.searchParams.set("pais", b.dataset.p); location.href = u.toString();
+  }));
+  aplicarPais();
+  const src = new URLSearchParams(location.search).get("data") || (PAIS === "comparado" ? "data/comparado.json" : PAISES[PAIS].json);
   fetch(src, { cache: "no-store" })
     .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then((d) => { DATA = d; renderAll(); })
+    .then((d) => { if (PAIS === "comparado") { COMP = d; renderComparado(); } else { DATA = d; renderAll(); } })
     .catch(() => {
       const b = document.getElementById("banner");
       b.style.display = "block";
