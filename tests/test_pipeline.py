@@ -372,6 +372,7 @@ def test_uruguay_lectores():
                         [None, None, "(a)", "(b)", "(e)", None],
                         [None, pd.Timestamp("2002-06-26"), 1098.7, "n/d", "n/d", "n/d"],
                         [None, pd.Timestamp("2026-10-08"), 18741.6, 0, 9133.4, 9564.5],
+                        [None, pd.Timestamp("2026-10-08"), 18741.6, 0, 9133.4, 9564.5],
                         [None, "NOTAS:", None, None, None, None]])
     r = uruguay.parse_reservas(res)
     assert list(r.index) == [pd.Timestamp("2002-06-26"), pd.Timestamp("2026-10-08")]

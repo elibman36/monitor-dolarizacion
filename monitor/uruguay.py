@@ -192,7 +192,9 @@ def parse_reservas(df: pd.DataFrame) -> pd.DataFrame:
     d = d.dropna(subset=["fecha"])
     for c in ["reservas", "posicion_me"]:
         d[c] = pd.to_numeric(d[c], errors="coerce")
-    return d.set_index("fecha").sort_index()
+    d = d.set_index("fecha").sort_index()
+    # La planilla repite algunas fechas (correcciones): vale la última fila.
+    return d[~d.index.duplicated(keep="last")]
 
 
 def parse_depositos(df: pd.DataFrame) -> pd.DataFrame:
