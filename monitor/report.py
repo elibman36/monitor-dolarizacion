@@ -323,9 +323,6 @@ def resumen(indice, semana, pts_cierre, datos) -> list[str]:
             puntos.append("En el último mes sumaron presión: " + "; ".join(_frase(k, pc[k]) for k in presion) + ".")
         if alivio:
             puntos.append("En el último mes restaron presión: " + "; ".join(_frase(k, pc[k]) for k in alivio) + ".")
-        puntos.append('<span class="muted">"Habitual" se refiere a los últimos dos años. Los puntos indican cuánto aporta '
-                      "cada factor a la distancia del índice respecto de 50, en promedio de las últimas cuatro semanas "
-                      "(el mismo período con que se calcula el índice).</span>")
     partes = []
     if "tc_oficial_ref" in datos:
         partes.append(f"el oficial {_txt_var(datos['tc_oficial_ref']['d'], 'pct', 2)}")
@@ -369,6 +366,7 @@ h2 { font-size: 11pt; margin: 0 0 2pt; }
 .kv { display: grid; grid-template-columns: auto auto; gap: 2pt 8pt; margin-top: 8pt; font-size: 8pt; color: #52514e; }
 .kv b { color: #0b0b0b; text-align: right; }
 ul.res { margin: 4pt 0 0; padding-left: 13pt; } ul.res li { margin-bottom: 3pt; }
+.nota-res { margin: 5pt 0 0; padding-top: 4pt; border-top: 1px solid #e1e0d9; color: #898781; font-size: 7.5pt; }
 .chart svg, .chart img { width: 100%; height: auto; display: block; }
 .note { color: #898781; font-size: 7.5pt; margin: 0 0 4pt; }
 table.vars { width: 100%; border-collapse: collapse; font-size: 8.3pt; }
@@ -466,6 +464,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
   <div class="card">
     <h2>Resumen de la semana</h2>
     <ul class="res">{"".join(f"<li>{x}</li>" for x in puntos)}</ul>
+    <p class="nota-res">Entre paréntesis, los puntos que cada factor suma o resta al índice. «Habitual»: lo normal en los últimos dos años.</p>
   </div>
 </section>
 
