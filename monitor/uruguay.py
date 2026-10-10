@@ -91,8 +91,8 @@ IPD_BLOCKS = {
                                                   "bajó la dolarización de los depósitos")},
             "depositos_me_usd": {"transform": "dlog", "horizonte": 63, "sign": +1, "weight": 1.0,
                                  "label": "Depósitos privados en dólares",
-                                 "frases": ("crecieron los depósitos privados en dólares",
-                                            "cayeron los depósitos privados en dólares")},
+                                 "frases": ("los depósitos privados en dólares crecieron más que lo habitual",
+                                            "los depósitos privados en dólares crecieron menos que lo habitual")},
         },
     },
 }

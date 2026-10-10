@@ -1,9 +1,11 @@
-# Monitor de Dolarización (Argentina)
+# Monitor de Dolarización (Argentina, Perú y Uruguay)
 
 Tablero diario para seguir la presión cambiaria y la dolarización de
 portafolios en Argentina, pensado para hacer incidencia en el ciclo electoral
 2027. Su eje es el **Índice de Presión de Dolarización (IPD)**, una adaptación
 del *Exchange Market Pressure Index* a la economía bimonetaria argentina.
+El mismo motor se aplica a Perú y Uruguay, con componentes propios, y un
+núcleo comparable mide la presión de los tres países en las mismas unidades.
 
 ```
 .
@@ -12,12 +14,18 @@ del *Exchange Market Pressure Index* a la economía bimonetaria argentina.
 │   ├── config.py           ← fuentes, componentes, pesos, umbrales, eventos
 │   ├── sources.py          ← descarga (BCRA, ArgentinaDatos, A3 Mercados)
 │   ├── indicators.py       ← series derivadas e IPD
-│   └── build.py            ← orquestador: python -m monitor.build
+│   ├── build.py            ← orquestador de Argentina: python -m monitor.build
+│   ├── peru.py             ← Perú (BCRP): python -m monitor.peru
+│   ├── uruguay.py          ← Uruguay (BCU): python -m monitor.uruguay
+│   ├── comparado.py        ← núcleo comparable: python -m monitor.comparado
+│   └── report.py           ← reporte semanal: python -m monitor.report --pais ar|pe|uy
 ├── data/
 │   ├── monitor.json        ← lo que consume el tablero (generado)
 │   ├── panel_diario.csv    ← panel diario completo, para Excel/R/Stata (generado)
 │   ├── bcra_catalogo.csv   ← catálogo de variables del BCRA (generado)
-│   └── series/*.csv        ← historia cruda de cada serie (generado)
+│   ├── series/*.csv        ← historia cruda de cada serie (generado)
+│   ├── pe/, uy/            ← lo mismo para Perú y Uruguay (generado)
+│   └── comparado.json      ← núcleo comparable entre países (generado)
 └── tests/
 ```
 
@@ -168,9 +176,40 @@ componentes, suavizado y tramos del índice, y eventos.
 - El índice mide presión relativa a la historia reciente, no niveles de
   equilibrio.
 
+## Otros países
+
+El tablero tiene un selector de país (`?pais=ar|pe|uy|comparado`) y cada país
+tiene su reporte semanal (`reportes/pe/`, `reportes/uy/`). El índice 0–100 de
+cada país usa el mismo método, con componentes propios; mide presión
+**respecto de la historia de ese país**, así que un 80 en Perú no es la misma
+presión que un 80 en Argentina.
+
+| País | Subíndice | Componentes | Fuente |
+|---|---|---|---|
+| Perú | Presión cambiaria | depreciación del sol, volatilidad, ventas de dólares del BCRP (mesa y swaps cambiarios, en % de reservas), posición de cambio del BCRP, tasa interbancaria | BCRP (API) |
+| | Dolarización y riesgo | cambio en 3 meses de la dolarización de la liquidez, EMBIG Perú, bono soberano en soles a 10 años | BCRP |
+| Uruguay | Presión cambiaria | depreciación del peso, volatilidad, posición en moneda extranjera del BCU, activos de reserva | BCU (servicio de cotizaciones y planilla de reservas) |
+| | Dolarización | cambio en 3 meses de la dolarización de los depósitos privados, depósitos privados en dólares | BCU (SSF) |
+
+En Uruguay todavía no hay fuentes automáticas para la tasa de política
+monetaria reciente ni para el riesgo país (UBI). El sitio del BCU tiene la
+cadena de certificados incompleta: el workflow usa `BCU_SSL_VERIFY=0` sólo
+para el BCU.
+
+**Núcleo comparable** (`monitor/comparado.py`). Presión mensual en % de
+depreciación equivalente (Girton y Roper, 1977; Weymark, 1995; Patnaik, Felman
+y Shah, 2017): *depreciación + ρ × intervención vendedora neta del banco
+central (% de las reservas del mes anterior)*, con un ρ común a los tres países
+fijado con la dispersión del panel (MAD de la depreciación / MAD de la
+intervención). Intervención: Argentina, compras del BCRA y cambio en su
+posición vendida de futuros; Perú, mesa y swaps cambiarios del BCRP; Uruguay,
+caída de la posición en moneda extranjera del BCU (aproximación). No incluye
+las ventas del Tesoro argentino ni las tasas de interés, y con cepo subestima
+la presión argentina, que se va a la brecha.
+
 ## Próximos pasos posibles
 
-- Sumar la posición del BCRA en futuros (se publica con rezago).
+- Uruguay: tasa de política monetaria y riesgo país (UBI) cuando haya una fuente automática.
 - Agregar el breakeven de devaluación implícito entre LECAPs y bonos dollar
   linked a partir de precios de mercado.
 - Agregar flujos diarios de FCI de dólares y de money market (CAFCI).
