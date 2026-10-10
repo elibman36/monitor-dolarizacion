@@ -43,11 +43,12 @@ jobs:
           python -m monitor.build
           python -m monitor.peru || echo "Perú: no se pudo actualizar; uso los datos guardados"
           BCU_SSL_VERIFY=0 python -m monitor.uruguay || echo "Uruguay: no se pudo actualizar; uso los datos guardados"
+          for M in brasil chile colombia; do python -m monitor.$M || echo "$M: no se pudo actualizar"; done
 
       - name: Generar el PDF
         run: |
           FECHA="${{ github.event.inputs.fecha }}"
-          for PAIS in ar pe uy; do
+          for PAIS in ar pe uy br cl co; do
             if [ -n "$FECHA" ]; then
               python -m monitor.report --pais "$PAIS" --fecha "$FECHA"
             else
@@ -63,6 +64,9 @@ jobs:
             reportes/*.pdf
             reportes/pe/*.pdf
             reportes/uy/*.pdf
+            reportes/br/*.pdf
+            reportes/cl/*.pdf
+            reportes/co/*.pdf
 
       - name: Publicar en el repositorio
         run: |

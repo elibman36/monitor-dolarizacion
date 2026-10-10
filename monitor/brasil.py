@@ -118,14 +118,34 @@ def parse_sgs(registros: list[dict], name: str) -> pd.Series:
     return s[~s.index.duplicated(keep="last")].sort_index()
 
 
+def _tramo_sgs(codigo: int, name: str, ini: pd.Timestamp, fin: pd.Timestamp, nivel: int = 0) -> pd.Series:
+    """Un tramo de la serie. Si el SGS responde con una página de error (pasa
+    con algunos rangos largos), se parte el tramo en dos y se reintenta."""
+    import time
+    url = SGS_URL.format(codigo=codigo, d=ini.strftime("%d/%m/%Y"), h=fin.strftime("%d/%m/%Y"))
+    for intento in range(3):
+        try:
+            return parse_sgs(comun.get(url).json(), name)
+        except ValueError:
+            time.sleep(2 * (intento + 1))
+        except RuntimeError as exc:
+            if "404" in str(exc):  # sin datos en el tramo
+                return parse_sgs([], name)
+            raise
+    if nivel < 4 and (fin - ini).days > 60:
+        medio = ini + (fin - ini) / 2
+        return pd.concat([_tramo_sgs(codigo, name, ini, medio.normalize(), nivel + 1),
+                          _tramo_sgs(codigo, name, medio.normalize() + pd.Timedelta(days=1), fin, nivel + 1)])
+    raise RuntimeError(f"SGS {codigo}: respuesta inválida entre {ini:%Y-%m-%d} y {fin:%Y-%m-%d}")
+
+
 def sgs(codigo: int, name: str):
-    """El SGS limita las series diarias a 10 años por consulta: se pide por tramos."""
+    """El SGS limita las series diarias a 10 años por consulta: se pide por tramos de 5."""
     def f(desde: pd.Timestamp, hasta: pd.Timestamp) -> pd.Series:
         partes, ini = [], desde
         while ini <= hasta:
-            fin = min(ini + pd.DateOffset(years=9), hasta)
-            r = comun.get(SGS_URL.format(codigo=codigo, d=ini.strftime("%d/%m/%Y"), h=fin.strftime("%d/%m/%Y")))
-            partes.append(parse_sgs(r.json(), name))
+            fin = min(ini + pd.DateOffset(years=5) - pd.Timedelta(days=1), hasta)
+            partes.append(_tramo_sgs(codigo, name, ini, fin))
             ini = fin + pd.Timedelta(days=1)
         s = pd.concat(partes)
         return s[~s.index.duplicated(keep="last")]
@@ -177,7 +197,7 @@ def derived_series(raw: dict) -> pd.DataFrame:
     df["vol_tc"] = comun.vol(df["tc"])
     # Ventas spot: un día sin operaciones es cero.
     spot = raw.get("ventas_spot")
-    if spot is not None and not spot.empty:
+    if spot is not None and not spot.empty and "reservas" in df:
         diaria = spot.reindex(df.index).fillna(0.0).where(df.index >= spot.index.min())
         df["ventas_spot_usd"] = diaria.rolling(VENTANA_SPOT, min_periods=10).sum()
         df["ventas_spot"] = df["ventas_spot_usd"] / df["reservas"].shift(VENTANA_SPOT) * 100

@@ -648,7 +648,113 @@ def _perfil_uy() -> dict:
     }
 
 
-PERFILES = {"ar": lambda: PERFIL_AR, "pe": _perfil_pe, "uy": _perfil_uy}
+def _partes_simple(moneda: str):
+    def f(datos: dict) -> list[str]:
+        partes = []
+        if "tc" in datos:
+            partes.append(f"{moneda} {_txt_var(datos['tc']['d'], 'pct', 2)}")
+        if "embig" in datos:
+            partes.append(f"el riesgo país {_txt_var(datos['embig']['d'], 'pb', 0)}")
+        if "reservas" in datos and np.isfinite(datos["reservas"]["d"]):
+            d = datos["reservas"]["d"]
+            partes.append(f"las reservas {'subieron' if d >= 0 else 'cayeron'} USD {fmt(abs(d), 0)} M")
+        return partes
+    return f
+
+
+def _metodo_generico(nombre: str, texto: str):
+    def f(pca_txt: str) -> str:
+        return (f"<p>El índice de {nombre} usa el mismo método que el de Argentina (una adaptación del <i>Exchange Market "
+                f"Pressure Index</i> de Girton y Roper, 1977, y Eichengreen, Rose y Wyplosz, 1996): cada componente se "
+                f"transforma para que un valor más alto signifique más presión, se compara con los últimos dos años "
+                f"(mediana y desvío absoluto mediano) y se pondera con componentes principales (cargas negativas en cero, "
+                f"mínimo de 10% por componente). {texto} Varianza explicada por el primer componente: {pca_txt}.</p>")
+    return f
+
+
+def _perfil_modulo(mod, codigo: str, titulo: str, moneda: str, variables: list, minis, texto: str,
+                   nota: str, fuentes: str) -> dict:
+    return {
+        "codigo": codigo, "titulo": f" · {titulo}", "query": f"?pais={codigo}", "blocks": mod.IPD_BLOCKS,
+        "variables": variables, "minis": minis, "partes": _partes_simple(moneda), "fae": False,
+        "metodo": _metodo_generico(titulo, texto), "metodo_extra": "", "nota_variables": nota, "fuentes": fuentes,
+        "panel": mod.DATA_DIR / "panel_diario.csv", "json": mod.DATA_DIR / "monitor.json", "salida": REPORTS_DIR / codigo,
+    }
+
+
+def _perfil_br() -> dict:
+    from . import brasil
+    variables = [
+        ("tc", "Tipo de cambio PTAX", "R$ por USD", 3, "pct"),
+        ("vol_tc", "Volatilidad del tipo de cambio (20 días)", "% anual", 1, "pp"),
+        ("reservas", "Reservas internacionales", "M USD", 0, "abs"),
+        ("ventas_spot_usd", "Ventas netas spot del BCB (20 días)", "M USD", 0, "abs"),
+        ("swaps", "Stock de swaps cambiales del BCB", "M USD", 0, "abs"),
+        ("linhas", "Líneas con recompra del BCB", "M USD", 0, "abs"),
+        ("selic", "Meta Selic", "% anual", 2, "pp"),
+        ("embig", "Riesgo país (EMBIG)", "pb", 0, "pb"),
+    ]
+    minis = lambda p, sem: [  # noqa: E731
+        chart_mini([("PTAX", p.get("tc"), S1)], "Tipo de cambio", "R$ por USD", sem),
+        chart_mini([("Reservas", p.get("reservas"), S1)], "Reservas", "millones de USD", sem),
+        chart_mini([("Swaps", p.get("swaps"), S1), ("Líneas", p.get("linhas"), S2)], "Intervención con derivados y líneas", "millones de USD", sem),
+        chart_mini([("Ventas spot", p.get("ventas_spot_usd"), S1)], "Ventas spot del BCB", "millones de USD, 20 días", sem),
+        chart_mini([("Selic", p.get("selic"), S1)], "Meta Selic", "% anual", sem),
+        chart_mini([("EMBIG", p.get("embig"), S1)], "Riesgo país", "pb", sem),
+        chart_mini([("Volatilidad", p.get("vol_tc"), S1)], "Volatilidad cambiaria", "% anualizada, 20 días", sem),
+    ]
+    return _perfil_modulo(brasil, "br", "Brasil", "el real", variables, minis,
+                          "Dos subíndices de igual peso: <b>presión cambiaria</b> (depreciación del real, su volatilidad, caída de "
+                          "las reservas, ventas netas spot del BCB y variación de su stock de swaps cambiales y de líneas con "
+                          "recompra) y <b>riesgo y tasas</b> (EMBIG y meta Selic).",
+                          "Las reservas se publican con un día de rezago; el EMBIG, con algunos días.",
+                          "BCB (Sistema Gerenciador de Séries Temporais e histórico de actuaciones en el mercado de cambios) y BCRP (EMBIG). Todas las series se descargan automáticamente.")
+
+
+def _perfil_cl() -> dict:
+    from . import chile
+    variables = [
+        ("tc", "Dólar observado", "$ por USD", 2, "pct"),
+        ("vol_tc", "Volatilidad del tipo de cambio (20 días)", "% anual", 1, "pp"),
+        ("cobre", "Precio del cobre", "USD por libra", 2, "pct"),
+        ("tpm", "Tasa de política monetaria", "%", 2, "pp"),
+        ("embig", "Riesgo país (EMBIG)", "pb", 0, "pb"),
+    ]
+    minis = lambda p, sem: [  # noqa: E731
+        chart_mini([("Dólar observado", p.get("tc"), S1)], "Tipo de cambio", "$ por USD", sem),
+        chart_mini([("Cobre", p.get("cobre"), S1)], "Precio del cobre", "USD por libra", sem),
+        chart_mini([("TPM", p.get("tpm"), S1)], "Tasa de política monetaria", "%", sem),
+        chart_mini([("EMBIG", p.get("embig"), S1)], "Riesgo país", "pb", sem),
+    ]
+    return _perfil_modulo(chile, "cl", "Chile", "el peso", variables, minis,
+                          "Dos subíndices de igual peso: <b>presión cambiaria</b> (depreciación del peso, su volatilidad y caída "
+                          "del precio del cobre) y <b>riesgo y tasas</b> (EMBIG y tasa de política monetaria). Las reservas y la "
+                          "intervención del Banco Central de Chile se suman cuando se habilite el acceso a su API.",
+                          "El EMBIG se publica con algunos días de rezago.",
+                          "Banco Central de Chile (dólar observado, TPM y cobre, vía mindicador.cl) y BCRP (EMBIG).")
+
+
+def _perfil_co() -> dict:
+    from . import colombia
+    variables = [
+        ("tc", "Tasa representativa del mercado (TRM)", "$ por USD", 2, "pct"),
+        ("vol_tc", "Volatilidad del tipo de cambio (20 días)", "% anual", 1, "pp"),
+        ("embig", "Riesgo país (EMBIG)", "pb", 0, "pb"),
+    ]
+    minis = lambda p, sem: [  # noqa: E731
+        chart_mini([("TRM", p.get("tc"), S1)], "Tipo de cambio", "$ por USD", sem),
+        chart_mini([("Volatilidad", p.get("vol_tc"), S1)], "Volatilidad cambiaria", "% anualizada, 20 días", sem),
+        chart_mini([("EMBIG", p.get("embig"), S1)], "Riesgo país", "pb", sem),
+    ]
+    return _perfil_modulo(colombia, "co", "Colombia", "el peso", variables, minis,
+                          "Por ahora tiene dos subíndices de igual peso: <b>presión cambiaria</b> (depreciación de la TRM y su "
+                          "volatilidad) y <b>riesgo</b> (EMBIG). Las reservas, la intervención y la tasa de política del Banco "
+                          "de la República se suman cuando estén automatizadas.",
+                          "El EMBIG se publica con algunos días de rezago.",
+                          "Superintendencia Financiera (TRM, vía datos.gov.co) y BCRP (EMBIG).")
+
+
+PERFILES = {"ar": lambda: PERFIL_AR, "pe": _perfil_pe, "uy": _perfil_uy, "br": _perfil_br, "cl": _perfil_cl, "co": _perfil_co}
 
 
 def html_a_pdf(html_txt: str, destino: Path, titulo: str = "Monitor de Dolarización") -> None:

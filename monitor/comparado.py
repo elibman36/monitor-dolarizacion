@@ -90,7 +90,24 @@ def uruguay_() -> pd.DataFrame:
     return _componentes(uruguay._cache("tc"), ventas, uruguay._cache("reservas"))
 
 
-PAISES = {"ar": ("Argentina", argentina), "pe": ("Perú", peru_), "uy": ("Uruguay", uruguay_)}
+def brasil_() -> pd.DataFrame:
+    """Real (PTAX); intervención: ventas netas spot del BCB en el mes más la
+    variación del stock de swaps cambiales y de líneas con recompra."""
+    from . import brasil, comun
+    c = lambda k: comun.cache(brasil.SERIES_DIR, k)  # noqa: E731
+    spot = c("ventas_spot")
+    if spot.empty:
+        return pd.DataFrame(columns=["depreciacion", "intervencion"])
+    ventas = spot.resample("ME").sum(min_count=1)
+    for k in ["swaps", "linhas"]:
+        st = c(k)
+        if not st.empty:
+            ventas = ventas.add(_fin_de_mes(st).diff().reindex(ventas.index).fillna(0.0), fill_value=0.0)
+    ventas = ventas.reindex(pd.date_range(ventas.index.min(), ventas.index.max(), freq="ME")).fillna(0.0)
+    return _componentes(c("tc"), ventas, c("reservas"))
+
+
+PAISES = {"ar": ("Argentina", argentina), "pe": ("Perú", peru_), "uy": ("Uruguay", uruguay_), "br": ("Brasil", brasil_)}
 
 
 def _mad(x: pd.Series) -> float:

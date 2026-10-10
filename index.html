@@ -18,7 +18,7 @@
   --axis: #c3c2b7;
   --border: rgba(11,11,11,0.10);
   --wash: rgba(11,11,11,0.05);
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
   --div-neg: #2a78d6; --div-pos: #e34948; --div-mid: #f0efec;
   --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
   /* Escala divergente del índice 0-100: azul = apreciación, rojo = depreciación */
@@ -32,7 +32,7 @@
     --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
     --muted: #898781; --grid: #2c2c2a; --axis: #383835;
     --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --div-neg: #3987e5; --div-pos: #e66767; --div-mid: #383835;
     --up-bad: #f97066; --down-good: #0ca30c;
     --dv-aprec_fuerte: #86b6ef; --dv-aprec: #2a78d6; --dv-neutral: #6b6a64; --dv-deprec: #b03a39; --dv-deprec_fuerte: #f08584;
@@ -43,7 +43,7 @@
   --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
   --muted: #898781; --grid: #2c2c2a; --axis: #383835;
   --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
   --div-neg: #3987e5; --div-pos: #e66767; --div-mid: #383835;
   --up-bad: #f97066; --down-good: #0ca30c;
   --dv-aprec_fuerte: #86b6ef; --dv-aprec: #2a78d6; --dv-neutral: #6b6a64; --dv-deprec: #b03a39; --dv-deprec_fuerte: #f08584;
@@ -121,7 +121,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </div>
     <div class="controls">
       <div class="seg" id="pais" role="group" aria-label="País">
-        <button data-p="ar">Argentina</button><button data-p="pe">Perú</button><button data-p="uy">Uruguay</button><button data-p="comparado">Comparar países</button>
+        <button data-p="ar">Argentina</button><button data-p="pe">Perú</button><button data-p="uy">Uruguay</button><button data-p="br">Brasil</button><button data-p="cl">Chile</button><button data-p="co">Colombia</button><button data-p="comparado">Comparar países</button>
       </div>
       <div class="seg" id="range" role="group" aria-label="Período">
         <button data-r="90">3M</button><button data-r="182">6M</button><button data-r="365" aria-pressed="true">1A</button><button data-r="730">2A</button><button data-r="1825">5A</button><button data-r="3650">10A</button><button data-r="0">Todo</button>
@@ -146,7 +146,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <table id="comp-tbl"><thead></thead><tbody></tbody></table>
     </section>
     <section class="card method">
-      <p><b>Cómo se calcula.</b> Siguiendo a Girton y Roper (1977), Weymark (1995) y Patnaik, Felman y Shah (2017), la presión sobre una moneda se ve en lo que se deprecia y en lo que el banco central vende para evitarlo: <i>presión = depreciación + ρ × intervención</i>. La intervención es la venta neta de dólares del banco central en el mes, en % de sus reservas del mes anterior: en Argentina, las compras y ventas de divisas del BCRA más el cambio en su posición vendida de futuros; en Perú, las operaciones de la mesa de negociación y los swaps cambiarios del BCRP; en Uruguay, a falta de una serie pública de operaciones del BCU, la caída de su posición en moneda extranjera (una aproximación que incluye efectos de valuación). ρ convierte la intervención en puntos de depreciación y es el mismo para todos los países, para que las unidades sean comparables: se fija con la dispersión del panel (desvío absoluto mediano de la depreciación sobre el de la intervención), de modo que una intervención típica equivale a una depreciación típica. <span id="comp-rho"></span></p>
+      <p><b>Cómo se calcula.</b> Siguiendo a Girton y Roper (1977), Weymark (1995) y Patnaik, Felman y Shah (2017), la presión sobre una moneda se ve en lo que se deprecia y en lo que el banco central vende para evitarlo: <i>presión = depreciación + ρ × intervención</i>. La intervención es la venta neta de dólares del banco central en el mes, en % de sus reservas del mes anterior: en Argentina, las compras y ventas de divisas del BCRA más el cambio en su posición vendida de futuros; en Perú, las operaciones de la mesa de negociación y los swaps cambiarios del BCRP; en Uruguay, a falta de una serie pública de operaciones del BCU, la caída de su posición en moneda extranjera (una aproximación que incluye efectos de valuación); en Brasil, las ventas netas spot del BCB más la variación de su stock de swaps cambiales y de líneas con recompra. Chile y Colombia se suman cuando estén automatizadas sus series de intervención. ρ convierte la intervención en puntos de depreciación y es el mismo para todos los países, para que las unidades sean comparables: se fija con la dispersión del panel (desvío absoluto mediano de la depreciación sobre el de la intervención), de modo que una intervención típica equivale a una depreciación típica. <span id="comp-rho"></span></p>
       <p class="note">Límites: en Argentina, con cepo, buena parte de la presión se va a la brecha y no al oficial, así que esta medida la subestima en esos años (el índice 0–100 sí la captura). Sólo cuenta la intervención del banco central: las ventas de dólares del Tesoro argentino (por ejemplo, en septiembre y octubre de 2025) no entran. Las tasas de interés no se incluyen. En Uruguay la intervención es una aproximación.</p>
     </section>
   </div>
@@ -234,6 +234,22 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </ul>
     <p>Todavía no hay fuentes automáticas para la tasa de política monetaria reciente ni para el riesgo país (UBI), así que no forman parte del índice. Fuentes: BCU (servicio de cotizaciones, planilla diaria de activos de reserva y series de depósitos de la Superintendencia de Servicios Financieros).</p>
     </div>
+    <div data-metodo="br" hidden>
+    <p>Brasil no tiene depósitos en dólares ni brecha: la presión se ve en el real, en las reservas y en la intervención del Banco Central do Brasil (BCB), que vende dólares en el mercado spot, da cobertura cambiaria con swaps (liquidados en reales, como los futuros del BCRA) y presta dólares con líneas con recompra. Dos subíndices de igual peso:</p>
+    <ul>
+      <li><b>Presión cambiaria:</b> depreciación del real (PTAX) en 5 días, volatilidad (20 días), caída de las reservas, ventas netas spot del BCB en 20 días (en % de las reservas), variación mensual del stock de swaps cambiales y de las líneas con recompra.</li>
+      <li><b>Riesgo y tasas:</b> suba del riesgo país (EMBIG Brasil) en 5 días y cambio mensual de la meta Selic.</li>
+    </ul>
+    <p>Fuentes: BCB (Sistema Gerenciador de Séries Temporais e histórico de actuaciones en el mercado de cambios, desde 1999) y BCRP (EMBIG). El índice se publica desde 2003.</p>
+    </div>
+    <div data-metodo="cl" hidden>
+    <p>Chile tiene tipo de cambio flotante y el Banco Central interviene sólo en episodios puntuales. Dos subíndices de igual peso: <b>presión cambiaria</b> (depreciación del peso en 5 días, volatilidad en 20 días y caída del precio del cobre, que explica buena parte de la oferta de dólares) y <b>riesgo y tasas</b> (riesgo país EMBIG y cambio mensual de la tasa de política monetaria).</p>
+    <p>Las reservas y la intervención del Banco Central de Chile están en su base de datos estadísticos, cuya API pide registrarse con usuario y clave: con esas credenciales se pueden sumar al índice y a la comparación entre países. Fuentes: Banco Central de Chile (dólar observado, TPM y cobre, vía mindicador.cl) y BCRP (EMBIG).</p>
+    </div>
+    <div data-metodo="co" hidden>
+    <p>Colombia tiene tipo de cambio flotante; el Banco de la República interviene poco y en episodios puntuales. Por ahora el índice tiene dos subíndices de igual peso: <b>presión cambiaria</b> (depreciación de la TRM en 5 días y volatilidad en 20 días) y <b>riesgo</b> (riesgo país EMBIG). Es la versión más acotada de las seis: las reservas, la intervención y la tasa de política del Banco de la República se suman cuando estén automatizadas.</p>
+    <p>Fuentes: Superintendencia Financiera (TRM, vía datos.gov.co) y BCRP (EMBIG).</p>
+    </div>
     <div data-metodo="ar">
     <p>El Índice de Presión de Dolarización (IPD) adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes) y se promedia dentro de tres subíndices:</p>
     <ul>
@@ -243,7 +259,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </ul>
     <p>El índice se publica desde 2003. Los datos de 1996–2002 sólo se usan como referencia para estandarizar: con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20 a 45 puntos por semana y se desplomó con el corralito, y hay huecos en los datos. No todos los componentes existen desde el inicio: la brecha se suma en 2011 (con el blue hasta 2012 y el CCL hasta que hay MEP, en 2018), la FAE en 2008, el canje en 2019 y los futuros en 2020. El tooltip del gráfico de la medida de base indica cuántos componentes había cada día.</p>
     </div>
-    <p><b>Ponderación.</b> Los subíndices pesan lo mismo (tres en Argentina, dos en Perú y Uruguay). Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así ninguna variable queda afuera aunque la PCA le asigne carga nula. Los pesos se recalculan en cada actualización con toda la historia.</p>
+    <p><b>Ponderación.</b> Los subíndices pesan lo mismo (tres en Argentina, dos en los demás países). Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así ninguna variable queda afuera aunque la PCA le asigne carga nula. Los pesos se recalculan en cada actualización con toda la historia.</p>
     <div class="table-wrap"><table id="pesos-tbl"><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody></tbody></table></div>
     <p class="note" id="pesos-nota"></p>
     <p>Si falta un componente, su peso se reparte entre los demás de su subíndice. El índice se publica cuando hay datos para al menos el 40% del peso.</p>
@@ -305,7 +321,46 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       { title: "Depósitos privados en dólares (fin de mes)", keys: ["depositos_me_usd"], unit: "millones de USD" },
     ],
   };
-  const COLOR_PAIS = { ar: "--s1", pe: "--s2", uy: "--s3" };
+  PAISES.br = {
+    json: "data/br/monitor.json", csv: "data/br/panel_diario.csv", pdf: "reportes/br/ultimo.pdf",
+    sub: "Presión cambiaria en Brasil, con datos diarios.", fuentes: "BCB, BCRP",
+    tiles: ["tc", "reservas", "ventas_spot_usd", "swaps", "linhas", "selic", "embig", "vol_tc"],
+    up: { tc: 1, reservas: -1, ventas_spot_usd: 1, swaps: 1, linhas: 1, selic: 1, embig: 1, vol_tc: 1 },
+    mensuales: [], absolutos: ["ventas_spot_usd"],
+    multiples: [
+      { title: "Tipo de cambio PTAX", keys: ["tc"], unit: "R$ por USD" },
+      { title: "Volatilidad del tipo de cambio (20 días)", keys: ["vol_tc"], unit: "% anualizada" },
+      { title: "Reservas internacionales", keys: ["reservas"], unit: "millones de USD" },
+      { title: "Ventas netas spot del BCB (20 días)", keys: ["ventas_spot_usd"], unit: "millones de USD" },
+      { title: "Swaps cambiales y líneas con recompra del BCB", keys: ["swaps", "linhas"], names: ["Swaps cambiales", "Líneas con recompra"], unit: "millones de USD" },
+      { title: "Meta Selic", keys: ["selic"], unit: "% anual" },
+      { title: "Riesgo país (EMBIG)", keys: ["embig"], unit: "pb" },
+    ],
+  };
+  PAISES.cl = {
+    json: "data/cl/monitor.json", csv: "data/cl/panel_diario.csv", pdf: "reportes/cl/ultimo.pdf",
+    sub: "Presión cambiaria en Chile, con datos diarios.", fuentes: "Banco Central de Chile (vía mindicador.cl), BCRP",
+    tiles: ["tc", "cobre", "tpm", "embig", "vol_tc"],
+    up: { tc: 1, cobre: -1, tpm: 1, embig: 1, vol_tc: 1 }, mensuales: [],
+    multiples: [
+      { title: "Dólar observado", keys: ["tc"], unit: "$ por USD" },
+      { title: "Volatilidad del tipo de cambio (20 días)", keys: ["vol_tc"], unit: "% anualizada" },
+      { title: "Precio del cobre", keys: ["cobre"], unit: "USD por libra" },
+      { title: "Tasa de política monetaria", keys: ["tpm"], unit: "%" },
+      { title: "Riesgo país (EMBIG)", keys: ["embig"], unit: "pb" },
+    ],
+  };
+  PAISES.co = {
+    json: "data/co/monitor.json", csv: "data/co/panel_diario.csv", pdf: "reportes/co/ultimo.pdf",
+    sub: "Presión cambiaria en Colombia, con datos diarios.", fuentes: "Superintendencia Financiera (datos.gov.co), BCRP",
+    tiles: ["tc", "embig", "vol_tc"], up: { tc: 1, embig: 1, vol_tc: 1 }, mensuales: [],
+    multiples: [
+      { title: "Tasa representativa del mercado (TRM)", keys: ["tc"], unit: "$ por USD" },
+      { title: "Volatilidad del tipo de cambio (20 días)", keys: ["vol_tc"], unit: "% anualizada" },
+      { title: "Riesgo país (EMBIG)", keys: ["embig"], unit: "pb" },
+    ],
+  };
+  const COLOR_PAIS = { ar: "--s1", pe: "--s2", uy: "--s3", br: "--s4" };
   let PAIS = new URLSearchParams(location.search).get("pais") || "ar";
   if (!PAISES[PAIS] && PAIS !== "comparado") PAIS = "ar";
   let TILES = ["tc_oficial_ref", "usd_mep", "usd_ccl", "brecha_mep", "canje", "riesgo_pais", "reservas", "tasa", "deval_implicita", "futuros_interes_abierto", "posicion_bcra", "depositos_usd"];
@@ -829,7 +884,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const idx = Object.fromEntries(entries.map(([k, v]) => [k, new Map(v.data.map((r) => [r[0], r]))]));
     document.querySelector("#comp-tbl tbody").innerHTML = ult.map((m) => `<tr><td>${m}</td>${entries.map(([k]) => { const r = idx[k].get(m); return r ? `<td class="num"><b>${nf(r[1], 1)}%</b></td><td class="num">${nf(r[3], 1)}%</td><td class="num">${nf(r[4], 1)}%</td>` : "<td></td><td></td><td></td>"; }).join("")}</tr>`).join("");
     document.getElementById("comp-rho").textContent = COMP.rho != null ? `Con los datos actuales, vender el 1% de las reservas en un mes equivale a ${nf(COMP.rho, 2)} puntos de depreciación.` : "";
-    document.getElementById("foot").textContent = `Actualizado: ${new Date(COMP.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, BCRP, BCU.`;
+    document.getElementById("foot").textContent = `Actualizado: ${new Date(COMP.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, BCRP, BCU, BCB.`;
   }
 
   // Configuración por defecto (Argentina), para volver a ella al cambiar de país.
