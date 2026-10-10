@@ -1,5 +1,6 @@
 import re, json, requests
-S = requests.Session(); S.headers["User-Agent"] = "Mozilla/5.0"; S.headers["Accept"] = "application/json"
+import urllib3; urllib3.disable_warnings()
+S = requests.Session(); S.verify = False; S.headers["User-Agent"] = "Mozilla/5.0"; S.headers["Accept"] = "application/json"
 B = "https://suameca.banrep.gov.co"
 def get(u, **kw):
     try:
