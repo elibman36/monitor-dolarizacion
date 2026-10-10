@@ -89,6 +89,13 @@ def fake_api(monkeypatch, tmp_path):
     monkeypatch.setattr(sources, "bcra_compras_personas_humanas", lambda: pd.DataFrame({
         "fecha": ["2025-01", "2025-02"], "compras_usd_millones": [1500.0, 1800.0],
         "ventas_usd_millones": [300.0, 250.0], "fuente": ["test", "test"]}))
+    def fake_planilla(mes):
+        if mes < "2025-01" or mes == "2025-06":  # 2025-06: mes sin PDF
+            return None
+        return {"fecha": mes, "cortas_usd_millones": -1000.0, "largas_usd_millones": 0.0,
+                "vendida_neta_usd_millones": 1000.0}
+    monkeypatch.setattr(sources, "bcra_planilla_reservas", fake_planilla)
+    monkeypatch.setattr(config, "BCRA_PLANILLA_DESDE", "2024-06")
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "SERIES_DIR", tmp_path / "series")
     monkeypatch.setattr(config, "OUTPUT_JSON", tmp_path / "monitor.json")
@@ -118,6 +125,11 @@ def test_run_end_to_end(fake_api):
     assert [r["fecha"] for r in ph] == ["2025-01", "2025-02"]
     assert ph[1]["netas_usd_millones"] == pytest.approx(1550.0)
     assert payload["ipd"]["n_components"]
+    pos = payload["series"]["posicion_bcra"]
+    assert pos["data"][0] == ["2025-01-31", 1000.0]
+    assert "2025-06-30" not in dict(pos["data"])
+    meta = json.loads((tmp / "series" / "_descargas.json").read_text())
+    assert "2024-06" in meta["posicion_futuros_bcra_no_disponibles"]
     json.loads((tmp / "monitor.json").read_text())
 
 
@@ -257,3 +269,40 @@ def test_apply_min_weight():
     assert out.sum() == pytest.approx(1.0)
     assert out["c"] == pytest.approx(0.10) and out["d"] == pytest.approx(0.10)
     assert out["a"] / out["b"] == pytest.approx(0.5 / 0.45)
+
+
+def test_parse_planilla_reservas():
+    vieja = ("Datos Corrientes en millones de USD (final del período) 31/01/19\n"
+             "(b) Instrumentos financieros denominados en moneda extranjera y liquidados por otros medios\n"
+             "(por ejemplo, en moneda nacional)13 159.85\n"
+             "—derivados financieros (forwards, futuros y opciones) 159.85\n"
+             "—Posiciones cortas -1,190.27\n—Posiciones largas 350.12\n—otros instrumentos\n")
+    nueva = ("Datos Corrientes en millones de USD (final del período) 31/08/26\n"
+             "(b) Instrumentos financieros denominados en moneda extranjera y liquidados por otros medios (por\n"
+             "ejemplo, en moneda nacional)13 -6.278,46\n"
+             "—derivados financieros (forwards, futuros y opciones) -6.278,46\n"
+             "—Posiciones cortas -6.278,46\n—Posiciones largas 0,00\n—otros instrumentos 0,00\n")
+    vacia = ("(final del período) 30/06/17\n(b) ... liquidados por otros medios (por\n"
+             "ejemplo, en moneda nacional)13\n—derivados financieros\n—Posiciones cortas\n"
+             "—Posiciones largas\n—otros instrumentos\n(c) Activos dados en prendas14 0.00\n")
+    a = sources.parse_planilla_reservas(vieja)
+    assert a["fecha"] == "2019-01"
+    assert a["cortas_usd_millones"] == pytest.approx(-1190.27)
+    assert a["vendida_neta_usd_millones"] == pytest.approx(840.15)
+    b = sources.parse_planilla_reservas(nueva)
+    assert b["fecha"] == "2026-08" and b["vendida_neta_usd_millones"] == pytest.approx(6278.46)
+    # En blanco = no informado (no es cero); "0.00" sí es cero.
+    assert sources.parse_planilla_reservas(vacia)["vendida_neta_usd_millones"] is None
+    cero = vacia.replace("Posiciones cortas\n", "Posiciones cortas 0.00\n")
+    assert sources.parse_planilla_reservas(cero)["vendida_neta_usd_millones"] == 0.0
+    assert sources.parse_planilla_reservas("sin datos") is None
+
+
+def test_posicion_bcra_rezago():
+    pos = pd.DataFrame({"fecha": ["2025-01", "2025-02"], "vendida_neta_usd_millones": [100.0, 200.0]})
+    idx = pd.bdate_range("2025-01-01", "2025-04-30")
+    d = indicators.posicion_bcra_daily(pos, idx)
+    # El dato de enero (31/1) recién se conoce 35 días después.
+    assert d[:"2025-03-06"].isna().all()
+    assert d["2025-03-07"] == 100.0
+    assert d["2025-04-30"] == 200.0

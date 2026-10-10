@@ -199,7 +199,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <p>El Índice de Presión de Dolarización (IPD) adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes) y se promedia dentro de tres subíndices:</p>
     <ul>
       <li><b>Presión cambiaria:</b> depreciación del oficial A3500 en 5 días, volatilidad del oficial (20 días), evolución de las reservas brutas en 5 días, suba de la tasa BADLAR en 5 días (defensa del peso) y brecha MEP / oficial, que mide cuánto pesan las restricciones para comprar al oficial.</li>
-      <li><b>Dolarización de portafolios:</b> devaluación implícita en los futuros de A3 Mercados (TNA a 90 días), posición abierta en futuros de dólar (demanda de cobertura, promedio de 21 días para sacar el efecto de los vencimientos), depósitos en dólares del sector privado (cuando caen suma presión; cuando crecen, alivia) y compras netas de dólares de personas humanas (FAE, dato mensual que entra un mes después de su cierre, medido contra su promedio de 12 meses para no confundir la salida del cepo con presión).</li>
+      <li><b>Dolarización de portafolios:</b> devaluación implícita en los futuros de A3 Mercados (TNA a 90 días), posición abierta en futuros de dólar (demanda de cobertura, promedio de 21 días para sacar el efecto de los vencimientos), futuros de dólar vendidos por el BCRA (cobertura que absorbe el BCRA para contener la devaluación implícita: presión que no se ve en el precio; cuenta la variación mensual de la posición vendida neta, así que ampliarla suma presión y desarmarla resta; dato de fin de mes de la planilla de reservas, que entra 35 días después), depósitos en dólares del sector privado (cuando caen suma presión; cuando crecen, alivia) y compras netas de dólares de personas humanas (FAE, dato mensual que entra un mes después de su cierre, medido contra su promedio de 12 meses para no confundir la salida del cepo con presión).</li>
       <li><b>Extranjerización de portafolios:</b> canje (CCL / MEP), que mide la preferencia por tener dólares afuera del país; volatilidad del CCL, y suba del riesgo país en 5 días.</li>
     </ul>
     <p>El índice se publica desde 2003. Los datos de 1996–2002 sólo se usan como referencia para estandarizar: con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20 a 45 puntos por semana y se desplomó con el corralito, y hay huecos en los datos. No todos los componentes existen desde el inicio: la brecha se suma en 2011 (con el blue hasta 2012 y el CCL hasta que hay MEP, en 2018), la FAE en 2008, el canje en 2019 y los futuros en 2020. El tooltip del gráfico de la medida de base indica cuántos componentes había cada día.</p>
@@ -223,9 +223,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     deprec_fuerte: { color: "var(--dv-deprec_fuerte)", icon: "▲" },
     unknown: { color: "var(--muted)", icon: "?" },
   };
-  const TILES = ["tc_oficial_ref", "usd_mep", "usd_ccl", "brecha_mep", "canje", "riesgo_pais", "reservas", "tasa", "deval_implicita", "futuros_interes_abierto", "depositos_usd"];
+  const TILES = ["tc_oficial_ref", "usd_mep", "usd_ccl", "brecha_mep", "canje", "riesgo_pais", "reservas", "tasa", "deval_implicita", "futuros_interes_abierto", "posicion_bcra", "depositos_usd"];
+  // Series de fin de mes: el delta se mide contra el mes anterior, en valor absoluto.
+  const MENSUALES = new Set(["posicion_bcra"]);
   // Variables donde una suba es "mala" (más presión): se colorea el delta.
-  const UP_IS_PRESSURE = { tc_oficial_ref: 1, usd_ccl: 1, usd_mep: 1, brecha_ccl: 1, brecha_mep: 1, canje: 1, futuros_interes_abierto: 1, riesgo_pais: 1, reservas: -1, deval_implicita: 1, depositos_usd: -1 };
+  const UP_IS_PRESSURE = { tc_oficial_ref: 1, usd_ccl: 1, usd_mep: 1, brecha_ccl: 1, brecha_mep: 1, canje: 1, futuros_interes_abierto: 1, posicion_bcra: 1, riesgo_pais: 1, reservas: -1, deval_implicita: 1, depositos_usd: -1 };
   const MULTIPLES = [
     { title: "Tipo de cambio", keys: ["tc_oficial_ref", "usd_mep", "usd_ccl"], names: ["Oficial (A3500)", "MEP", "CCL"], unit: "$ por USD" },
     { title: "Brecha MEP / oficial y canje (CCL / MEP)", keys: ["brecha_mep", "canje"], names: ["Brecha MEP / oficial", "Canje CCL / MEP"], unit: "%" },
@@ -235,6 +237,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     { title: "Tasa BADLAR (bancos privados)", keys: ["tasa"], unit: "% n.a." },
     { title: "Devaluación implícita en futuros (90 días)", keys: ["deval_implicita"], unit: "% TNA" },
     { title: "Interés abierto en futuros de dólar", keys: ["futuros_interes_abierto"], unit: "contratos" },
+    { title: "Posición vendida neta del BCRA en futuros (fin de mes)", keys: ["posicion_bcra"], unit: "millones de USD", bars: true },
     { title: "Depósitos en dólares", keys: ["depositos_usd"], unit: "millones de USD" },
   ];
 
@@ -283,10 +286,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     });
   });
 
-  function cut(pairs) {
+  function cut(pairs, minDays = 0) {
     if (!rangeDays || !pairs.length) return pairs;
     const last = new Date(pairs[pairs.length - 1][0]);
-    const from = new Date(last - rangeDays * 864e5).toISOString().slice(0, 10);
+    const from = new Date(last - Math.max(rangeDays, minDays) * 864e5).toISOString().slice(0, 10);
     return pairs.filter((p) => p[0] >= from);
   }
 
@@ -391,7 +394,14 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       if (!s) return;
       const dg = digitsFor(s.unit, s.last);
       let delta = "";
-      if (s.prev_7d != null && s.last != null) {
+      if (MENSUALES.has(k) && s.prev_7d != null && s.last != null) {
+        const ch = s.last - s.prev_7d;
+        const sign = Math.sign(ch) * (UP_IS_PRESSURE[k] || 0);
+        const cls = sign > 0 ? "up" : sign < 0 ? "down" : "";
+        const arrow = ch > 0 ? "▲" : ch < 0 ? "▼" : "•";
+        const mes = new Date(s.last_date + "T12:00:00").toLocaleDateString("es-AR", { month: "short", year: "2-digit" });
+        delta = `<div class="delta"><span class="${cls}">${arrow} ${ch > 0 ? "+" : ""}${nf(ch, 0)}</span> vs. mes anterior (dato a ${mes})</div>`;
+      } else if (s.prev_7d != null && s.last != null) {
         const isPct = s.unit.startsWith("%") || s.unit === "pb";
         const ch = isPct ? s.last - s.prev_7d : (s.last / s.prev_7d - 1) * 100;
         const sign = Math.sign(ch) * (UP_IS_PRESSURE[k] || 0);
@@ -578,7 +588,13 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         o.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 11 } };
         o.grid.top = 32;
       }
-      o.series = avail.map((k) => lineSeries(m.names ? m.names[m.keys.indexOf(k)] : DATA.series[k].label, cut(DATA.series[k].data), cols[m.keys.indexOf(k)]));
+      o.series = avail.map((k) => {
+        const name = m.names ? m.names[m.keys.indexOf(k)] : DATA.series[k].label;
+        const col = cols[m.keys.indexOf(k)];
+        // Dato mensual: barras, con al menos 3 años a la vista.
+        if (m.bars) return { name, type: "bar", data: cut(DATA.series[k].data, 1095), itemStyle: { color: col }, barMaxWidth: 10 };
+        return lineSeries(name, cut(DATA.series[k].data), col);
+      });
       c.setOption(o);
     });
   }

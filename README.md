@@ -83,6 +83,7 @@ python -m monitor.report --fecha 2026-10-05   # semana del 28/9 al 2/10
 | Dólar MEP | 2018 | diaria | ArgentinaDatos | automática |
 | Brechas CCL, MEP y blue | 2011 | diaria | cálculo propio (CCL; antes de 2013, blue) | derivada |
 | Futuros de dólar: devaluación implícita e interés abierto | 2020 | diaria | A3 Mercados (API pública de precios de cierre) | automática |
+| Posición del BCRA en futuros de dólar (ítem IV.1.b) | 2003 | mensual (fin de mes) | BCRA, Planilla de Reservas Internacionales y Liquidez en Moneda Extranjera (PDF, formato FMI) | automática |
 | Compras de USD de personas humanas | 2003 | mensual | BCRA, anexo del Informe de Evolución del Mercado de Cambios | automática (semanal) |
 
 **Historia.** El IPD se publica desde 2003 (`IPD_PUBLICAR_DESDE`). Las series
@@ -115,6 +116,7 @@ igual peso:
 | | Brecha MEP / oficial | nivel (antes de 2018, brecha CCL; antes de 2013, blue) | + |
 | Dolarización de portafolios | Devaluación implícita en futuros | nivel (TNA a 90 días) | + |
 | | Posición abierta en futuros de dólar | nivel, promedio de 21 días | + |
+| | Futuros de dólar vendidos por el BCRA (neto) | Δ 21 días de la posición vendida neta (una posición comprada cuenta como 0); entra 35 días después de cada fin de mes | + |
 | | Depósitos en USD del sector privado | Δlog 5 días | − |
 | | Compras netas de USD de personas humanas (FAE) | desvío respecto de su promedio de 12 meses; entra 30 días después del cierre de cada mes | + |
 | Extranjerización de portafolios | Canje (CCL / MEP) | nivel | + |

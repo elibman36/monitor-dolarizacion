@@ -82,6 +82,21 @@ BCRA_ANEXO_HOJA = "Datos Mercado de Cambios"
 BCRA_ANEXO_SECTOR = "Personas Humanas"
 BCRA_ANEXO_DIAS_ENTRE_DESCARGAS = 7  # el anexo se actualiza una vez por mes
 
+# Planilla mensual de Reservas Internacionales y Liquidez en Moneda Extranjera
+# (formato del FMI, NEDD): de ahí sale la posición del BCRA en futuros de dólar.
+# Un PDF por mes, con nombre tempMMAA.pdf (entre jul-23 y may-24, tempMMAAAA.pdf).
+BCRA_PLANILLA_URLS = [
+    "https://www.bcra.gob.ar/archivos/Pdfs/PublicacionesEstadisticas/temp{mm}{yy}.pdf",
+    "https://www.bcra.gob.ar/archivos/Pdfs/PublicacionesEstadisticas/temp{mm}{yyyy}.pdf",
+]
+# Antes de 2011 el ítem de derivados figura en blanco (no se informaba).
+BCRA_PLANILLA_DESDE = "2011-01"
+# Los meses que no están publicados se reintentan sólo si son de este número
+# de meses para acá (los huecos viejos se dan por definitivos).
+BCRA_PLANILLA_REINTENTAR_MESES = 4
+# El dato de fin de mes se publica unas 4-5 semanas después.
+POSICION_BCRA_REZAGO_DIAS = 35
+
 # Devaluación implícita: TNA de los futuros interpolada a un plazo constante.
 # Se descartan contratos con menos de FUTUROS_PLAZO_MINIMO_DIAS (muy ruidosos).
 FUTUROS_PLAZO_CONSTANTE_DIAS = 90
@@ -99,6 +114,8 @@ FUTUROS_PLAZO_MINIMO_DIAS = 20
 #   dlog  -> variación logarítmica en `horizon` días hábiles (x100)
 #   diff  -> diferencia simple en `horizon` días hábiles
 #   level -> nivel de la serie
+# Opcionales: horizonte (días hábiles, en lugar de IPD_HORIZON) y piso (valor
+# mínimo de la serie antes de transformarla).
 # sign: +1 si un aumento implica más presión, -1 si implica menos.
 # Primer día que se publica el IPD. Antes de 2003 la serie no es confiable:
 # con la convertibilidad el tipo de cambio no se movía (faltan dos
@@ -179,6 +196,17 @@ IPD_BLOCKS = {
                               "label": "Depósitos en USD",
                               "frases": ("cayeron los depósitos en dólares",
                                          "crecieron los depósitos en dólares")},
+            # Futuros vendidos por el BCRA (planilla de reservas, mensual): es
+            # demanda de cobertura que el BCRA absorbe para contener la
+            # devaluación implícita, es decir, presión que no se ve en el precio.
+            # Cuenta la variación mensual (21 días hábiles): ampliar la posición
+            # vendida suma presión y desarmarla resta, para que el remanente de
+            # un episodio no se lea como presión mientras se desarma. Una posición
+            # comprada neta (2019) cuenta como cero, no como alivio.
+            "posicion_bcra": {"transform": "diff", "horizonte": 21, "piso": 0.0, "sign": +1, "weight": 1.0,
+                              "label": "Futuros vendidos por el BCRA",
+                              "frases": ("el BCRA amplió su posición vendida en futuros de dólar",
+                                         "el BCRA redujo su posición vendida en futuros de dólar")},
             # Formación de activos externos de personas humanas: dato mensual,
             # que entra recién cuando el BCRA lo publica (ver FAE_REZAGO_DIAS).
             # Se mide contra su promedio de 12 meses: con el cepo las compras

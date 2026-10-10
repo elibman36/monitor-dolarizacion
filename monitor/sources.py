@@ -261,3 +261,75 @@ def bcra_compras_personas_humanas() -> pd.DataFrame:
     if out.empty:
         raise RuntimeError("el anexo no trae operaciones de personas humanas")
     return out
+
+
+# ---------------------------------------------------------------------------
+# BCRA - Planilla de Reservas Internacionales y Liquidez en Moneda Extranjera
+# ---------------------------------------------------------------------------
+
+def _numero_planilla(x: str) -> float:
+    """Número de la planilla: los PDF viejos usan punto decimal ("-6,904.60") y
+    los nuevos coma ("-1.248,77"). El separador decimal es el último seguido
+    de uno o dos dígitos."""
+    x = x.strip()
+    m = re.search(r"[.,](\d{1,2})$", x)
+    entero, dec = (x[:m.start()], m.group(1)) if m else (x, "0")
+    return float(re.sub(r"[.,]", "", entero) + "." + dec)
+
+
+def parse_planilla_reservas(texto: str) -> dict | None:
+    """Posición del BCRA en derivados de moneda extranjera liquidados en pesos.
+
+    Es el ítem IV.(1)(b) de la planilla del FMI (NEDD): "Instrumentos
+    financieros denominados en moneda extranjera y liquidados por otros medios
+    (por ejemplo, en moneda nacional) - derivados financieros (forwards,
+    futuros y opciones)". En la práctica, los futuros de dólar en A3/ROFEX.
+    Devuelve fecha de cierre y posiciones cortas y largas en millones de USD
+    (cortas con signo negativo, como en la planilla).
+    """
+    t = re.sub(r"[ \t]+", " ", texto)
+    fecha = re.search(r"final del per[ií]odo\)?\s*(\d{2}/\d{2}[/.]\d{2,4})", t)
+    i = t.find("liquidados por otros medios")
+    if fecha is None or i < 0:
+        return None
+    tramo = t[i:i + 700]
+    num = r"(-?\d[\d.,]*)"
+    cortas = re.search(r"Posiciones cortas[^\d\n-]*" + num, tramo)
+    largas = re.search(r"Posiciones largas[^\d\n-]*" + num, tramo)
+    fecha_cierre = re.sub(r"[.]", "/", fecha.group(1))
+    out = {"fecha": pd.to_datetime(fecha_cierre, dayfirst=True).strftime("%Y-%m")}
+    if cortas is None and largas is None:
+        # Ítem en blanco: hasta 2011 el BCRA no lo informaba ("no disponibles").
+        # Desde 2012 siempre trae un número, aunque sea 0.
+        return {**out, "cortas_usd_millones": None, "largas_usd_millones": None,
+                "vendida_neta_usd_millones": None}
+    c = _numero_planilla(cortas.group(1)) if cortas else 0.0
+    l = _numero_planilla(largas.group(1)) if largas else 0.0
+    return {**out,
+            "cortas_usd_millones": round(-abs(c), 2) + 0.0,  # sin "-0.0"
+            "largas_usd_millones": round(abs(l), 2),
+            "vendida_neta_usd_millones": round(abs(c) - abs(l), 2)}
+
+
+def bcra_planilla_reservas(mes: str) -> dict | None:
+    """Descarga y lee la planilla de un mes ("YYYY-MM"). None si no está publicada."""
+    import pdfplumber  # dependencia sólo de esta fuente
+
+    for plantilla in config.BCRA_PLANILLA_URLS:
+        url = plantilla.format(mm=mes[5:7], yy=mes[2:4], yyyy=mes[:4])
+        r = _session.get(url, timeout=60, verify=_bcra_verify(), headers={"Accept": "*/*"})
+        if r.status_code != 404 and r.content.startswith(b"%PDF"):
+            break
+        if r.status_code not in (200, 404):
+            r.raise_for_status()
+    else:
+        return None
+    with pdfplumber.open(io.BytesIO(r.content)) as pdf:
+        texto = "\n".join((p.extract_text() or "") for p in pdf.pages)
+    out = parse_planilla_reservas(texto)
+    if out is None:
+        raise RuntimeError(f"no se encontró la posición en derivados en {url}")
+    if out["fecha"] != mes:
+        log.warning("planilla %s: la fecha de cierre es %s", url, out["fecha"])
+    out["fecha"] = mes
+    return out

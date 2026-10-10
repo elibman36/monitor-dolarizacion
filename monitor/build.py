@@ -154,6 +154,61 @@ def load_compras_personas_humanas(offline: bool) -> pd.DataFrame:
     return data
 
 
+POSICION_BCRA_CACHE = "posicion_futuros_bcra"
+
+
+def _meses_planilla(hoy: pd.Timestamp) -> list[str]:
+    """Meses cerrados desde BCRA_PLANILLA_DESDE hasta el anterior a `hoy`."""
+    fin = (hoy.to_period("M") - 1)
+    return [str(p) for p in pd.period_range(config.BCRA_PLANILLA_DESDE, fin, freq="M")]
+
+
+def load_posicion_bcra(offline: bool) -> pd.DataFrame:
+    """Posición del BCRA en futuros de dólar (planilla mensual de reservas).
+
+    Se baja sólo lo que falta: la primera corrida recorre toda la historia y
+    las siguientes, el mes nuevo. Los meses sin PDF se reintentan mientras
+    sean recientes; los huecos viejos quedan anotados y no se vuelven a pedir.
+    """
+    path = config.SERIES_DIR / f"{POSICION_BCRA_CACHE}.csv"
+    cached = pd.read_csv(path, dtype={"fecha": str}) if path.exists() else pd.DataFrame()
+    if offline:
+        return cached
+    meta = _downloads_meta()
+    no_disponibles = set(meta.get(f"{POSICION_BCRA_CACHE}_no_disponibles", []))
+    tengo = set(cached["fecha"]) if not cached.empty else set()
+    hoy = pd.Timestamp(datetime.now(timezone.utc).date())
+    meses = _meses_planilla(hoy)
+    recientes = set(meses[-config.BCRA_PLANILLA_REINTENTAR_MESES:])
+    pendientes = [m for m in meses if m not in tengo and (m not in no_disponibles or m in recientes)]
+    nuevos, errores = [], 0
+    for mes in pendientes:
+        try:
+            fila = sources.bcra_planilla_reservas(mes)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("planilla de reservas %s: %s", mes, exc)
+            errores += 1
+            if errores >= 5:  # el BCRA está caído: se sigue en la próxima corrida
+                break
+            continue
+        if fila is None:
+            if mes not in recientes:
+                no_disponibles.add(mes)
+            continue
+        nuevos.append(fila)
+    if nuevos:
+        data = pd.concat([cached, pd.DataFrame(nuevos)]).drop_duplicates("fecha", keep="last")
+        data = data.sort_values("fecha")
+        config.SERIES_DIR.mkdir(parents=True, exist_ok=True)
+        data.to_csv(path, index=False)
+        log.info("BCRA planilla de reservas: %d meses nuevos (%d en total)", len(nuevos), len(data))
+        cached = data
+    meta = _downloads_meta()
+    meta[f"{POSICION_BCRA_CACHE}_no_disponibles"] = sorted(no_disponibles)
+    _save_downloads_meta(meta)
+    return cached
+
+
 def fetch_all(offline: bool) -> tuple[dict[str, pd.Series], dict[str, str]]:
     series: dict[str, pd.Series] = {}
     status: dict[str, str] = {}
@@ -220,6 +275,8 @@ SERIES_META = {
     "deval_implicita": ("Devaluación implícita en futuros a 90 días", "% TNA", "A3 Mercados"),
     "deval_implicita_mensual": ("Devaluación mensual implícita en futuros (90 días)", "% mensual", "A3 Mercados"),
     "futuros_interes_abierto": ("Posición abierta en futuros de dólar", "contratos (USD 1.000 c/u)", "A3 Mercados"),
+    "posicion_bcra": ("Posición vendida neta del BCRA en futuros de dólar", "millones de USD (fin de mes)",
+                      "BCRA, Planilla de Reservas Internacionales y Liquidez en Moneda Extranjera"),
 }
 
 
@@ -353,10 +410,14 @@ def run(offline: bool = False) -> dict:
 
     futuros = load_futures(offline)
     compras = indicators.monthly_fx_purchases(load_compras_personas_humanas(offline))
-    panel = indicators.derived_series(panel, futuros, compras)
+    posicion_bcra = load_posicion_bcra(offline)
+    panel = indicators.derived_series(panel, futuros, compras, posicion_bcra)
     ipd = indicators.compute_ipd(panel)
 
-    payload = build_payload(panel, ipd, compras, status, daily)
+    # La posición del BCRA se publica con su fecha real (fin de mes), no con
+    # la de entrada al índice.
+    publicar = {**daily, "posicion_bcra": indicators.posicion_bcra_mensual(posicion_bcra)}
+    payload = build_payload(panel, ipd, compras, status, publicar)
 
     # Panel diario completo, útil para análisis en Excel / R / Stata.
     out_panel = panel.copy()

@@ -248,6 +248,7 @@ VARIABLES = [
     ("tasa", "Tasa BADLAR privados", "% n.a.", 2, "pp"),
     ("deval_implicita", "Devaluación implícita en futuros (90 días)", "% TNA", 1, "pp"),
     ("futuros_interes_abierto", "Posición abierta en futuros de dólar", "contratos de USD 1.000", 0, "pct"),
+    ("posicion_bcra", "Futuros vendidos por el BCRA (neto)", "M USD, último fin de mes publicado", 0, "abs"),
     ("depositos_usd", "Depósitos en USD del sector privado", "M USD", 0, "abs"),
 ]
 
@@ -421,8 +422,10 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
         chart_mini([("Riesgo país", p["riesgo_pais"], S1)], "Riesgo país", "pb", semana),
         chart_mini([("Reservas", p["reservas"], S1)], "Reservas brutas", "millones de USD", semana),
         chart_mini([("Futuros", p.get("deval_implicita"), S1)], "Devaluación implícita", "% TNA a 90 días", semana),
-        chart_mini([("Posición abierta", p.get("futuros_interes_abierto") / 1000 if "futuros_interes_abierto" in p else None, S1)],
-                   "Futuros de dólar", "posición abierta, miles de contratos", semana),
+        # Cada contrato es de USD 1.000: miles de contratos = millones de USD.
+        chart_mini([("Posición abierta", p.get("futuros_interes_abierto") / 1000 if "futuros_interes_abierto" in p else None, S1),
+                    ("Vendida por el BCRA", p.get("posicion_bcra"), S2)],
+                   "Futuros de dólar", "millones de USD", semana),
         chart_mini([("Depósitos", p.get("depositos_usd"), S1)], "Depósitos en USD", "millones de USD", semana),
         chart_mini([("Oficial", p.get("vol_oficial"), S1), ("CCL", p.get("vol_ccl"), S2)],
                    "Volatilidad cambiaria", "% anualizada, 20 días", semana),
@@ -505,10 +508,10 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
 
 <section class="page method">
   <h2>Metodología</h2>
-  <p>El Índice de Presión de Dolarización adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano, para que un episodio extremo no infle la escala). Los componentes se agrupan en tres subíndices de igual peso: <b>presión cambiaria</b> (tipo de cambio oficial, su volatilidad, reservas, tasa en pesos y brecha MEP / oficial), <b>dolarización de portafolios</b> (devaluación implícita y posición abierta en futuros de dólar, depósitos en dólares y compras de dólares de personas humanas) y <b>extranjerización de portafolios</b> (canje CCL / MEP, volatilidad del CCL y riesgo país). Dentro de cada subíndice, los pesos salen de componentes principales: cada componente pesa según cuánto se mueve junto con el resto (cargas del primer componente principal de los promedios mensuales desde 2003). Las cargas negativas valen cero y ningún componente pesa menos del 10% de su subíndice. Varianza explicada por el primer componente: {pca_txt}.</p>
+  <p>El Índice de Presión de Dolarización adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano, para que un episodio extremo no infle la escala). Los componentes se agrupan en tres subíndices de igual peso: <b>presión cambiaria</b> (tipo de cambio oficial, su volatilidad, reservas, tasa en pesos y brecha MEP / oficial), <b>dolarización de portafolios</b> (devaluación implícita y posición abierta en futuros de dólar, futuros vendidos por el BCRA, depósitos en dólares y compras de dólares de personas humanas) y <b>extranjerización de portafolios</b> (canje CCL / MEP, volatilidad del CCL y riesgo país). Dentro de cada subíndice, los pesos salen de componentes principales: cada componente pesa según cuánto se mueve junto con el resto (cargas del primer componente principal de los promedios mensuales desde 2003). Las cargas negativas valen cero y ningún componente pesa menos del 10% de su subíndice. Varianza explicada por el primer componente: {pca_txt}.</p>
   <table><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody>{comp_rows}</tbody></table>
   <p>El promedio ponderado se promedia en 20 días hábiles (un mes, para que el índice no salte de una semana a otra) y se lleva a una escala de 0 a 100 con la normal acumulada. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Los aportes en puntos reparten la distancia del índice a 50 entre los componentes, así que suman exactamente esa distancia. Si falta un componente, su peso se reparte entre los demás de su subíndice. Las compras de dólares de personas humanas son mensuales, entran al índice un mes después del cierre de cada mes (cuando el BCRA las publica) y se miden contra su promedio de 12 meses, para no confundir la salida del cepo con presión.</p>
-  <p><b>Fuentes:</b> BCRA (reservas, tipo de cambio A3500, BADLAR, depósitos en dólares y anexo del balance cambiario), ArgentinaDatos (dólar MEP, CCL y blue; riesgo país) y A3 Mercados (futuros de dólar). Todas las series se descargan automáticamente.</p>
+  <p><b>Fuentes:</b> BCRA (reservas, tipo de cambio A3500, BADLAR, depósitos en dólares, anexo del balance cambiario y planilla de reservas y liquidez en moneda extranjera), ArgentinaDatos (dólar MEP, CCL y blue; riesgo país) y A3 Mercados (futuros de dólar). Todas las series se descargan automáticamente.</p>
   <p class="muted">Generado el {generado.day}/{generado.month}/{generado.year} a las {generado:%H:%M} (hora argentina). Tablero diario y datos: <a href="{DASHBOARD_URL}">{DASHBOARD_URL}</a></p>
 </section>
 </body></html>"""

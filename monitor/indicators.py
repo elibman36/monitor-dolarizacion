@@ -97,7 +97,29 @@ def fae_daily(compras: pd.DataFrame, index: pd.DatetimeIndex) -> pd.Series:
     return s.reindex(index.union(s.index)).ffill(limit=80).reindex(index)
 
 
-def derived_series(df: pd.DataFrame, futuros: pd.DataFrame, compras: pd.DataFrame | None = None) -> pd.DataFrame:
+def posicion_bcra_mensual(posicion: pd.DataFrame | None) -> pd.Series:
+    """Posición vendida neta del BCRA en futuros (millones de USD) a fin de mes."""
+    if posicion is None or posicion.empty or "vendida_neta_usd_millones" not in posicion:
+        return pd.Series(dtype=float, name="posicion_bcra", index=pd.DatetimeIndex([], name="fecha"))
+    fechas = pd.to_datetime(posicion["fecha"].astype(str).str[:7] + "-01") + pd.offsets.MonthEnd(0)
+    s = pd.Series(pd.to_numeric(posicion["vendida_neta_usd_millones"], errors="coerce").values,
+                  index=fechas, name="posicion_bcra")
+    s.index.name = "fecha"
+    return s[~s.index.duplicated(keep="last")].sort_index()
+
+
+def posicion_bcra_daily(posicion: pd.DataFrame | None, index: pd.DatetimeIndex) -> pd.Series:
+    """La posición de cada fin de mes entra POSICION_BCRA_REZAGO_DIAS después,
+    cuando el BCRA publica la planilla, y se mantiene hasta la siguiente."""
+    s = posicion_bcra_mensual(posicion)
+    if s.empty:
+        return pd.Series(np.nan, index=index)
+    s.index = s.index + pd.Timedelta(days=config.POSICION_BCRA_REZAGO_DIAS)
+    return s.reindex(index.union(s.index)).ffill(limit=80).reindex(index)
+
+
+def derived_series(df: pd.DataFrame, futuros: pd.DataFrame, compras: pd.DataFrame | None = None,
+                   posicion_bcra: pd.DataFrame | None = None) -> pd.DataFrame:
     out = df.copy()
     oficial = official_rate(df)
     out["tc_oficial_ref"] = oficial
@@ -143,6 +165,7 @@ def derived_series(df: pd.DataFrame, futuros: pd.DataFrame, compras: pd.DataFram
             out["futuros_oi"] = out["futuros_interes_abierto"].rolling(
                 config.FUTUROS_OI_SUAVIZADO, min_periods=10).mean()
     out["compras_ph"] = fae_daily(compras, out.index)
+    out["posicion_bcra"] = posicion_bcra_daily(posicion_bcra, out.index)
     return out
 
 
@@ -168,7 +191,10 @@ def rolling_z(x: pd.Series, window: int, min_obs: int, clip: float) -> pd.Series
     if config.IPD_ZSCORE_METODO == "robusto":
         med = x.rolling(window, min_periods=min_obs).median()
         mad = (x - med).abs().rolling(window, min_periods=min_obs).median() * 1.4826
-        z = (x - med) / mad.replace(0, np.nan)
+        # Si más de la mitad de la ventana es un mismo valor (p. ej. el BCRA sin
+        # futuros en 2024), el MAD es 0: se usa el desvío estándar.
+        std = x.rolling(window, min_periods=min_obs).std()
+        z = (x - med) / mad.where(mad > 0, std).replace(0, np.nan)
     else:
         roll = x.rolling(window, min_periods=min_obs)
         z = (x - roll.mean()) / roll.std()
@@ -216,7 +242,10 @@ def compute_ipd(df: pd.DataFrame) -> dict[str, pd.DataFrame | pd.Series]:
         for ckey, spec in block["components"].items():
             if ckey not in df or df[ckey].dropna().empty:
                 continue
-            x = transform(df[ckey], spec["transform"], h) * spec["sign"]
+            serie = df[ckey]
+            if "piso" in spec:
+                serie = serie.clip(lower=spec["piso"])
+            x = transform(serie, spec["transform"], spec.get("horizonte", h)) * spec["sign"]
             z = rolling_z(x, config.IPD_ZSCORE_WINDOW, config.IPD_ZSCORE_MIN_OBS, config.IPD_Z_CLIP)
             if z.dropna().empty:
                 continue
