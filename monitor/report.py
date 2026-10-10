@@ -264,11 +264,11 @@ def _txt_var(d, tipo, dec):
     return fmt(d, 1 if tipo in ("pct", "pp") else dec, signo=True, sufijo=suf)
 
 
-def tabla_variables(p: pd.DataFrame, semana: Semana) -> tuple[str, dict]:
+def tabla_variables(p: pd.DataFrame, semana: Semana, variables: list | None = None) -> tuple[str, dict]:
     filas, datos = [], {}
     cierre_prev = semana.viernes - pd.Timedelta(days=7)
     hace4 = semana.viernes - pd.Timedelta(days=28)
-    for col, label, unidad, dec, tipo in VARIABLES:
+    for col, label, unidad, dec, tipo in (variables or VARIABLES):
         if col not in p:
             continue
         f1, v1 = _hasta(p[col], semana.viernes)
@@ -295,16 +295,17 @@ def _minus(txt: str) -> str:
 FRASES = {c: spec["frases"] for b in config.IPD_BLOCKS.values() for c, spec in b["components"].items()}
 
 
-def _frase(comp: str, pts: float) -> str:
-    sube, baja = FRASES.get(comp, (comp, comp))
+def _frase(comp: str, pts: float, frases: dict | None = None) -> str:
+    sube, baja = (frases or FRASES).get(comp, (comp, comp))
     return f"{sube if pts > 0 else baja} ({fmt(pts, 0, signo=True)} pts)"
 
 
-def resumen(indice, semana, pts_cierre, datos) -> list[str]:
+def resumen(indice, semana, pts_cierre, datos, perfil: dict | None = None) -> list[str]:
     """Resumen en palabras: cuánto se movió el índice y qué lo explica, en puntos."""
     _, i1 = _hasta(indice, semana.viernes)
     _, i0 = _hasta(indice, semana.viernes - pd.Timedelta(days=7))
     tramo = indicators.status_for(i1)[1].lower()
+    frases = {c: spec["frases"] for b in (perfil or PERFIL_AR)["blocks"].values() for c, spec in b["components"].items()}
     puntos = []
     if np.isfinite(i1):
         txt = f"El índice cerró la semana en <b>{fmt(i1, 0)}/100</b> ({tramo})"
@@ -320,9 +321,16 @@ def resumen(indice, semana, pts_cierre, datos) -> list[str]:
         presion = [k for k, v in sorted(pc.items(), key=lambda t: -t[1]) if v >= 1][:3]
         alivio = [k for k, v in sorted(pc.items(), key=lambda t: t[1]) if v <= -1][:3]
         if presion:
-            puntos.append("En el último mes sumaron presión: " + "; ".join(_frase(k, pc[k]) for k in presion) + ".")
+            puntos.append("En el último mes sumaron presión: " + "; ".join(_frase(k, pc[k], frases) for k in presion) + ".")
         if alivio:
-            puntos.append("En el último mes restaron presión: " + "; ".join(_frase(k, pc[k]) for k in alivio) + ".")
+            puntos.append("En el último mes restaron presión: " + "; ".join(_frase(k, pc[k], frases) for k in alivio) + ".")
+    partes = (perfil or PERFIL_AR)["partes"](datos)
+    if partes:
+        puntos.append("Variaciones de la semana: " + ", ".join(partes) + ".")
+    return puntos
+
+
+def _partes_ar(datos: dict) -> list[str]:
     partes = []
     if "tc_oficial_ref" in datos:
         partes.append(f"el oficial {_txt_var(datos['tc_oficial_ref']['d'], 'pct', 2)}")
@@ -335,9 +343,7 @@ def resumen(indice, semana, pts_cierre, datos) -> list[str]:
     if "reservas" in datos and np.isfinite(datos["reservas"]["d"]):
         d = datos["reservas"]["d"]
         partes.append(f"las reservas {'subieron' if d >= 0 else 'cayeron'} USD {fmt(abs(d), 0)} M")
-    if partes:
-        puntos.append("Variaciones de la semana: " + ", ".join(partes) + ".")
-    return puntos
+    return partes
 
 
 # ---------------------------------------------------------------------------
@@ -388,31 +394,8 @@ a { color: #2a78d6; text-decoration: none; }
 """
 
 
-def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
-    indice = p["indice_0_100"]
-    f_cierre, i1 = _hasta(indice, semana.viernes)
-    if f_cierre is None:
-        raise SystemExit("No hay datos del índice para la semana pedida.")
-    _, i0 = _hasta(indice, semana.viernes - pd.Timedelta(days=7))
-    _, i4 = _hasta(indice, semana.viernes - pd.Timedelta(days=28))
-    tramo_key, tramo_label = indicators.status_for(i1)
-
-    labels = {c: spec["label"] for b in config.IPD_BLOCKS.values() for c, spec in b["components"].items()}
-    meta = {c["key"]: c for c in payload["ipd"]["components"]}
-    labels_peso = {c: (f"{l} · {fmt(meta[c]['weight_ipd'] * 100, 0)}%" if meta.get(c, {}).get("weight_ipd") is not None else l)
-                   for c, l in labels.items()}
-    pts_cierre = {c: _hasta(p[f"pts_{c}"], semana.viernes)[1] for c in labels if f"pts_{c}" in p}
-
-    tabla, datos = tabla_variables(p, semana)
-    puntos = resumen(indice, semana, pts_cierre, datos)
-
-    gauge = "".join(f"<span style='flex:{min(hi, 100) - lo};background:{TRAMO_COLOR[k]}'></span>"
-                    for lo, hi, k, _ in config.INDICE_TRAMOS)
-    gauge += f"<i style='left:{max(0, min(100, i1)):.1f}%'></i>"
-    leyenda = "".join(f"<span style='--c:{TRAMO_COLOR[k]}'>{html.escape(l)} ({lo}–{int(min(hi, 100))})</span>"
-                      for lo, hi, k, l in config.INDICE_TRAMOS)
-
-    minis = [
+def _minis_ar(p: pd.DataFrame, semana: Semana) -> list[str]:
+    return [
         chart_mini([("Oficial", p["tc_oficial_ref"], S1), ("MEP", p.get("usd_mep"), S2), ("CCL", p.get("usd_ccl"), S3)],
                    "Tipo de cambio", "$ por USD", semana),
         chart_mini([("Brecha MEP", p.get("brecha_mep"), S1), ("Canje", p.get("canje"), S2)],
@@ -428,7 +411,37 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
         chart_mini([("Oficial", p.get("vol_oficial"), S1), ("CCL", p.get("vol_ccl"), S2)],
                    "Volatilidad cambiaria", "% anualizada, 20 días", semana),
     ]
-    compras = payload.get("monthly", {}).get("compras_personas_humanas", [])
+
+
+
+def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict | None = None) -> str:
+    perfil = perfil or PERFIL_AR
+    blocks_cfg = perfil["blocks"]
+    indice = p["indice_0_100"]
+    f_cierre, i1 = _hasta(indice, semana.viernes)
+    if f_cierre is None:
+        raise SystemExit("No hay datos del índice para la semana pedida.")
+    _, i0 = _hasta(indice, semana.viernes - pd.Timedelta(days=7))
+    _, i4 = _hasta(indice, semana.viernes - pd.Timedelta(days=28))
+    tramo_key, tramo_label = indicators.status_for(i1)
+
+    labels = {c: spec["label"] for b in blocks_cfg.values() for c, spec in b["components"].items()}
+    meta = {c["key"]: c for c in payload["ipd"]["components"]}
+    labels_peso = {c: (f"{l} · {fmt(meta[c]['weight_ipd'] * 100, 0)}%" if meta.get(c, {}).get("weight_ipd") is not None else l)
+                   for c, l in labels.items()}
+    pts_cierre = {c: _hasta(p[f"pts_{c}"], semana.viernes)[1] for c in labels if f"pts_{c}" in p}
+
+    tabla, datos = tabla_variables(p, semana, perfil["variables"])
+    puntos = resumen(indice, semana, pts_cierre, datos, perfil)
+
+    gauge = "".join(f"<span style='flex:{min(hi, 100) - lo};background:{TRAMO_COLOR[k]}'></span>"
+                    for lo, hi, k, _ in config.INDICE_TRAMOS)
+    gauge += f"<i style='left:{max(0, min(100, i1)):.1f}%'></i>"
+    leyenda = "".join(f"<span style='--c:{TRAMO_COLOR[k]}'>{html.escape(l)} ({lo}–{int(min(hi, 100))})</span>"
+                      for lo, hi, k, l in config.INDICE_TRAMOS)
+
+    minis = perfil["minis"](p, semana)
+    compras = payload.get("monthly", {}).get("compras_personas_humanas", []) if perfil.get("fae") else []
     ph_svg = chart_compras_ph(compras)
     ph_ult = compras[-1] if compras else None
 
@@ -436,16 +449,16 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
         f"<tr><td>{html.escape(b['label'])}</td><td>{html.escape(spec['label'])}</td>"
         f"<td class='num'>{fmt((meta.get(c, {}).get('weight') or 0) * 100, 0)}%</td>"
         f"<td class='num'>{fmt((meta.get(c, {}).get('weight_ipd') or 0) * 100, 1)}%</td></tr>"
-        for b in config.IPD_BLOCKS.values() for c, spec in b["components"].items())
-    pca_txt = "; ".join(f"{config.IPD_BLOCKS[k]['label']}, {fmt(v['varianza_explicada'] * 100, 0)}%"
+        for b in blocks_cfg.values() for c, spec in b["components"].items())
+    pca_txt = "; ".join(f"{blocks_cfg[k]['label']}, {fmt(v['varianza_explicada'] * 100, 0)}%"
                         for k, v in payload.get("config", {}).get("pca", {}).items())
     generado = pd.Timestamp.now(tz="America/Argentina/Buenos_Aires")
 
     return f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><style>{CSS}</style></head><body>
 <header class="top">
-  <div><h1>Monitor de Dolarización</h1>
+  <div><h1>Monitor de Dolarización{perfil["titulo"]}</h1>
   <p class="sub">Reporte semanal · semana del {semana.etiqueta}</p></div>
-  <div class="meta">Datos al {fecha_larga(f_cierre)}<br><a href="{DASHBOARD_URL}">Tablero diario</a></div>
+  <div class="meta">Datos al {fecha_larga(f_cierre)}<br><a href="{DASHBOARD_URL}{perfil["query"]}">Tablero diario</a></div>
 </header>
 
 <section class="hero">
@@ -470,7 +483,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
 
 <section class="card">
   <h2>Índice en los últimos 18 meses</h2>
-  <p class="note">Dato diario (promedio de 20 días hábiles). La franja gris marca la semana informada. <a href="{DASHBOARD_URL}">Ver la versión interactiva, con el período a elección</a>.</p>
+  <p class="note">Dato diario (promedio de 20 días hábiles). La franja gris marca la semana informada. <a href="{DASHBOARD_URL}{perfil["query"]}">Ver la versión interactiva, con el período a elección</a>.</p>
   <div class="chart">{chart_indice_anual(indice, semana, payload.get("events", []))}</div>
   <div class="legend">{leyenda}</div>
 </section>
@@ -491,7 +504,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
 <section class="page">
   <div class="card">
     <h2>Variables de la semana</h2>
-    <p class="note">Cierre al viernes {fecha_larga(semana.viernes)} o último dato disponible. Las reservas y los depósitos se publican con dos o tres días de rezago.</p>
+    <p class="note">Cierre al viernes {fecha_larga(semana.viernes)} o último dato disponible. {perfil["nota_variables"]}</p>
     {tabla}
   </div>
   <div class="section">
@@ -507,20 +520,96 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict) -> str:
 
 <section class="page method">
   <h2>Metodología</h2>
-  <p>El Índice de Presión de Dolarización adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano, para que un episodio extremo no infle la escala). Los componentes se agrupan en tres subíndices de igual peso: <b>presión cambiaria</b> (tipo de cambio oficial, su volatilidad, reservas, tasa en pesos y brecha MEP / oficial), <b>dolarización de portafolios</b> (devaluación implícita y posición abierta en futuros de dólar, futuros vendidos por el BCRA, depósitos en dólares y compras de dólares de personas humanas) y <b>extranjerización de portafolios</b> (canje CCL / MEP, volatilidad del CCL y riesgo país). Dentro de cada subíndice, los pesos salen de componentes principales: cada componente pesa según cuánto se mueve junto con el resto (cargas del primer componente principal de los promedios mensuales desde 2003). Las cargas negativas valen cero y ningún componente pesa menos del 10% de su subíndice. Varianza explicada por el primer componente: {pca_txt}.</p>
+  {perfil["metodo"](pca_txt)}
   <table><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody>{comp_rows}</tbody></table>
-  <p>El promedio ponderado se promedia en 20 días hábiles (un mes, para que el índice no salte de una semana a otra) y se lleva a una escala de 0 a 100 con la normal acumulada. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Los aportes en puntos reparten la distancia del índice a 50 entre los componentes, así que suman exactamente esa distancia. Si falta un componente, su peso se reparte entre los demás de su subíndice. Las compras de dólares de personas humanas son mensuales, entran al índice un mes después del cierre de cada mes (cuando el BCRA las publica) y se miden contra su promedio de 12 meses, para no confundir la salida del cepo con presión.</p>
-  <p><b>Fuentes:</b> BCRA (reservas, tipo de cambio A3500, BADLAR, depósitos en dólares, anexo del balance cambiario y planilla de reservas y liquidez en moneda extranjera), ArgentinaDatos (dólar MEP, CCL y blue; riesgo país) y A3 Mercados (futuros de dólar). Todas las series se descargan automáticamente.</p>
+  <p>El promedio ponderado se promedia en 20 días hábiles (un mes, para que el índice no salte de una semana a otra) y se lleva a una escala de 0 a 100 con la normal acumulada. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Los aportes en puntos reparten la distancia del índice a 50 entre los componentes, así que suman exactamente esa distancia. Si falta un componente, su peso se reparte entre los demás de su subíndice.{perfil["metodo_extra"]}</p>
+  <p><b>Fuentes:</b> {perfil["fuentes"]}</p>
   <p class="muted">Generado el {generado.day}/{generado.month}/{generado.year} a las {generado:%H:%M} (hora argentina). Tablero diario y datos: <a href="{DASHBOARD_URL}">{DASHBOARD_URL}</a></p>
 </section>
 </body></html>"""
 
 
-def html_a_pdf(html_txt: str, destino: Path) -> None:
+# ---------------------------------------------------------------------------
+# Perfiles por país
+# ---------------------------------------------------------------------------
+
+def _metodo_ar(pca_txt: str) -> str:
+    return f"""<p>El Índice de Presión de Dolarización adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano, para que un episodio extremo no infle la escala). Los componentes se agrupan en tres subíndices de igual peso: <b>presión cambiaria</b> (tipo de cambio oficial, su volatilidad, reservas, tasa en pesos y brecha MEP / oficial), <b>dolarización de portafolios</b> (devaluación implícita y posición abierta en futuros de dólar, futuros vendidos por el BCRA, depósitos en dólares y compras de dólares de personas humanas) y <b>extranjerización de portafolios</b> (canje CCL / MEP, volatilidad del CCL y riesgo país). Dentro de cada subíndice, los pesos salen de componentes principales: cada componente pesa según cuánto se mueve junto con el resto (cargas del primer componente principal de los promedios mensuales desde 2003). Las cargas negativas valen cero y ningún componente pesa menos del 10% de su subíndice. Varianza explicada por el primer componente: {pca_txt}.</p>"""
+
+
+def _metodo_pe(pca_txt: str) -> str:
+    return f"""<p>El índice de Perú usa el mismo método que el de Argentina (una adaptación del <i>Exchange Market Pressure Index</i> de Girton y Roper, 1977, y Eichengreen, Rose y Wyplosz, 1996), con componentes propios: en Perú no hay brecha ni canje, así que la presión se ve en el tipo de cambio, en la intervención del Banco Central de Reserva (BCRP) y en la dolarización. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano). Dos subíndices de igual peso: <b>presión cambiaria</b> (depreciación del sol, su volatilidad, ventas de dólares del BCRP en la mesa y con swaps cambiarios en % de las reservas, caída de la posición de cambio y suba de la tasa interbancaria) y <b>dolarización y riesgo</b> (cambio en 3 meses de la dolarización de la liquidez, riesgo país EMBIG y tasa del bono soberano en soles a 10 años). Dentro de cada subíndice, los pesos salen de componentes principales, con cargas negativas en cero y un mínimo de 10% por componente. Varianza explicada por el primer componente: {pca_txt}.</p>"""
+
+
+def _partes_pe(datos: dict) -> list[str]:
+    partes = []
+    if "tc" in datos:
+        partes.append(f"el sol {_txt_var(datos['tc']['d'], 'pct', 2)}")
+    if "embig" in datos:
+        partes.append(f"el riesgo país {_txt_var(datos['embig']['d'], 'pb', 0)}")
+    if "posicion_cambio" in datos and np.isfinite(datos["posicion_cambio"]["d"]):
+        d = datos["posicion_cambio"]["d"]
+        partes.append(f"la posición de cambio del BCRP {'subió' if d >= 0 else 'cayó'} USD {fmt(abs(d), 0)} M")
+    return partes
+
+
+def _minis_pe(p: pd.DataFrame, semana: Semana) -> list[str]:
+    return [
+        chart_mini([("Interbancario", p.get("tc"), S1)], "Tipo de cambio", "S/ por USD", semana),
+        chart_mini([("Volatilidad", p.get("vol_tc"), S1)], "Volatilidad cambiaria", "% anualizada, 20 días", semana),
+        chart_mini([("Ventas netas", p.get("intervencion_usd"), S1)], "Intervención del BCRP", "millones de USD, 20 días", semana),
+        chart_mini([("Reservas netas", p.get("rin"), S1), ("Posición de cambio", p.get("posicion_cambio"), S2)],
+                   "Reservas", "millones de USD", semana),
+        chart_mini([("EMBIG", p.get("embig"), S1)], "Riesgo país", "pb", semana),
+        chart_mini([("Interbancaria", p.get("tasa_interbancaria"), S1)], "Tasa interbancaria", "% en soles", semana),
+        chart_mini([("Bono 10 años", p.get("bono_10a"), S1)], "Bono soberano", "% en soles", semana),
+        chart_mini([("Liquidez", p.get("dolarizacion_liquidez"), S1), ("Crédito", p.get("dolarizacion_credito"), S2)],
+                   "Dolarización", "% (dato mensual)", semana),
+    ]
+
+
+VARIABLES_PE = [
+    ("tc", "Tipo de cambio interbancario", "S/ por USD", 3, "pct"),
+    ("vol_tc", "Volatilidad del tipo de cambio (20 días)", "% anual", 1, "pp"),
+    ("intervencion_usd", "Ventas netas de dólares del BCRP (20 días)", "M USD", 0, "abs"),
+    ("rin", "Reservas internacionales netas", "M USD", 0, "abs"),
+    ("posicion_cambio", "Posición de cambio del BCRP", "M USD", 0, "abs"),
+    ("embig", "Riesgo país (EMBIG)", "pb", 0, "pb"),
+    ("tasa_interbancaria", "Tasa interbancaria en soles", "%", 2, "pp"),
+    ("bono_10a", "Bono soberano en soles a 10 años", "%", 2, "pp"),
+    ("dolarizacion_liquidez", "Dolarización de la liquidez", "%, último fin de mes publicado", 1, "pp"),
+]
+
+PERFIL_AR = {
+    "codigo": "ar", "titulo": "", "query": "", "blocks": config.IPD_BLOCKS, "variables": VARIABLES,
+    "minis": _minis_ar, "partes": _partes_ar, "fae": True, "metodo": _metodo_ar,
+    "metodo_extra": " Las compras de dólares de personas humanas son mensuales, entran al índice un mes después del cierre de cada mes (cuando el BCRA las publica) y se miden contra su promedio de 12 meses, para no confundir la salida del cepo con presión.",
+    "nota_variables": "Las reservas y los depósitos se publican con dos o tres días de rezago.",
+    "fuentes": """BCRA (reservas, tipo de cambio A3500, BADLAR, depósitos en dólares, anexo del balance cambiario y planilla de reservas y liquidez en moneda extranjera), ArgentinaDatos (dólar MEP, CCL y blue; riesgo país) y A3 Mercados (futuros de dólar). Todas las series se descargan automáticamente.""",
+    "panel": config.DATA_DIR / "panel_diario.csv", "json": config.OUTPUT_JSON, "salida": REPORTS_DIR,
+}
+
+
+def _perfil_pe() -> dict:
+    from . import peru
+    return {
+        "codigo": "pe", "titulo": " · Perú", "query": "?pais=pe", "blocks": peru.IPD_BLOCKS, "variables": VARIABLES_PE,
+        "minis": _minis_pe, "partes": _partes_pe, "fae": False, "metodo": _metodo_pe,
+        "metodo_extra": " La dolarización de la liquidez es mensual y entra al índice un mes después del cierre de cada mes.",
+        "nota_variables": "El EMBIG se publica con algunos días de rezago; la dolarización, una vez por mes.",
+        "fuentes": "BCRP, estadísticas (API pública): tipo de cambio, reservas, posición de cambio, operaciones cambiarias y swaps del BCRP, tasas, EMBIG y dolarización. Todas las series se descargan automáticamente.",
+        "panel": peru.DATA_DIR / "panel_diario.csv", "json": peru.OUTPUT_JSON, "salida": REPORTS_DIR / "pe",
+    }
+
+
+PERFILES = {"ar": lambda: PERFIL_AR, "pe": _perfil_pe}
+
+
+def html_a_pdf(html_txt: str, destino: Path, titulo: str = "Monitor de Dolarización") -> None:
     from playwright.sync_api import sync_playwright
 
     footer = ("<div style='font-family:Inter,DejaVu Sans,sans-serif;font-size:7px;color:#898781;width:100%;"
-              "padding:0 14mm;display:flex;justify-content:space-between'><span>Monitor de Dolarización · "
+              "padding:0 14mm;display:flex;justify-content:space-between'><span>" + titulo + " · "
               "Reporte semanal</span><span><span class='pageNumber'></span> / "
               "<span class='totalPages'></span></span></div>")
     with sync_playwright() as pw:
@@ -540,16 +629,18 @@ def html_a_pdf(html_txt: str, destino: Path) -> None:
         browser.close()
 
 
-def generar(ref: date) -> Path:
+def generar(ref: date, pais: str = "ar") -> Path:
+    perfil = PERFILES[pais]()
     semana = semana_anterior(ref)
-    p = pd.read_csv(PANEL_CSV, index_col=0, parse_dates=True)
-    payload = json.loads(config.OUTPUT_JSON.read_text(encoding="utf-8"))
-    html_txt = construir_html(semana, p, payload)
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-    destino = REPORTS_DIR / f"reporte-semanal-{semana.viernes:%Y-%m-%d}.pdf"
-    (REPORTS_DIR / "ultimo.html").write_text(html_txt, encoding="utf-8")
-    html_a_pdf(html_txt, destino)
-    shutil.copyfile(destino, REPORTS_DIR / "ultimo.pdf")
+    p = pd.read_csv(perfil["panel"], index_col=0, parse_dates=True)
+    payload = json.loads(perfil["json"].read_text(encoding="utf-8"))
+    html_txt = construir_html(semana, p, payload, perfil)
+    salida = perfil["salida"]
+    salida.mkdir(parents=True, exist_ok=True)
+    destino = salida / f"reporte-semanal-{semana.viernes:%Y-%m-%d}.pdf"
+    (salida / "ultimo.html").write_text(html_txt, encoding="utf-8")
+    html_a_pdf(html_txt, destino, "Monitor de Dolarización" + perfil["titulo"])
+    shutil.copyfile(destino, salida / "ultimo.pdf")
     log.info("Reporte de la semana del %s: %s", semana.etiqueta, destino)
     return destino
 
@@ -557,10 +648,11 @@ def generar(ref: date) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fecha", help="fecha de referencia AAAA-MM-DD (se informa la semana anterior)")
+    parser.add_argument("--pais", default="ar", choices=sorted(PERFILES), help="país (ar por defecto)")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     ref = date.fromisoformat(args.fecha) if args.fecha else date.today()
-    generar(ref)
+    generar(ref, args.pais)
 
 
 if __name__ == "__main__":
