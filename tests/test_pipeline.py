@@ -383,3 +383,21 @@ def test_uruguay_lectores():
     d = uruguay.parse_depositos(dep)
     assert d.index[0] == pd.Timestamp("2026-08-31")
     assert d["dolarizacion_depositos"].iloc[0] == pytest.approx(70.0)
+
+
+def test_lectores_brasil_chile_colombia():
+    from monitor import brasil, chile, colombia
+    s = brasil.parse_sgs([{"data": "03/08/2026", "valor": "5.0723"}, {"data": "04/08/2026", "valor": "5.10"}], "tc")
+    assert s.index[0] == pd.Timestamp("2026-08-03") and s.iloc[1] == pytest.approx(5.10)
+    csv = ("﻿Comunicação,Data Hora Comunicação,Comunicado,Data Hora Comunicado,Data Hora Anúncio,Procedimento Operacional,Data,Instrumento,Modalidade,Tipo Composto,Data de Liquidação,Data de Vencimento,Volume USD Ofertado,Volume USD Aceito,Taxa de Corte\n"
+           ',,,,,Operação Direta,1999-01-22 00:00:00,Venda a Vista,Mercado,,1999-01-26 00:00:00,,,"675510000,00",\n'
+           ',,,,,Operação Direta,1999-01-22 00:00:00,Compra a Vista,Mercado,,1999-01-26 00:00:00,,,"75510000,00",\n'
+           ',,45808,,,Leilão Eletrônico,2026-08-25 00:00:00,Swap Cambial,Tradicional,,2026-09-01 00:00:00,2026-12-01 00:00:00,"2500000000,00","2000000000,00","5,029000"\n')
+    v = brasil.parse_atuacoes(csv)
+    assert v[pd.Timestamp("1999-01-22")] == pytest.approx(600.0)
+    assert v[pd.Timestamp("2026-08-25")] == 0.0  # los swaps van por el stock, no por acá
+    m = chile.parse_mindicador({"serie": [{"fecha": "2026-10-13T03:00:00.000Z", "valor": 978.61},
+                                           {"fecha": "2026-10-10T03:00:00.000Z", "valor": 975.0}]}, "tc")
+    assert list(m.index) == [pd.Timestamp("2026-10-10"), pd.Timestamp("2026-10-13")]
+    t = colombia.parse_trm([{"valor": "3194.44", "vigenciadesde": "2026-10-10T00:00:00.000", "vigenciahasta": "2026-10-13T00:00:00.000"}])
+    assert t.index[0] == pd.Timestamp("2026-10-10") and t.iloc[0] == pytest.approx(3194.44)

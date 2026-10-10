@@ -51,6 +51,18 @@ jobs:
           BCU_SSL_VERIFY: "0"
         run: python -m monitor.uruguay
 
+      - name: Brasil
+        continue-on-error: true
+        run: python -m monitor.brasil
+
+      - name: Chile
+        continue-on-error: true
+        run: python -m monitor.chile
+
+      - name: Colombia
+        continue-on-error: true
+        run: python -m monitor.colombia
+
       - name: Núcleo comparable entre países
         continue-on-error: true
         run: python -m monitor.comparado
