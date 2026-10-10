@@ -1,25 +1,33 @@
 import io, re, requests, pdfplumber
 S = requests.Session(); S.headers["User-Agent"] = "Mozilla/5.0 (monitor-dolarizacion probe)"
 B = "https://www.bcra.gob.ar/archivos/Pdfs/PublicacionesEstadisticas/"
-def get(u):
-    try:
-        r = S.get(u, timeout=60); print(f"=== {r.status_code} {u} ({len(r.content)} b, {r.headers.get('content-type')})"); return r
-    except Exception as e: print("ERR", u, e)
-r = get(B + "temp0826.pdf")
-if r is not None and r.ok and r.content[:4] == b"%PDF":
-    with pdfplumber.open(io.BytesIO(r.content)) as pdf:
-        print("paginas", len(pdf.pages))
-        for i, p in enumerate(pdf.pages):
-            t = p.extract_text() or ""
-            print(f"\n----- PAGINA {i+1} -----\n{t[:6000]}")
-# historico
+NUM = r"(-?[\d\.]+,\d+)"
+def parse(txt):
+    t = re.sub(r"[ \t]+", " ", txt)
+    fecha = re.search(r"final del per[ií]odo\)?\s*(\d{2}/\d{2}/\d{2,4})", t)
+    i = t.find("liquidados por otros medios")
+    if i < 0: return fecha and fecha.group(1), None, None, t[:0]
+    seg = t[i:i+900]
+    c = re.search(r"Posiciones cortas\s*\(?\s*[-–]?\s*\)?\s*" + NUM, seg)
+    l = re.search(r"Posiciones largas\s*\(?\s*\+?\s*\)?\s*" + NUM, seg)
+    return fecha and fecha.group(1), c and c.group(1), l and l.group(1), seg
+for y in [10, 11, 12, 13]:
+    h = S.get(B + f"temp01{y}.pdf", timeout=30); print("OLD", y, h.status_code, h.content[:4])
+first = set()
 for y in range(14, 27):
-    for m in (1, 6, 12):
-        u = B + f"temp{m:02d}{y:02d}.pdf"
+    for m in range(1, 13):
+        if y == 26 and m > 9: break
+        code = f"{m:02d}{y:02d}"
         try:
-            h = S.get(u, timeout=30)
-            print("HIST", f"{m:02d}{y:02d}", h.status_code, len(h.content), h.content[:4])
+            r = S.get(B + f"temp{code}.pdf", timeout=40)
         except Exception as e:
-            print("HIST", f"{m:02d}{y:02d}", "ERR", e)
-for name in ("temp.pdf", "temp0726.pdf", "temp0925.pdf", "temp1025.pdf", "temp1224.pdf"):
-    h = get(B + name)
+            print(code, "ERR", e); continue
+        if r.content[:4] != b"%PDF":
+            print(code, "NOPDF", r.status_code); continue
+        with pdfplumber.open(io.BytesIO(r.content)) as pdf:
+            txt = "\n".join((p.extract_text() or "") for p in pdf.pages)
+        f, c, l, seg = parse(txt)
+        print(code, "fecha", f, "cortas", c, "largas", l)
+        if y not in first or c is None:
+            first.add(y)
+            print("   CTX:", repr(seg[:700]))
