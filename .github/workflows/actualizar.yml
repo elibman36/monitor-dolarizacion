@@ -44,6 +44,10 @@ jobs:
         continue-on-error: true
         run: python -m monitor.peru
 
+      - name: Núcleo comparable entre países
+        continue-on-error: true
+        run: python -m monitor.comparado
+
       - name: Publicar datos
         run: |
           git config user.name "monitor-dolarizacion[bot]"

@@ -345,3 +345,17 @@ def test_peru_intervencion_y_ipd():
     assert out["indice"].dropna().between(0, 100).all()
     assert out["indice"][:"2002-12-31"].isna().all()
     assert set(out["pesos"]) == {"cambiaria", "dolarizacion"}
+
+
+def test_comparado_unidades_comunes():
+    from monitor import comparado
+    idx = pd.date_range("2003-01-31", periods=120, freq="ME")
+    rng = np.random.default_rng(3)
+    a = pd.DataFrame({"depreciacion": rng.normal(2, 3, 120), "intervencion": rng.normal(0, 2, 120)}, index=idx)
+    b = pd.DataFrame({"depreciacion": rng.normal(0, 1, 120), "intervencion": rng.normal(0, 1, 120)}, index=idx)
+    res, rho = comparado.calcular({"ar": a, "pe": b})
+    assert rho > 0
+    # La presión es depreciación + ρ × intervención, con el mismo ρ para todos.
+    for v, src in [(res["ar"], a), (res["pe"], b)]:
+        assert np.allclose(v["presion"], src["depreciacion"] + rho * src["intervencion"])
+    assert res["ar"]["presion_3m"].iloc[:2].isna().all()

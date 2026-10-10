@@ -31,7 +31,7 @@ def _cache_path(key: str):
 def load_cached(key: str) -> pd.Series:
     path = _cache_path(key)
     if not path.exists():
-        return pd.Series(dtype=float, name=key)
+        return pd.Series(dtype=float, name=key, index=pd.DatetimeIndex([], name="fecha"))
     df = pd.read_csv(path, parse_dates=["fecha"])
     s = df.set_index("fecha")["valor"].rename(key)
     return s

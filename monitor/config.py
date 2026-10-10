@@ -49,6 +49,14 @@ BCRA_VARIABLES = {
         "unit": "% n.a.",
         "optional": True,
     },
+    # Sólo para el núcleo comparable entre países (intervención del BCRA).
+    "compras_bcra": {
+        "id": 78,
+        "regex": r"variaci[oó]n de reservas internacionales por compra de divisas",
+        "label": "Compras netas de divisas del BCRA",
+        "unit": "millones de USD",
+        "optional": True,
+    },
     "depositos_usd": {
         "id": 108,
         "regex": r"dep[oó]sitos.*(?:d[oó]lares|moneda extranjera)",
