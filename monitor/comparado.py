@@ -170,6 +170,10 @@ def run() -> dict:
                        "data": [fila(f, r) for f, r in v.dropna(subset=["presion"]).iterrows()]}
                    for k, v in res.items()},
     }
+    payload["indices"] = indices_0_100()
+    ar = INDICES["ar"][1]
+    if ar.exists():
+        payload["tramos"] = json.loads(ar.read_text(encoding="utf-8")).get("config", {}).get("tramos", [])
     OUTPUT_JSON.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     for k, v in res.items():
         u = v.dropna(subset=["presion"]).iloc[-1:] if not v.empty else v
@@ -177,6 +181,26 @@ def run() -> dict:
             log.info("%s %s: presión %.2f%% (3m %.2f%%), ρ = %.3f", k, u.index[0].strftime("%Y-%m"),
                      u["presion"].iloc[0], u["presion_3m"].iloc[0], rho)
     return payload
+
+
+INDICES = {"ar": ("Argentina", config.DATA_DIR / "monitor.json"), "pe": ("Perú", config.DATA_DIR / "pe" / "monitor.json"),
+           "uy": ("Uruguay", config.DATA_DIR / "uy" / "monitor.json"), "br": ("Brasil", config.DATA_DIR / "br" / "monitor.json"),
+           "cl": ("Chile", config.DATA_DIR / "cl" / "monitor.json"), "co": ("Colombia", config.DATA_DIR / "co" / "monitor.json")}
+
+
+def indices_0_100() -> dict:
+    """El índice 0–100 de cada país, tal como lo publica su tablero, para verlos
+    juntos. Cada uno mide presión respecto de la historia de su país."""
+    out = {}
+    for k, (nombre, path) in INDICES.items():
+        if not path.exists():
+            continue
+        d = json.loads(path.read_text(encoding="utf-8"))
+        h = d.get("headline", {})
+        out[k] = {"nombre": nombre,
+                  "headline": {c: h.get(c) for c in ["date", "indice", "indice_7d", "indice_30d", "status", "status_label"]},
+                  "data": [[f, round(v, 1)] for f, v in d.get("ipd", {}).get("indice", []) if v is not None]}
+    return out
 
 
 def main() -> None:

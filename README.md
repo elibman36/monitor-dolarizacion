@@ -211,7 +211,13 @@ están en la API del Banco Central (BDE), que exige registro: con las
 credenciales como secretos se pueden sumar, y Chile entraría al núcleo
 comparable.
 
-**Núcleo comparable** (`monitor/comparado.py`). Presión mensual en % de
+La vista **Comparar países** muestra juntos los índices 0–100 de los seis países
+y una tabla con el último dato de cada uno. Como cada índice se mide contra la
+historia de su país, el gráfico dice cuándo cada país está más presionado que lo
+habitual, no cuál tiene más presión. Debajo, plegada, está la medida
+complementaria que sí es comparable en nivel.
+
+**Núcleo comparable** (`monitor/comparado.py`, medida complementaria). Presión mensual en % de
 depreciación equivalente (Girton y Roper, 1977; Weymark, 1995; Patnaik, Felman
 y Shah, 2017): *depreciación + ρ × intervención vendedora neta del banco
 central (% de las reservas del mes anterior)*, con un ρ común a todos los países

@@ -18,7 +18,7 @@
   --axis: #c3c2b7;
   --border: rgba(11,11,11,0.10);
   --wash: rgba(11,11,11,0.05);
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300;
   --div-neg: #2a78d6; --div-pos: #e34948; --div-mid: #f0efec;
   --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b;
   /* Escala divergente del índice 0-100: azul = apreciación, rojo = depreciación */
@@ -32,7 +32,7 @@
     --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
     --muted: #898781; --grid: #2c2c2a; --axis: #383835;
     --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
     --div-neg: #3987e5; --div-pos: #e66767; --div-mid: #383835;
     --up-bad: #f97066; --down-good: #0ca30c;
     --dv-aprec_fuerte: #86b6ef; --dv-aprec: #2a78d6; --dv-neutral: #6b6a64; --dv-deprec: #b03a39; --dv-deprec_fuerte: #f08584;
@@ -43,7 +43,7 @@
   --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7;
   --muted: #898781; --grid: #2c2c2a; --axis: #383835;
   --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
   --div-neg: #3987e5; --div-pos: #e66767; --div-mid: #383835;
   --up-bad: #f97066; --down-good: #0ca30c;
   --dv-aprec_fuerte: #86b6ef; --dv-aprec: #2a78d6; --dv-neutral: #6b6a64; --dv-deprec: #b03a39; --dv-deprec_fuerte: #f08584;
@@ -136,6 +136,17 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <div id="vista-comparado" hidden>
     <section class="card" style="margin-bottom:16px">
+      <h2>Índice de Presión de Dolarización por país</h2>
+      <p class="note">El índice 0–100 de cada país, con el mismo método. Cada uno mide la presión respecto de la historia de su país: muestra cuándo cada país está más presionado que lo habitual, no cuál tiene más presión. <span id="comp-idx-frec"></span></p>
+      <div class="chart tall" id="c-idx-comp" role="img" aria-label="Índice de presión 0 a 100 por país"></div>
+    </section>
+    <section class="card table-wrap" style="margin-bottom:16px">
+      <h2>Último dato</h2>
+      <table id="comp-hoy"><thead><tr><th>País</th><th class="num">Índice</th><th>Tramo</th><th class="num">Cambio en 7 días</th><th class="num">Cambio en 30 días</th><th class="num">Fecha</th></tr></thead><tbody></tbody></table>
+    </section>
+    <details class="card" id="comp-core" style="margin-bottom:16px">
+    <summary><b>Medida complementaria: presión en % de depreciación equivalente</b> <span class="note">(sí comparable en nivel entre países, con menos componentes)</span></summary>
+    <section style="margin:16px 0">
       <h2>Presión cambiaria comparable entre países</h2>
       <p class="note">Depreciación más intervención vendedora del banco central convertida a puntos de depreciación, en % por mes (promedio móvil de 3 meses). A diferencia del índice 0–100 de cada país, este nivel sí se compara: un 5% en un país es la misma presión que un 5% en otro.</p>
       <div class="chart tall" id="c-comp" role="img" aria-label="Presión cambiaria comparable por país"></div>
@@ -150,6 +161,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <p><b>Cómo se calcula.</b> Siguiendo a Girton y Roper (1977), Weymark (1995) y Patnaik, Felman y Shah (2017), la presión sobre una moneda se ve en lo que se deprecia y en lo que el banco central vende para evitarlo: <i>presión = depreciación + ρ × intervención</i>. La intervención es la venta neta de dólares del banco central en el mes, en % de sus reservas del mes anterior: en Argentina, las compras y ventas de divisas del BCRA más el cambio en su posición vendida de futuros; en Perú, las operaciones de la mesa de negociación y los swaps cambiarios del BCRP; en Uruguay, a falta de una serie pública de operaciones del BCU, la caída de su posición en moneda extranjera (una aproximación que incluye efectos de valuación); en Brasil, las ventas netas spot del BCB más la variación de su stock de swaps cambiales y de líneas con recompra; en Colombia, las operaciones del Banco de la República en el mercado cambiario (compras directas, opciones, NDF y swaps). Chile se suma cuando se habilite el acceso a la API del Banco Central. ρ convierte la intervención en puntos de depreciación y es el mismo para todos los países, para que las unidades sean comparables: se fija con la dispersión del panel (desvío absoluto mediano de la depreciación sobre el de la intervención, en los meses con intervención), de modo que una intervención típica equivale a una depreciación típica. <span id="comp-rho"></span></p>
       <p class="note">Límites: en Argentina, con cepo, buena parte de la presión se va a la brecha y no al oficial, así que esta medida la subestima en esos años (el índice 0–100 sí la captura). Sólo cuenta la intervención del banco central: las ventas de dólares del Tesoro argentino (por ejemplo, en septiembre y octubre de 2025) no entran. Las tasas de interés no se incluyen. En Uruguay la intervención es una aproximación.</p>
     </section>
+    </details>
   </div>
 
   <div id="vista-pais">
@@ -365,7 +377,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       { title: "Riesgo país (EMBIG)", keys: ["embig"], unit: "pb" },
     ],
   };
-  const COLOR_PAIS = { ar: "--s1", pe: "--s2", uy: "--s3", br: "--s4", co: "--s5" };
+  const COLOR_PAIS = { ar: "--s1", pe: "--s2", uy: "--s3", br: "--s4", co: "--s5", cl: "--s6" };
   let PAIS = new URLSearchParams(location.search).get("pais") || "ar";
   if (!PAISES[PAIS] && PAIS !== "comparado") PAIS = "ar";
   let TILES = ["tc_oficial_ref", "usd_mep", "usd_ccl", "brecha_mep", "canje", "riesgo_pais", "reservas", "tasa", "deval_implicita", "futuros_interes_abierto", "posicion_bcra", "depositos_usd"];
@@ -408,9 +420,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const next = dark ? "light" : "dark";
     document.documentElement.dataset.theme = next;
     try { localStorage.setItem("md-theme", next); } catch (e) {}
-    renderAll(); renderComparado();
+    redibujar();
   });
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderAll(); renderComparado(); });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => redibujar());
+  function redibujar() { if (PAIS === "comparado") renderComparado(); else if (DATA) renderAll(); }
 
   // ---- rango ------------------------------------------------------------
   document.querySelectorAll("#range button").forEach((b) => b.addEventListener("click", () => {
@@ -838,7 +851,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     document.getElementById("vista-comparado").hidden = !comp;
     document.getElementById("vista-pais").hidden = comp;
     const cfg = PAISES[comp ? "ar" : PAIS];
-    document.getElementById("sub").textContent = comp ? "Presión cambiaria comparable entre países, en % de depreciación equivalente." : cfg.sub;
+    document.getElementById("sub").textContent = comp ? "El índice de presión de cada país, en un mismo gráfico." : cfg.sub;
     document.getElementById("lnk-csv").href = GH + (comp ? "data/comparado.json" : cfg.csv);
     document.getElementById("lnk-pdf").href = GH + cfg.pdf;
     document.getElementById("lnk-pdf").style.display = comp ? "none" : "";
@@ -848,8 +861,62 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
 
   let COMP = null;
+  // Promedio por semana (lunes) o por mes, para que las líneas se lean en rangos largos.
+  function agrupar(pairs, frec) {
+    if (frec === "d") return pairs;
+    const g = new Map();
+    pairs.forEach(([f, v]) => {
+      let key = f.slice(0, 7) + "-01";
+      if (frec === "w") { const d = new Date(f + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); key = d.toISOString().slice(0, 10); }
+      const a = g.get(key) || [0, 0]; a[0] += v; a[1] += 1; g.set(key, a);
+    });
+    return [...g].map(([f, [s, n]]) => [f, s / n]);
+  }
+
+  function renderIndicesComp() {
+    const ind = COMP.indices || {};
+    const orden = ["ar", "pe", "uy", "br", "cl", "co"].filter((k) => ind[k]);
+    const frec = !rangeDays || rangeDays > 1825 ? "m" : rangeDays > 365 ? "w" : "d";
+    document.getElementById("comp-idx-frec").textContent =
+      { d: "Dato diario.", w: "Promedio semanal.", m: "Promedio mensual." }[frec];
+    const c = mount("c-idx-comp");
+    const o = base();
+    o.yAxis.scale = false; o.yAxis.min = 0; o.yAxis.max = 100; o.yAxis.interval = 25;
+    o.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 0);
+    o.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } };
+    o.grid.top = 32;
+    const tramos = (COMP.tramos || [{ key: "aprec_fuerte", from: 0, to: 10 }, { key: "aprec", from: 10, to: 35 }, { key: "deprec", from: 65, to: 90 }, { key: "deprec_fuerte", from: 90, to: 100 }]);
+    o.series = orden.map((k, i) => lineSeries(ind[k].nombre, agrupar(cut(ind[k].data), frec), css(COLOR_PAIS[k]),
+      i ? { lineStyle: { width: frec === "d" ? 1.5 : 2, color: css(COLOR_PAIS[k]) }, emphasis: { focus: "series" } } : {
+        lineStyle: { width: frec === "d" ? 1.5 : 2, color: css(COLOR_PAIS[k]) }, emphasis: { focus: "series" },
+        markLine: { symbol: "none", silent: true, lineStyle: { color: css("--axis"), type: "solid", width: 1 }, label: { show: false }, data: [{ yAxis: 50 }] },
+        markArea: { silent: true, data: tramos.filter((tr) => tr.key !== "neutral").map((tr) => [
+          { yAxis: tr.from, itemStyle: { color: css(`--dv-${tr.key}`), opacity: 0.07 } }, { yAxis: Math.min(tr.to, 100) }]) },
+      }));
+    c.setOption(o, true);
+    const d = (a, b) => (a == null || b == null) ? "–" : ((a - b > 0 ? "+" : "") + nf(a - b, 0) + " pts");
+    document.querySelector("#comp-hoy tbody").innerHTML = orden.map((k) => {
+      const h = ind[k].headline || {};
+      const st = STATUS[h.status] || STATUS.unknown;
+      return `<tr><td><span class="sw" style="display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px;background:var(${COLOR_PAIS[k]})"></span><a href="?pais=${k}" data-ir="${k}" style="color:inherit">${ind[k].nombre}</a></td>`
+        + `<td class="num"><b>${h.indice == null ? "–" : nf(h.indice, 0)}</b></td>`
+        + `<td><span style="color:${st.color}" aria-hidden="true">${st.icon}</span> ${h.status_label || "–"}</td>`
+        + `<td class="num">${d(h.indice, h.indice_7d)}</td><td class="num">${d(h.indice, h.indice_30d)}</td><td class="num">${h.date || "–"}</td></tr>`;
+    }).join("");
+    document.querySelectorAll("#comp-hoy [data-ir]").forEach((a) => a.addEventListener("click", (e) => {
+      e.preventDefault(); document.querySelector(`#pais button[data-p="${a.dataset.ir}"]`).click();
+    }));
+  }
+
   function renderComparado() {
     if (!COMP) return;
+    renderIndicesComp();
+    document.getElementById("foot").textContent = `Actualizado: ${new Date(COMP.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, BCRP, BCU, BCB, Banco Central de Chile, Banco de la República.`;
+    // La medida complementaria se dibuja sólo cuando está abierta (un gráfico oculto no tiene tamaño).
+    if (document.getElementById("comp-core").open) renderNucleo();
+  }
+
+  function renderNucleo() {
     const entries = Object.entries(COMP.paises);
     // Datos mensuales: el período elegido se traduce a meses (3M = últimos 3 meses).
     const nMeses = rangeDays ? Math.max(3, Math.round(rangeDays / 30.44)) : 0;
@@ -900,8 +967,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const idx = Object.fromEntries(entries.map(([k, v]) => [k, new Map(v.data.map((r) => [r[0], r]))]));
     document.querySelector("#comp-tbl tbody").innerHTML = ult.map((m) => `<tr><td>${m}</td>${entries.map(([k]) => { const r = idx[k].get(m); return r ? `<td class="num" title="Depreciación ${nf(r[3], 1)}% · intervención ${nf(r[4], 1)}%">${nf(r[1], 1)}%</td>` : "<td></td>"; }).join("")}</tr>`).join("");
     document.getElementById("comp-rho").textContent = COMP.rho != null ? `Con los datos actuales, vender el 1% de las reservas en un mes equivale a ${nf(COMP.rho, 2)} puntos de depreciación.` : "";
-    document.getElementById("foot").textContent = `Actualizado: ${new Date(COMP.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, BCRP, BCU, BCB, Banco de la República.`;
   }
+  document.getElementById("comp-core").addEventListener("toggle", (e) => { if (e.target.open && COMP) renderNucleo(); });
 
   // Configuración por defecto (Argentina), para volver a ella al cambiar de país.
   const AR_CFG = { tiles: TILES, up: UP_IS_PRESSURE, multiples: MULTIPLES, mensuales: [...MENSUALES], absolutos: [] };

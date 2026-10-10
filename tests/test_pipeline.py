@@ -416,3 +416,16 @@ def test_tipo_de_cambio_a_fecha_de_operacion():
     out = comun.a_fecha_de_operacion(s)
     assert list(out.index.strftime("%Y-%m-%d")) == ["2026-10-08", "2026-10-09"]
     assert out.iloc[-1] == 978.61
+
+
+def test_comparado_incluye_indices_0_100(tmp_path, monkeypatch):
+    import json
+    from monitor import comparado
+    f = tmp_path / "monitor.json"
+    f.write_text(json.dumps({"headline": {"date": "2026-10-09", "indice": 49.8, "status": "neutral"},
+                             "ipd": {"indice": [["2026-10-08", 51.23], ["2026-10-09", None], ["2026-10-10", 49.8]]}}))
+    monkeypatch.setattr(comparado, "INDICES", {"ar": ("Argentina", f), "pe": ("Perú", tmp_path / "no.json")})
+    out = comparado.indices_0_100()
+    assert list(out) == ["ar"]
+    assert out["ar"]["data"] == [["2026-10-08", 51.2], ["2026-10-10", 49.8]]
+    assert out["ar"]["headline"]["indice"] == 49.8
