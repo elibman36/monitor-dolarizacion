@@ -851,12 +851,17 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   function renderComparado() {
     if (!COMP) return;
     const entries = Object.entries(COMP.paises);
-    const cut3 = (rows) => {
-      if (!rangeDays || !rows.length) return rows;
-      const last = new Date(rows[rows.length - 1][0] + "-01");
-      const from = new Date(last - Math.max(rangeDays, 730) * 864e5).toISOString().slice(0, 7);
-      return rows.filter((r) => r[0] >= from);
-    };
+    // Datos mensuales: el período elegido se traduce a meses (3M = últimos 3 meses).
+    const nMeses = rangeDays ? Math.max(3, Math.round(rangeDays / 30.44)) : 0;
+    const ultimoMes = entries.map(([, v]) => v.data.length ? v.data[v.data.length - 1][0] : "").sort().pop() || "";
+    const desde = (() => {
+      if (!nMeses || !ultimoMes) return "";
+      const [y, m] = ultimoMes.split("-").map(Number);
+      const d = new Date(Date.UTC(y, m - nMeses, 1));
+      return d.toISOString().slice(0, 7);
+    })();
+    const cut3 = (rows) => desde ? rows.filter((r) => r[0] >= desde) : rows;
+    const periodo = !nMeses ? "Toda la historia" : nMeses % 12 === 0 ? `Últimos ${nMeses / 12 === 1 ? "12 meses" : nMeses / 12 + " años"}` : `Últimos ${nMeses} meses`;
     const c = mount("c-comp");
     const o = base();
     o.xAxis.type = "category";
@@ -867,14 +872,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     o.grid.top = 32;
     o.series = entries.map(([k, v]) => {
       const m = new Map(v.data.map((r) => [r[0], r[2]]));
-      return lineSeries(v.nombre, meses.map((x) => m.get(x) ?? null), css(COLOR_PAIS[k]), { connectNulls: false, markLine: k === entries[0][0] ? { symbol: "none", silent: true, lineStyle: { color: css("--axis"), type: "solid", width: 1 }, label: { show: false }, data: [{ yAxis: 0 }] } : undefined });
+      return lineSeries(v.nombre, meses.map((x) => m.get(x) ?? null), css(COLOR_PAIS[k]), { showSymbol: meses.length <= 12, connectNulls: false, markLine: k === entries[0][0] ? { symbol: "none", silent: true, lineStyle: { color: css("--axis"), type: "solid", width: 1 }, label: { show: false }, data: [{ yAxis: 0 }] } : undefined });
     });
     c.setOption(o, true);
     // Descomposición por país: depreciación e intervención (equivalente), últimos 24 meses.
     const box = document.getElementById("comp-desc");
-    box.innerHTML = entries.map(([k, v]) => `<div class="card"><h2>${v.nombre}: de dónde viene la presión</h2><p class="note">Por mes, en puntos de depreciación. Últimos 24 meses.</p><div class="chart" id="cd-${k}"></div></div>`).join("");
+    box.innerHTML = entries.map(([k, v]) => `<div class="card"><h2>${v.nombre}: de dónde viene la presión</h2><p class="note">Por mes, en puntos de depreciación. ${periodo}.</p><div class="chart" id="cd-${k}"></div></div>`).join("");
     entries.forEach(([k, v]) => {
-      const rows = v.data.slice(-24);
+      // Cada país con sus últimos meses publicados (no todos tienen el mismo rezago).
+      const rows = nMeses ? v.data.slice(-nMeses) : v.data;
       const ch = mount(`cd-${k}`);
       const ob = base();
       ob.xAxis.type = "category"; ob.xAxis.data = rows.map((r) => r[0]);
@@ -882,7 +888,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       ob.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 8, textStyle: { color: css("--ink-2"), fontSize: 12 } };
       ob.grid.top = 32;
       ob.series = [
-        { name: "Depreciación", type: "bar", stack: "p", data: rows.map((r) => r[3]), itemStyle: { color: css("--ink-2"), borderColor: css("--surface"), borderWidth: 1 }, barMaxWidth: 14 },
+        { name: "Depreciación", type: "bar", stack: "p", data: rows.map((r) => r[3]), itemStyle: { color: css("--ink-2"), borderColor: css("--surface"), borderWidth: 1 }, barMaxWidth: 14, large: rows.length > 300 },
         { name: "Intervención (equivalente)", type: "bar", stack: "p", data: rows.map((r) => r[4]), itemStyle: { color: css("--axis"), borderColor: css("--surface"), borderWidth: 1 }, barMaxWidth: 14 },
         { name: "Presión total", type: "line", data: rows.map((r) => r[1]), showSymbol: true, symbol: "circle", symbolSize: 8, lineStyle: { width: 0 }, itemStyle: { color: css(COLOR_PAIS[k]), borderColor: css("--surface"), borderWidth: 2 }, z: 4 },
       ];
