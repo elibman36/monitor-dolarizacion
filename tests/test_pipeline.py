@@ -407,3 +407,12 @@ def test_colombia_suameca():
     from monitor import colombia
     s = colombia.parse_suameca([{"id": 59, "data": [[1760331600000, 12.25], [1760418000000, 12.0]]}], "tpm")
     assert s.index[0] == pd.Timestamp("2025-10-13") and s.iloc[-1] == 12.0
+
+
+def test_tipo_de_cambio_a_fecha_de_operacion():
+    from monitor import comun
+    # Publicado viernes 9 (operaciones del jueves) y martes 13 tras feriado (operaciones del viernes).
+    s = pd.Series([979.85, 981.61, 978.61], index=pd.to_datetime(["2026-10-08", "2026-10-09", "2026-10-13"]))
+    out = comun.a_fecha_de_operacion(s)
+    assert list(out.index.strftime("%Y-%m-%d")) == ["2026-10-08", "2026-10-09"]
+    assert out.iloc[-1] == 978.61

@@ -71,6 +71,14 @@ def actualizar(series_dir: Path, key: str, fetch: Callable[[pd.Timestamp, pd.Tim
         return cached, f"error: {exc}"
 
 
+def a_fecha_de_operacion(s: pd.Series) -> pd.Series:
+    """Para tipos de cambio fechados el día en que rigen (dólar observado de
+    Chile, TRM de Colombia), que se calculan con las operaciones del día hábil
+    anterior: cada valor pasa a la fecha de publicación previa de la misma
+    serie, que es ese día hábil en el calendario del país."""
+    return s.shift(-1).dropna()
+
+
 def panel_diario(raw: dict[str, pd.Series], diarias: list[str], mensuales: dict[str, int] | None = None) -> pd.DataFrame:
     """Panel en días hábiles; las mensuales entran `rezago` días después del fin de mes."""
     from .peru import mensual_a_diario

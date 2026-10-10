@@ -174,7 +174,10 @@ def fetch_all(offline: bool) -> tuple[dict, dict]:
 
 
 def derived_series(raw: dict) -> pd.DataFrame:
+    raw = {**raw, "tc": comun.a_fecha_de_operacion(raw["tc"])}
     df = comun.panel_diario(raw, ["tc", "embig", "tpm"], {"reservas": RESERVAS_REZAGO_DIAS})
+    # Las tasas vigentes vienen fechadas hacia adelante: el panel termina en el último tipo de cambio.
+    df = df.loc[:raw["tc"].index.max()]
     df["vol_tc"] = comun.vol(df["tc"])
     compras = raw.get("compras_netas")
     if compras is not None and not compras.empty and "reservas" in df:
