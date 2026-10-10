@@ -275,7 +275,9 @@ def tabla_variables(p: pd.DataFrame, semana: Semana, variables: list | None = No
         _, v0 = _hasta(p[col], cierre_prev)
         _, v4 = _hasta(p[col], hace4)
         d1, d4 = _variacion(v1, v0, tipo), _variacion(v1, v4, tipo)
-        datos[col] = {"v": v1, "d": d1, "fecha": f1}
+        # "nueva": hubo dato en la semana (una serie que la fuente dejó de
+        # actualizar no se comenta en el resumen).
+        datos[col] = {"v": v1, "d": d1, "fecha": f1, "nueva": f1 is not None and f1 >= semana.lunes}
         nota = "" if f1 is None or f1 >= semana.lunes else f' <span class="muted">(al {f1.day}/{f1.month})</span>'
         filas.append(
             f"<tr><td>{label} <span class='unit'>{unidad}</span>{nota}</td>"
@@ -545,7 +547,7 @@ def _partes_pe(datos: dict) -> list[str]:
     partes = []
     if "tc" in datos:
         partes.append(f"el sol {_txt_var(datos['tc']['d'], 'pct', 2)}")
-    if "embig" in datos:
+    if "embig" in datos and datos["embig"]["nueva"]:
         partes.append(f"el riesgo país {_txt_var(datos['embig']['d'], 'pb', 0)}")
     if "posicion_cambio" in datos and np.isfinite(datos["posicion_cambio"]["d"]):
         d = datos["posicion_cambio"]["d"]
@@ -653,9 +655,10 @@ def _partes_simple(moneda: str):
         partes = []
         if "tc" in datos:
             partes.append(f"{moneda} {_txt_var(datos['tc']['d'], 'pct', 2)}")
-        if "embig" in datos:
+        if "embig" in datos and datos["embig"]["nueva"]:
             partes.append(f"el riesgo país {_txt_var(datos['embig']['d'], 'pb', 0)}")
-        if "reservas" in datos and np.isfinite(datos["reservas"]["d"]):
+        # Reservas mensuales (Colombia): sin dato nuevo en la semana, la variación es cero y no se comenta.
+        if "reservas" in datos and np.isfinite(datos["reservas"]["d"]) and datos["reservas"]["d"] != 0:
             d = datos["reservas"]["d"]
             partes.append(f"las reservas {'subieron' if d >= 0 else 'cayeron'} USD {fmt(abs(d), 0)} M")
         return partes

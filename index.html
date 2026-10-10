@@ -143,10 +143,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <section class="grid2" id="comp-desc"></section>
     <section class="card table-wrap" style="margin-bottom:16px">
       <h2>Últimos 12 meses</h2>
+      <p class="note">Presión del mes, en % de depreciación equivalente. Pasá el mouse sobre una celda para ver la depreciación y la intervención.</p>
       <table id="comp-tbl"><thead></thead><tbody></tbody></table>
     </section>
     <section class="card method">
-      <p><b>Cómo se calcula.</b> Siguiendo a Girton y Roper (1977), Weymark (1995) y Patnaik, Felman y Shah (2017), la presión sobre una moneda se ve en lo que se deprecia y en lo que el banco central vende para evitarlo: <i>presión = depreciación + ρ × intervención</i>. La intervención es la venta neta de dólares del banco central en el mes, en % de sus reservas del mes anterior: en Argentina, las compras y ventas de divisas del BCRA más el cambio en su posición vendida de futuros; en Perú, las operaciones de la mesa de negociación y los swaps cambiarios del BCRP; en Uruguay, a falta de una serie pública de operaciones del BCU, la caída de su posición en moneda extranjera (una aproximación que incluye efectos de valuación); en Brasil, las ventas netas spot del BCB más la variación de su stock de swaps cambiales y de líneas con recompra. en Colombia, las operaciones del Banco de la República en el mercado cambiario (compras directas, opciones, NDF y swaps). Chile se suma cuando se habilite el acceso a la API del Banco Central. ρ convierte la intervención en puntos de depreciación y es el mismo para todos los países, para que las unidades sean comparables: se fija con la dispersión del panel (desvío absoluto mediano de la depreciación sobre el de la intervención), de modo que una intervención típica equivale a una depreciación típica. <span id="comp-rho"></span></p>
+      <p><b>Cómo se calcula.</b> Siguiendo a Girton y Roper (1977), Weymark (1995) y Patnaik, Felman y Shah (2017), la presión sobre una moneda se ve en lo que se deprecia y en lo que el banco central vende para evitarlo: <i>presión = depreciación + ρ × intervención</i>. La intervención es la venta neta de dólares del banco central en el mes, en % de sus reservas del mes anterior: en Argentina, las compras y ventas de divisas del BCRA más el cambio en su posición vendida de futuros; en Perú, las operaciones de la mesa de negociación y los swaps cambiarios del BCRP; en Uruguay, a falta de una serie pública de operaciones del BCU, la caída de su posición en moneda extranjera (una aproximación que incluye efectos de valuación); en Brasil, las ventas netas spot del BCB más la variación de su stock de swaps cambiales y de líneas con recompra; en Colombia, las operaciones del Banco de la República en el mercado cambiario (compras directas, opciones, NDF y swaps). Chile se suma cuando se habilite el acceso a la API del Banco Central. ρ convierte la intervención en puntos de depreciación y es el mismo para todos los países, para que las unidades sean comparables: se fija con la dispersión del panel (desvío absoluto mediano de la depreciación sobre el de la intervención, en los meses con intervención), de modo que una intervención típica equivale a una depreciación típica. <span id="comp-rho"></span></p>
       <p class="note">Límites: en Argentina, con cepo, buena parte de la presión se va a la brecha y no al oficial, así que esta medida la subestima en esos años (el índice 0–100 sí la captura). Sólo cuenta la intervención del banco central: las ventas de dólares del Tesoro argentino (por ejemplo, en septiembre y octubre de 2025) no entran. Las tasas de interés no se incluyen. En Uruguay la intervención es una aproximación.</p>
     </section>
   </div>
@@ -555,7 +556,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         const arrow = ch > 0 ? "▲" : ch < 0 ? "▼" : "•";
         const txt = ABSOLUTOS.has(k) ? `${ch > 0 ? "+" : ""}${nf(ch, 0)} M USD`
           : isPct ? `${ch > 0 ? "+" : ""}${nf(ch, s.unit === "pb" ? 0 : 1)} ${s.unit === "pb" ? "pb" : "pp"}` : `${ch > 0 ? "+" : ""}${nf(ch, 1)}%`;
-        delta = `<div class="delta"><span class="${cls}">${arrow} ${txt}</span> en 7 días</div>`;
+        // Serie diaria atrasada (la fuente dejó de actualizar): se dice hasta cuándo llega.
+        const atraso = s.last_date && DATA.headline.date ? (new Date(DATA.headline.date) - new Date(s.last_date)) / 864e5 : 0;
+        const cuando = atraso > 10
+          ? `en 7 días (dato al ${new Date(s.last_date + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })})`
+          : "en 7 días";
+        delta = `<div class="delta"><span class="${cls}">${arrow} ${txt}</span> ${cuando}</div>`;
       }
       const el = document.createElement("div");
       el.className = "card tile";
@@ -884,9 +890,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     });
     // Tabla
     const ult = [...new Set(entries.flatMap(([, v]) => v.data.slice(-12).map((r) => r[0])))].sort().reverse();
-    document.querySelector("#comp-tbl thead").innerHTML = `<tr><th>Mes</th>${entries.map(([, v]) => `<th class="num">${v.nombre}: presión</th><th class="num">depreciación</th><th class="num">intervención</th>`).join("")}</tr>`;
+    document.querySelector("#comp-tbl thead").innerHTML = `<tr><th>Mes</th>${entries.map(([, v]) => `<th class="num">${v.nombre}</th>`).join("")}</tr>`;
     const idx = Object.fromEntries(entries.map(([k, v]) => [k, new Map(v.data.map((r) => [r[0], r]))]));
-    document.querySelector("#comp-tbl tbody").innerHTML = ult.map((m) => `<tr><td>${m}</td>${entries.map(([k]) => { const r = idx[k].get(m); return r ? `<td class="num"><b>${nf(r[1], 1)}%</b></td><td class="num">${nf(r[3], 1)}%</td><td class="num">${nf(r[4], 1)}%</td>` : "<td></td><td></td><td></td>"; }).join("")}</tr>`).join("");
+    document.querySelector("#comp-tbl tbody").innerHTML = ult.map((m) => `<tr><td>${m}</td>${entries.map(([k]) => { const r = idx[k].get(m); return r ? `<td class="num" title="Depreciación ${nf(r[3], 1)}% · intervención ${nf(r[4], 1)}%">${nf(r[1], 1)}%</td>` : "<td></td>"; }).join("")}</tr>`).join("");
     document.getElementById("comp-rho").textContent = COMP.rho != null ? `Con los datos actuales, vender el 1% de las reservas en un mes equivale a ${nf(COMP.rho, 2)} puntos de depreciación.` : "";
     document.getElementById("foot").textContent = `Actualizado: ${new Date(COMP.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: BCRA, BCRP, BCU, BCB, Banco de la República.`;
   }
