@@ -1,29 +1,24 @@
 import re, json, requests, urllib3
+from datetime import datetime, timezone
 urllib3.disable_warnings()
 S = requests.Session(); S.verify = False; S.headers["User-Agent"] = "Mozilla/5.0"; S.headers["Accept"] = "application/json"
-B = "https://suameca.banrep.gov.co"
-SVC = B + "/graficador-series/rest/graficadorService"
-js = S.get(B + "/graficador-interactivo/main-IXSDOCJ3.js", timeout=90).text
-i = js.find("graficador-series/rest/graficadorService")
-print("contexto:", js[max(0, i-300): i+300].replace("\n", " "))
-metodos = sorted(set(re.findall(r'["\'`]/((?:consulta|obtener|listar|buscar|descarga|generar|exportar)[A-Za-z]*)', js)))
-print("METODOS", metodos)
-for m in re.finditer(r'(consulta[A-Za-z]*|obtener[A-Za-z]*|descarga[A-Za-z]*)\??[^"\'`]{0,80}', js):
-    pass
-for m in sorted(set(re.findall(r'["\'`]/?(consulta[A-Za-z]+\?[a-zA-Z]+=)', js))): print("  QS", m)
+SVC = "https://suameca.banrep.gov.co/graficador-series/rest/graficadorService"
 cat = S.get(SVC + "/consultaCatalogo", timeout=120).json()
-m2 = cat.get("mapCategoriaNivel2", {})
-for k in ["Reservas internacionales", "Operaciones en el mercado cambiario", "Tasas de interés", "Tasas de cambio nominales"]:
-    for it in m2.get(k, [])[:60]:
-        print(" ", k[:18], "|", it.get("id"), "|", it.get("nombre", "")[:90], "|", it.get("periodicidad") or it.get("idPeriodicidad"))
-print("CLAVES item:", list((m2.get("Reservas internacionales") or [{}])[0].keys()))
-# probar métodos candidatos con una serie
-ids = [it["id"] for it in m2.get("Reservas internacionales", [])[:1]]
-for met in metodos[:25]:
-    for q in ["idSerie", "idsSerie", "id"]:
-        for sid in ids:
-            u = f"{SVC}/{met}?{q}={sid}"
-            try:
-                r = S.get(u, timeout=40)
-                if r.ok and len(r.content) > 200: print("  OK", r.status_code, u, len(r.content), r.text[:250].replace("\n", " "))
-            except Exception as e: pass
+todos = [it for v in cat.get("mapCategoriaNivel2", {}).values() for it in v]
+for it in todos:
+    n = it.get("nombre", "")
+    if re.search(r"reservas internacionales|pol[ií]tica monetaria|intervenci|compra directa|venta de d[oó]lares|NDF|FX Swap|opciones put|opciones call|IBR\) overnight", n, re.I) and not re.search(r"Cupo|Prima|presentado|demandado|Tasa de co", n):
+        print(it["id"], "|", n[:95], "|", it.get("descripcionPeriodicidad"), "|", it.get("fechaInicialFormateada"), "->", it.get("fechaFinalFormateada"), "|", it.get("unidad"))
+def serie(i):
+    r = S.get(f"{SVC}/consultaSerieParaGraficar?idSerie={i}", timeout=90)
+    j = r.json(); x = j[0] if isinstance(j, list) else j
+    d = x.get("data") or []
+    f = lambda ms: datetime.fromtimestamp(ms / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+    print("  SERIE", i, x.get("nombre"), x.get("descripcionPeriodicidad"), len(d), (f(d[0][0]), d[0][1]) if d else None, (f(d[-1][0]), d[-1][1]) if d else None, "| claves", [k for k in x.keys() if "data" in k.lower()])
+for i in [15050, 15053, 16650, 16651, 16656, 16657, 241]:
+    try: serie(i)
+    except Exception as e: print("  ERR", i, e)
+for it in todos:
+    if re.search(r"tasa de pol[ií]tica|tasa de intervenci", it.get("nombre", ""), re.I):
+        try: serie(it["id"])
+        except Exception as e: print("  ERR", it["id"], e)
