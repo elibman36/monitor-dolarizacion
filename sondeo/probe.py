@@ -1,30 +1,29 @@
-import re, json, requests
-import urllib3; urllib3.disable_warnings()
+import re, json, requests, urllib3
+urllib3.disable_warnings()
 S = requests.Session(); S.verify = False; S.headers["User-Agent"] = "Mozilla/5.0"; S.headers["Accept"] = "application/json"
 B = "https://suameca.banrep.gov.co"
-def get(u, **kw):
-    try:
-        r = S.get(u, timeout=60, **kw); print(f"\n=== {r.status_code} {u[:180]} ({len(r.content)} b)"); return r
-    except Exception as e: print("ERR", u, e)
-# endpoints declarados en los bundles JS
-r = get(B + "/graficador-interactivo/")
-js = set(re.findall(r'src="([^"]+\.js)"', r.text)) if r is not None else set()
-print("JS", js)
-endpoints = set()
-for j in js:
-    u = j if j.startswith("http") else B + ("/graficador-interactivo/" + j.lstrip("./") if not j.startswith("/") else j)
-    t = get(u)
-    if t is None: continue
-    endpoints |= set(re.findall(r'["\'`](/?[\w\-/]*rest/[\w\-/]+(?:\?[\w=&]+)?)', t.text))
-    endpoints |= set(re.findall(r'["\'`]((?:graficadorService|buscadorSeriesRestService|estadisticaEconomicaRestService)/[\w]+)', t.text))
-for e in sorted(endpoints): print("  EP", e)
-# catálogo
-r = get(B + "/graficador-series/rest/graficadorService/consultaCatalogo")
-try:
-    cat = r.json(); txt = json.dumps(cat, ensure_ascii=False)
-    print("  catálogo:", type(cat), len(txt)); print(txt[:1500])
-    for m in re.finditer(r'\{[^{}]*?(reserv|pol[ií]tica monetaria|compra|interven|IBR|forward|swap)[^{}]*?\}', txt, re.I):
-        print("  CAT", m.group(0)[:300])
-except Exception as e: print("no json", e, r.text[:300] if r is not None else "")
-r = get(B + "/graficador-series/rest/graficadorService/principalesIndicadores")
-if r is not None: print(r.text[:1500])
+SVC = B + "/graficador-series/rest/graficadorService"
+js = S.get(B + "/graficador-interactivo/main-IXSDOCJ3.js", timeout=90).text
+i = js.find("graficador-series/rest/graficadorService")
+print("contexto:", js[max(0, i-300): i+300].replace("\n", " "))
+metodos = sorted(set(re.findall(r'["\'`]/((?:consulta|obtener|listar|buscar|descarga|generar|exportar)[A-Za-z]*)', js)))
+print("METODOS", metodos)
+for m in re.finditer(r'(consulta[A-Za-z]*|obtener[A-Za-z]*|descarga[A-Za-z]*)\??[^"\'`]{0,80}', js):
+    pass
+for m in sorted(set(re.findall(r'["\'`]/?(consulta[A-Za-z]+\?[a-zA-Z]+=)', js))): print("  QS", m)
+cat = S.get(SVC + "/consultaCatalogo", timeout=120).json()
+m2 = cat.get("mapCategoriaNivel2", {})
+for k in ["Reservas internacionales", "Operaciones en el mercado cambiario", "Tasas de interés", "Tasas de cambio nominales"]:
+    for it in m2.get(k, [])[:60]:
+        print(" ", k[:18], "|", it.get("id"), "|", it.get("nombre", "")[:90], "|", it.get("periodicidad") or it.get("idPeriodicidad"))
+print("CLAVES item:", list((m2.get("Reservas internacionales") or [{}])[0].keys()))
+# probar métodos candidatos con una serie
+ids = [it["id"] for it in m2.get("Reservas internacionales", [])[:1]]
+for met in metodos[:25]:
+    for q in ["idSerie", "idsSerie", "id"]:
+        for sid in ids:
+            u = f"{SVC}/{met}?{q}={sid}"
+            try:
+                r = S.get(u, timeout=40)
+                if r.ok and len(r.content) > 200: print("  OK", r.status_code, u, len(r.content), r.text[:250].replace("\n", " "))
+            except Exception as e: pass
