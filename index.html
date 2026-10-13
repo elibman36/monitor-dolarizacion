@@ -216,7 +216,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <h2>Qué explica el índice</h2>
       <div class="seg" id="contrib-h" role="group" aria-label="Período del cambio"><button data-h="7" aria-pressed="true">Cambio en 7 días</button><button data-h="30">Cambio en 30 días</button></div>
     </div>
-    <p class="note">En puntos del índice. <b>Aporte hoy</b>: cuánto suma (rojo) o resta (azul) cada parte; los aportes suman la distancia a 50. <b>Cambio</b>: cuánto cambió ese aporte en el período; los cambios suman lo que se movió el índice. Un componente puede seguir por encima de lo habitual y aun así haber restado puntos, si se acercó a lo normal.</p>
+    <p class="note"><b>Dato</b>: la variable que mide cada componente y su cambio en el período, en su unidad. <b>Aporte hoy</b>: cuánto suma (rojo) o resta (azul) cada parte, en puntos del índice; suman la distancia a 50. <b>Cambio de puntos</b>: cuánto cambió ese aporte en el período; suman lo que se movió el índice. Ojo: el índice promedia las últimas cuatro semanas, así que su cambio compara los días nuevos con los que salieron del promedio, de hace un mes. Un componente que bajó en la semana pero sigue más alto que hace un mes todavía suma puntos; deja de sumar cuando queda por debajo de ese nivel.</p>
     <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
@@ -573,8 +573,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const bl = Object.values(DATA.ipd.blocks || {}).filter((b) => b.indice_last != null);
     const cols = ["--s1", "--s2", "--s3"];
     document.getElementById("hero-subs").innerHTML = bl.length
-      ? `<div class="subs-t">Subíndices (0–100, cambio en 7 días)</div><div class="kv">` + bl.map((b, i) =>
-        `<span><i class="sw" style="background:var(${cols[i % 3]})"></i>${b.label}</span><b>${nf(b.indice_last, 0)} <small>(${b.indice_7d == null ? "–" : (Math.round(b.indice_last - b.indice_7d) === 0 ? "0" : d(b.indice_last, b.indice_7d, 0))})</small></b>`).join("") + "</div>"
+      ? `<div class="subs-t">Subíndices (0–100). Entre paréntesis, cuánto movió cada uno el índice en 7 días</div><div class="kv">` + bl.map((b, i) => {
+        const dp = b.puntos == null || b.puntos_7d == null ? null : b.puntos - b.puntos_7d;
+        const dtxt = dp == null ? "–" : Math.abs(dp) < 0.05 ? "0" : (dp > 0 ? "+" : "") + nf(dp, 1);
+        return `<span><i class="sw" style="background:var(${cols[i % 3]})"></i>${b.label}</span><b>${nf(b.indice_last, 0)}/100 <small>(${dtxt} pts)</small></b>`;
+      }).join("") + "</div>"
       : "";
   }
 
@@ -766,15 +769,34 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       if (Math.abs(v) < 0.05) return "<td class='num muted'>0</td>";
       return `<td class="num ${v > 0 ? "up" : "down"}">${v > 0 ? "▲" : "▼"} ${sg(v)}</td>`;
     };
-    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Peso</th><th>Aporte hoy</th><th class="num">Puntos</th><th class="num">Cambio en ${contribH} días</th></tr>`;
+    // La variable que mide cada componente, con su cambio en el mismo período.
+    const ALIAS = { tc_a3500: "tc_oficial_ref", futuros_oi: "futuros_interes_abierto", intervencion: "intervencion_usd", ventas_spot: "ventas_spot_usd" };
+    const varCelda = (k) => {
+      const s = DATA.series[k] || DATA.series[ALIAS[k]];
+      if (!s || s.last == null) return "<td></td><td></td>";
+      const prev = contribH === 7 ? s.prev_7d : s.prev_30d;
+      const dg = digitsFor(s.unit, s.last);
+      let ch = "–";
+      if (prev != null) {
+        const abs = /^(millones de USD|M USD)/.test(s.unit);
+        const dif = s.unit.startsWith("%") || s.unit === "pb" || abs;
+        const v = dif ? s.last - prev : (s.last / prev - 1) * 100;
+        const u = s.unit === "pb" ? " pb" : s.unit.startsWith("%") ? " pp" : abs ? "" : "%";
+        const dec = dif && !s.unit.startsWith("%") ? 0 : 1;
+        ch = Math.abs(v) < 0.5 * 10 ** -dec ? "0" : (v > 0 ? "+" : "") + nf(v, dec) + u;
+      }
+      const unit = s.unit.split(",")[0];
+      return `<td class="num">${nf(s.last, dg)} <span class="muted">${unit}</span></td><td class="num">${ch}</td>`;
+    };
+    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Dato</th><th class="num">Cambio en ${contribH} días</th><th class="num">Peso</th><th>Aporte hoy</th><th class="num">Puntos</th><th class="num">Cambio de puntos en ${contribH} días</th></tr>`;
     const filas = [];
     Object.entries(DATA.ipd.blocks).forEach(([bk, b]) => {
       const cs = comps.filter((x) => x.block === bk).sort((x, y) => (y.weight || 0) - (x.weight || 0));
       if (!cs.length) return;
-      filas.push(`<tr class="sub"><td>${b.label}${b.indice_last != null ? ` <span class="muted">· ${nf(b.indice_last, 0)}/100</span>` : ""}</td><td class="num">${b.weight != null ? nf(b.weight * 100, 0) + "%" : ""}</td>${barra(b.puntos)}<td class="num">${b.puntos == null ? "–" : sg(b.puntos)}</td>${delta(b.puntos, b[prevKey])}</tr>`);
-      cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td><td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td>${barra(x.puntos)}<td class="num">${sg(x.puntos)}</td>${delta(x.puntos, x[prevKey])}</tr>`));
+      filas.push(`<tr class="sub"><td>${b.label}</td><td class="num">${b.indice_last != null ? nf(b.indice_last, 0) + "/100" : ""}</td><td></td><td class="num">${b.weight != null ? nf(b.weight * 100, 0) + "%" : ""}</td>${barra(b.puntos)}<td class="num">${b.puntos == null ? "–" : sg(b.puntos)}</td>${delta(b.puntos, b[prevKey])}</tr>`);
+      cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td>${varCelda(x.key)}<td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td>${barra(x.puntos)}<td class="num">${sg(x.puntos)}</td>${delta(x.puntos, x[prevKey])}</tr>`));
     });
-    filas.push(`<tr class="tot"><td>Índice (distancia a 50)</td><td class="num">100%</td>${barra(h.indice - 50)}<td class="num">${sg(h.indice - 50)}</td>${delta(h.indice, iPrev)}</tr>`);
+    filas.push(`<tr class="tot"><td>Índice (distancia a 50)</td><td class="num">${nf(h.indice, 0)}/100</td><td></td><td class="num">100%</td>${barra(h.indice - 50)}<td class="num">${sg(h.indice - 50)}</td>${delta(h.indice, iPrev)}</tr>`);
     tbl.querySelector("tbody").innerHTML = filas.join("");
   }
 
