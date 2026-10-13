@@ -185,6 +185,19 @@ IPD_BLOCKS = {
                             "label": "Brecha MEP / oficial",
                             "frases": ("la brecha MEP / oficial está por encima de lo habitual",
                                        "la brecha MEP / oficial está por debajo de lo habitual")},
+            # Futuros vendidos por el BCRA (planilla de reservas, mensual): es
+            # intervención del BCRA, como vender reservas. Absorbe demanda de
+            # cobertura para contener la devaluación implícita: presión que no se
+            # ve en el precio. Por eso va en presión cambiaria y no en
+            # dolarización (que mide la demanda de cobertura, no quién la ofrece).
+            # Cuenta la variación mensual (21 días hábiles): ampliar la posición
+            # vendida suma presión y desarmarla resta, para que el remanente de
+            # un episodio no se lea como presión mientras se desarma. Una posición
+            # comprada neta (2019) cuenta como cero, no como alivio.
+            "posicion_bcra": {"transform": "diff", "horizonte": 21, "piso": 0.0, "sign": +1, "weight": 1.0,
+                              "label": "Futuros vendidos por el BCRA",
+                              "frases": ("el BCRA amplió su posición vendida en futuros de dólar",
+                                         "el BCRA redujo su posición vendida en futuros de dólar")},
         },
     },
     "dolarizacion": {
@@ -205,17 +218,6 @@ IPD_BLOCKS = {
                               "label": "Depósitos en USD",
                               "frases": ("cayeron los depósitos en dólares",
                                          "crecieron los depósitos en dólares")},
-            # Futuros vendidos por el BCRA (planilla de reservas, mensual): es
-            # demanda de cobertura que el BCRA absorbe para contener la
-            # devaluación implícita, es decir, presión que no se ve en el precio.
-            # Cuenta la variación mensual (21 días hábiles): ampliar la posición
-            # vendida suma presión y desarmarla resta, para que el remanente de
-            # un episodio no se lea como presión mientras se desarma. Una posición
-            # comprada neta (2019) cuenta como cero, no como alivio.
-            "posicion_bcra": {"transform": "diff", "horizonte": 21, "piso": 0.0, "sign": +1, "weight": 1.0,
-                              "label": "Futuros vendidos por el BCRA",
-                              "frases": ("el BCRA amplió su posición vendida en futuros de dólar",
-                                         "el BCRA redujo su posición vendida en futuros de dólar")},
             # Formación de activos externos de personas humanas: dato mensual,
             # que entra recién cuando el BCRA lo publica (ver FAE_REZAGO_DIAS).
             # Se mide contra su promedio de 12 meses: con el cepo las compras

@@ -127,9 +127,9 @@ igual peso:
 | | Reservas brutas | Δlog 5 días | − |
 | | Tasa BADLAR | Δ 5 días | + |
 | | Brecha MEP / oficial | nivel (antes de 2018, brecha CCL; antes de 2013, blue) | + |
+| | Futuros de dólar vendidos por el BCRA (neto) | Δ 21 días de la posición vendida neta (una posición comprada cuenta como 0); entra 35 días después de cada fin de mes | + |
 | Dolarización de portafolios | Devaluación implícita en futuros | nivel (TNA a 90 días) | + |
 | | Posición abierta en futuros de dólar | nivel, promedio de 21 días | + |
-| | Futuros de dólar vendidos por el BCRA (neto) | Δ 21 días de la posición vendida neta (una posición comprada cuenta como 0); entra 35 días después de cada fin de mes | + |
 | | Depósitos en USD del sector privado | Δlog 5 días | − |
 | | Compras netas de USD de personas humanas (FAE) | desvío respecto de su promedio de 12 meses; entra 30 días después del cierre de cada mes | + |
 | Extranjerización de portafolios | Canje (CCL / MEP) | nivel | + |
