@@ -297,7 +297,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </ul>
     <p>El índice se publica desde 2003. Los datos de 1996–2002 sólo se usan como referencia para estandarizar: con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20 a 45 puntos por semana y se desplomó con el corralito, y hay huecos en los datos. No todos los componentes existen desde el inicio: la brecha se suma en 2011 (con el blue hasta 2012 y el CCL hasta que hay MEP, en 2018), la FAE en 2008, el canje en 2019 y los futuros en 2020. El tooltip del gráfico de la medida de base indica cuántos componentes había cada día.</p>
     </div>
-    <p><b>Ponderación.</b> Los subíndices pesan lo mismo (tres en Argentina, dos en los demás países). Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así ninguna variable queda afuera aunque la PCA le asigne carga nula. Los pesos se recalculan en cada actualización con toda la historia.</p>
+    <p><b>Ponderación.</b> Los subíndices se ponderan con componentes principales, igual que los componentes dentro de cada uno (en los países con dos subíndices, el método da 50% a cada uno). Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así ninguna variable queda afuera aunque la PCA le asigne carga nula. Los pesos se recalculan en cada actualización con toda la historia.</p>
     <div class="table-wrap"><table id="pesos-tbl"><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody></tbody></table></div>
     <p class="note" id="pesos-nota"></p>
     <p>Si falta un componente, su peso se reparte entre los demás de su subíndice. El índice se publica cuando hay datos para al menos el 40% del peso.</p>
@@ -912,7 +912,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       `<tr><td>${bl[c.block] || c.block}</td><td>${c.label}</td><td class="num">${c.weight == null ? "–" : nf(c.weight * 100, 0) + "%"}</td><td class="num">${c.weight_ipd == null ? "–" : nf(c.weight_ipd * 100, 1) + "%"}</td></tr>`).join("");
     const pca = DATA.config.pca || {};
     document.getElementById("pesos-nota").textContent = Object.keys(pca).length
-      ? "Varianza explicada por el primer componente: " + Object.entries(pca).map(([k, v]) => `${bl[k] || k}, ${nf(v.varianza_explicada * 100, 0)}%`).join("; ") + "."
+      ? "Peso de cada subíndice en el índice: " + Object.values(DATA.ipd.blocks).map((b) => `${b.label}, ${b.weight == null ? "–" : nf(b.weight * 100, 0) + "%"}`).join("; ") +
+        ". Varianza explicada por el primer componente: " + Object.entries(pca).map(([k, v]) => `${k === "_subindices" ? "entre subíndices" : (bl[k] || k)}, ${nf(v.varianza_explicada * 100, 0)}%`).join("; ") + "."
       : "";
   }
 

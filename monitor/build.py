@@ -329,7 +329,8 @@ def _bloque_meta(b: str, blocks_cfg: dict, ipd: dict) -> dict:
     cols = [c for c in blocks_cfg[b]["components"] if c in ipd["aportes"]]
     pts = ipd["aportes"][cols].sum(axis=1, min_count=1) if cols else pd.Series(dtype=float)
     ind = ipd.get("indices_bloque", pd.DataFrame()).get(b)
-    out = {"label": blocks_cfg[b]["label"], "weight": _clean(blocks_cfg[b]["weight"]), "data": _pairs(ipd["blocks"][b])}
+    peso = ipd.get("pesos_bloques", {}).get(b, blocks_cfg[b]["weight"])
+    out = {"label": blocks_cfg[b]["label"], "weight": _clean(peso), "data": _pairs(ipd["blocks"][b])}
     if ind is not None:
         out.update({"indice": _pairs(ind), "indice_last": _last(ind)[1], "indice_7d": _last(ind, 7)[1], "indice_30d": _last(ind, 30)[1]})
     if not pts.dropna().empty:
@@ -385,7 +386,7 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
                 "key": ckey, "block": bkey, "label": spec["label"],
                 "transform": spec["transform"],
                 "weight": _clean(w_bloque),
-                "weight_ipd": _clean(w_bloque * block["weight"]) if w_bloque is not None else None,
+                "weight_ipd": _clean(w_bloque * ipd.get("pesos_bloques", {}).get(bkey, block["weight"])) if w_bloque is not None else None,
                 "last_date": d, "z": v, "puntos": pts_last, "puntos_7d": pts_7d, "puntos_30d": pts_30d,
                 "data": _pairs(z) if z is not None else [],
             })

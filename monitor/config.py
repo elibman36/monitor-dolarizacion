@@ -153,6 +153,11 @@ IPD_MIN_WEIGHT_SHARE = 0.4 # peso mínimo disponible para publicar el índice
 #   "fija" -> los `weight` de abajo.
 # Los bloques pesan siempre según su propio `weight` (50% / 50%).
 IPD_PONDERACION = "pca"
+# Pesos de los subíndices en el índice: "pca" (primer componente principal de
+# los subíndices, con el mismo mínimo que los componentes) o "fijos" (los de
+# cada bloque en IPD_BLOCKS). Con dos subíndices de correlación positiva, el
+# primer componente principal da siempre 50/50.
+IPD_PONDERACION_BLOQUES = "pca"
 IPD_PCA_FRECUENCIA = "ME"
 IPD_PCA_MIN_OBS = 24        # meses mínimos en común entre dos componentes
 # Peso mínimo de cada componente dentro de su bloque: ninguno queda afuera

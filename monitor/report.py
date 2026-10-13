@@ -228,7 +228,7 @@ def _txt_var_comp(v: dict, d: float) -> str:
 
 
 def tabla_aportes(blocks_cfg: dict, meta: dict, pts1: dict, pts0: dict, sub1: dict, i1: float, i0: float,
-                  datos: dict, perfil: dict) -> str:
+                  datos: dict, perfil: dict, pesos_b: dict | None = None) -> str:
     """Una fila por subíndice y componente: la variable que mide (dato y
     variaciones en su unidad) y su aporte al índice al cierre y su cambio en la
     semana, en puntos. Los aportes suman la distancia a 50; los cambios, el
@@ -248,7 +248,7 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, pts1: dict, pts0: dict, sub1: di
         sub = sub1.get(bkey)
         sub_txt = f"{fmt(sub, 0)}/100" if sub is not None and np.isfinite(sub) else ""
         filas.append(f"<tr class='sub'><td>{html.escape(b['label'])}</td><td class='num'>{sub_txt}</td><td></td><td></td>"
-                     f"<td class='num'>{fmt(b['weight'] * 100, 0)}%</td>"
+                     f"<td class='num'>{fmt((pesos_b or {}).get(bkey, b['weight']) * 100, 0)}%</td>"
                      f"{_barra(v1, escala)}<td class='num'>{fmt(v1, 1, signo=True)}</td>{_celda_delta(v1 - v0)}</tr>")
         for c in sorted(cols, key=lambda c: -(meta.get(c, {}).get("weight") or 0)):
             w = meta.get(c, {}).get("weight_ipd")
@@ -635,8 +635,10 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
         f"<td class='num'>{fmt((meta.get(c, {}).get('weight') or 0) * 100, 0)}%</td>"
         f"<td class='num'>{fmt((meta.get(c, {}).get('weight_ipd') or 0) * 100, 1)}%</td></tr>"
         for b in blocks_cfg.values() for c, spec in b["components"].items())
-    pca_txt = "; ".join(f"{blocks_cfg[k]['label']}, {fmt(v['varianza_explicada'] * 100, 0)}%"
-                        for k, v in payload.get("config", {}).get("pca", {}).items())
+    pca_cfg = payload.get("config", {}).get("pca", {})
+    pca_txt = "; ".join(f"{blocks_cfg[k]['label'] if k in blocks_cfg else 'entre subíndices'}, {fmt(v['varianza_explicada'] * 100, 0)}%"
+                        for k, v in pca_cfg.items())
+    pesos_b = {b: (payload["ipd"]["blocks"].get(b, {}).get("weight") or blocks_cfg[b]["weight"]) for b in blocks_cfg}
     generado = pd.Timestamp.now(tz="America/Argentina/Buenos_Aires")
 
     return f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><style>{CSS}</style></head><body>
@@ -670,7 +672,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
   <p class="note"><b>Dato y variaciones</b>: la variable que mide cada componente, al viernes {fecha_larga(semana.viernes)} o último dato disponible, en su unidad. {perfil["nota_variables"]} <b>Peso</b>: participación en el índice. <b>Aporte al cierre</b>: cuánto suma (rojo) o resta (azul) cada parte, en puntos del índice; suman la distancia a 50. <b>Cambio en la semana</b>: cuánto cambió ese aporte desde el viernes anterior; suman lo que se movió el índice. Como el índice promedia las últimas cuatro semanas, ese cambio compara la semana nueva con la que salió del promedio, de hace un mes: un componente que bajó en la semana pero sigue por encima de hace un mes (ver «Var. 4 sem.») todavía suma.</p>
-  {tabla_aportes(blocks_cfg, meta, pts_cierre, pts_prev, sub1, i1, i0, datos, perfil)}
+  {tabla_aportes(blocks_cfg, meta, pts_cierre, pts_prev, sub1, i1, i0, datos, perfil, pesos_b)}
 </section>
 
 <section class="card page">
@@ -712,7 +714,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="page method">
   <h2>Metodología</h2>
-  {perfil["metodo"](pca_txt)}
+  {perfil["metodo"](pca_txt, pesos_b) if perfil["codigo"] == "ar" else perfil["metodo"](pca_txt)}
   <table><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody>{comp_rows}</tbody></table>
   <p>El promedio ponderado se promedia en 20 días hábiles (un mes, para que el índice no salte de una semana a otra) y se lleva a una escala de 0 a 100 con la normal acumulada. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Los aportes en puntos reparten la distancia del índice a 50 entre los componentes, así que suman exactamente esa distancia. Si falta un componente, su peso se reparte entre los demás de su subíndice. Cada subíndice también se lleva a su propia escala de 0 a 100 con el mismo método, para leerlo solo; en puntos del índice, los tres subíndices suman la distancia del índice a 50.{perfil["metodo_extra"]}</p>
   <p><b>Fuentes:</b> {perfil["fuentes"]}</p>
@@ -725,8 +727,10 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 # Perfiles por país
 # ---------------------------------------------------------------------------
 
-def _metodo_ar(pca_txt: str) -> str:
-    return f"""<p>El Índice de Dolarización adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano, para que un episodio extremo no infle la escala). Los componentes se agrupan en tres subíndices de igual peso: <b>presión cambiaria</b> (tipo de cambio oficial, su volatilidad, reservas, tasa en pesos, brecha MEP / oficial y futuros de dólar vendidos por el BCRA, que son intervención como la venta de reservas), <b>dolarización de portafolios</b> (devaluación implícita y posición abierta en futuros de dólar, depósitos en dólares y compras de dólares de personas humanas: la demanda de cobertura) y <b>extranjerización de portafolios</b> (canje CCL / MEP, volatilidad del CCL y riesgo país). Dentro de cada subíndice, los pesos salen de componentes principales: cada componente pesa según cuánto se mueve junto con el resto (cargas del primer componente principal de los promedios mensuales desde 2003). Las cargas negativas valen cero y ningún componente pesa menos del 10% de su subíndice. Varianza explicada por el primer componente: {pca_txt}.</p>"""
+def _metodo_ar(pca_txt: str, pesos_b: dict | None = None) -> str:
+    pesos_sub_txt = (": " + ", ".join(f"{_minus(config.IPD_BLOCKS[b]['label'])} {fmt(w * 100, 0)}%" for b, w in pesos_b.items())
+                     if pesos_b else "")
+    return f"""<p>El Índice de Dolarización adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano, para que un episodio extremo no infle la escala). Los componentes se agrupan en tres subíndices: <b>presión cambiaria</b> (tipo de cambio oficial, su volatilidad, reservas, tasa en pesos, brecha MEP / oficial y futuros de dólar vendidos por el BCRA, que son intervención como la venta de reservas), <b>dolarización de portafolios</b> (devaluación implícita y posición abierta en futuros de dólar, depósitos en dólares y compras de dólares de personas humanas: la demanda de cobertura) y <b>extranjerización de portafolios</b> (canje CCL / MEP, volatilidad del CCL y riesgo país). Dentro de cada subíndice, los pesos salen de componentes principales: cada componente pesa según cuánto se mueve junto con el resto (cargas del primer componente principal de los promedios mensuales desde 2003). Los tres subíndices se ponderan con el mismo método{pesos_sub_txt}. Las cargas negativas valen cero y ningún componente pesa menos del 10% de su subíndice. Varianza explicada por el primer componente: {pca_txt}.</p>"""
 
 
 def _metodo_pe(pca_txt: str) -> str:

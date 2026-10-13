@@ -269,7 +269,13 @@ def compute_ipd(df: pd.DataFrame, blocks_cfg: dict | None = None,
             pesos[bkey] = weights
             block_series[bkey] = _weighted_mean(pd.DataFrame(zs), weights, config.IPD_MIN_WEIGHT_SHARE_BLOQUE)
     blocks = pd.DataFrame(block_series, index=df.index)
-    ipd = _weighted_mean(blocks, {k: blocks_cfg[k]["weight"] for k in blocks.columns})
+    pesos_bloques = {k: blocks_cfg[k]["weight"] for k in blocks.columns}
+    if config.IPD_PONDERACION_BLOQUES == "pca" and blocks.shape[1] >= 2:
+        pca = pca_weights(blocks, publicar_desde)
+        if pca is not None:
+            pesos_bloques, var_expl = pca
+            pesos_info["_subindices"] = {"varianza_explicada": var_expl}
+    ipd = _weighted_mean(blocks, pesos_bloques)
     ipd = ipd.reindex(df.index)
     # Antes de IPD_PUBLICAR_DESDE los datos sólo sirven de ventana de referencia.
     publicar = df.index >= pd.Timestamp(publicar_desde)
@@ -280,13 +286,14 @@ def compute_ipd(df: pd.DataFrame, blocks_cfg: dict | None = None,
     comps = pd.DataFrame(components, index=df.index)
     n_comp = comps.notna().sum(axis=1).where(ipd.notna())
     indice, sigma = pressure_index(ipd)
-    aportes = contributions_points(comps, blocks, pesos, ipd, indice, sigma, blocks_cfg)
+    aportes = contributions_points(comps, blocks, pesos, ipd, indice, sigma, blocks_cfg, pesos_bloques)
     # Cada subíndice en su propia escala 0-100 (mismo método que el índice,
     # con el desvío histórico del subíndice).
     indices_bloque = pd.DataFrame({b: pressure_index(blocks[b])[0] for b in blocks.columns}, index=df.index)
     return {
         "aportes": aportes,
         "indices_bloque": indices_bloque,
+        "pesos_bloques": pesos_bloques,
         "pesos": pesos,
         "pesos_info": pesos_info,
         "ipd": ipd,
@@ -300,7 +307,8 @@ def compute_ipd(df: pd.DataFrame, blocks_cfg: dict | None = None,
 
 
 def contributions_points(comps: pd.DataFrame, blocks: pd.DataFrame, pesos: dict, ipd: pd.Series,
-                         indice: pd.Series, sigma: float, blocks_cfg: dict | None = None) -> pd.DataFrame:
+                         indice: pd.Series, sigma: float, blocks_cfg: dict | None = None,
+                         pesos_bloques: dict | None = None) -> pd.DataFrame:
     """Aporte de cada componente al índice 0-100, en puntos respecto de 50.
 
     Cada día, el IPD es la suma de peso efectivo x z-score de cada componente
@@ -312,7 +320,7 @@ def contributions_points(comps: pd.DataFrame, blocks: pd.DataFrame, pesos: dict,
         return comps
     aporte = pd.DataFrame(0.0, index=comps.index, columns=comps.columns)
     blocks_cfg = blocks_cfg or config.IPD_BLOCKS
-    bw = pd.Series({b: blocks_cfg[b]["weight"] for b in blocks.columns})
+    bw = pd.Series({b: (pesos_bloques or {}).get(b, blocks_cfg[b]["weight"]) for b in blocks.columns})
     bw_avail = blocks.notna().mul(bw, axis=1)
     bw_eff = bw_avail.div(bw_avail.sum(axis=1).replace(0, np.nan), axis=0)
     for b in blocks.columns:

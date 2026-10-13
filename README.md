@@ -117,10 +117,10 @@ de forma silenciosa. Si el certificado del BCRA falla en CI, existe la opción
 ## Metodología del ID
 
 Se parte del EMP de Girton y Roper (1977) y Eichengreen, Rose y Wyplosz (1996):
-*EMP = Δe/σₑ − Δr/σᵣ + Δi/σᵢ*. La versión argentina tiene tres subíndices de
-igual peso:
+*EMP = Δe/σₑ − Δr/σᵣ + Δi/σᵢ*. La versión argentina tiene tres subíndices,
+ponderados por componentes principales (hoy 38%, 30% y 32%):
 
-| Subíndice (1/3 cada uno) | Componente | Transformación | Signo |
+| Subíndice | Componente | Transformación | Signo |
 |---|---|---|---|
 | Presión cambiaria | Tipo de cambio A3500 | Δlog 5 días | + |
 | | Volatilidad del oficial | desvío de variaciones diarias, 20 días, anualizado | + |
@@ -144,7 +144,9 @@ El cálculo sigue estos pasos:
    dispersión, como en el EMP clásico, pero sin que un episodio extremo (la
    devaluación de dic-23) infle la escala durante dos años. La versión con
    media y desvío estándar sigue disponible (`IPD_ZSCORE_METODO = "clasico"`).
-2. **Promedio ponderado.** Los subíndices pesan un tercio cada uno. Dentro de cada
+2. **Promedio ponderado.** Los subíndices se ponderan por componentes principales
+   (primer componente principal de los subíndices mensuales, con el mismo piso
+   de 10%; con dos subíndices el método da 50/50). Dentro de cada
    bloque, los pesos salen de **componentes principales**: se calcula la matriz
    de correlaciones de los promedios mensuales de los z-scores desde 2003 y cada
    componente pesa según su carga en el primer componente principal (cuánto se
