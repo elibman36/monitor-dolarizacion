@@ -262,6 +262,26 @@ def chart_mini(series: list[tuple[str, pd.Series, str]], titulo: str, unidad: st
     return _svg(fig)
 
 
+def chart_flujos(flujos: list[dict]) -> str:
+    """Flujos financieros netos del exterior por el mercado oficial, últimos 24 meses."""
+    if not flujos:
+        return ""
+    df = pd.DataFrame(flujos).tail(24)
+    fig, ax = plt.subplots(figsize=(7.4, 2.3))
+    x = np.arange(len(df))
+    w = 0.27
+    for i, (k, nombre, color) in enumerate([("portafolio_neto", "Portafolio de no residentes", S1),
+                                             ("directa_neto", "Inversión directa", S2),
+                                             ("deuda_neto", "Préstamos y títulos de deuda", S3)]):
+        ax.bar(x + (i - 1) * w, df[k].astype(float), width=w, color=color, label=nombre, zorder=3)
+    ax.axhline(0, color=AXIS, lw=0.8)
+    etiquetas = [f"{MESES[int(f[5:7]) - 1]}\n{f[2:4]}" if j % 3 == 0 else "" for j, f in enumerate(df["fecha"])]
+    ax.set_xticks(x, etiquetas, fontsize=7)
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: fmt(v, 0)))
+    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=3, fontsize=7.5, frameon=False, borderaxespad=0.2)
+    return _svg(fig)
+
+
 def chart_compras_ph(compras: list[dict]) -> str:
     df = pd.DataFrame(compras)
     if df.empty or "netas_usd_millones" not in df:
@@ -547,6 +567,9 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     compras = payload.get("monthly", {}).get("compras_personas_humanas", []) if perfil.get("fae") else []
     ph_svg = chart_compras_ph(compras)
     ph_ult = compras[-1] if compras else None
+    flujos = payload.get("monthly", {}).get("flujos_financieros", []) if perfil.get("fae") else []
+    flujos_svg = chart_flujos(flujos)
+    fl_ult = flujos[-1] if flujos else None
 
     comp_rows = "".join(
         f"<tr><td>{html.escape(b['label'])}</td><td>{html.escape(spec['label'])}</td>"
@@ -625,6 +648,11 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     <h2>Compras netas de USD de personas humanas (FAE)</h2>
     <p class="note">Formación de activos externos (billetes y divisas sin fines específicos), millones de USD por mes, con su promedio móvil de 12 meses. Último dato: {ph_ult["fecha"]} ({fmt(ph_ult.get("netas_usd_millones"), 0)} M USD netos; {fmt(ph_ult.get("compras_usd_millones"), 0)} M de compras brutas). BCRA, balance cambiario.</p>
     <div class="chart">{ph_svg}</div>
+  </div>'''}
+  {"" if not flujos_svg else f'''<div class="section card">
+    <h2>Flujos financieros del exterior por el mercado oficial</h2>
+    <p class="note">Neto mensual de todos los sectores, millones de USD (positivo: entran dólares). Inversión de portafolio y directa de no residentes, y préstamos financieros y títulos de deuda. Sólo lo que pasa por el mercado oficial; lo que entra o sale por el CCL no figura. Último dato: {fl_ult["fecha"]} (portafolio {fmt(fl_ult.get("portafolio_neto"), 0)}; directa {fmt(fl_ult.get("directa_neto"), 0)}; deuda {fmt(fl_ult.get("deuda_neto"), 0)} M USD). BCRA, balance cambiario.</p>
+    <div class="chart">{flujos_svg}</div>
   </div>'''}
 </section>
 

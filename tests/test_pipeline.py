@@ -86,7 +86,8 @@ def fake_api(monkeypatch, tmp_path):
         raise AssertionError(f"URL inesperada: {url}")
 
     monkeypatch.setattr(sources, "get_json", fake_get_json)
-    monkeypatch.setattr(sources, "bcra_compras_personas_humanas", lambda: pd.DataFrame({
+    monkeypatch.setattr(sources, "bcra_anexo_cambios", lambda: pd.DataFrame())
+    monkeypatch.setattr(sources, "bcra_compras_personas_humanas", lambda datos=None: pd.DataFrame({
         "fecha": ["2025-01", "2025-02"], "compras_usd_millones": [1500.0, 1800.0],
         "ventas_usd_millones": [300.0, 250.0], "fuente": ["test", "test"]}))
     def fake_planilla(mes):
@@ -449,3 +450,25 @@ def test_subindices_suman_el_indice():
     assert abs(sum(m["puntos"] for m in metas.values()) - (ind.iloc[-1] - 50)) < 1e-3
     assert abs(sum(m["puntos_7d"] for m in metas.values()) - (build._last(ind, 7)[1] - 50)) < 1e-3
     assert all(0 <= m["indice_last"] <= 100 for m in metas.values())
+
+
+def test_flujos_financieros_del_anexo():
+    from monitor import sources
+    fila = lambda mes, b, c, d, monto: {"Anexo": 49, "Mes": mes, "Sector": "Petróleo", "Monto": monto, "A": "03- Cuenta Financiera", "B": b, "C": c, "D": d}
+    nr = "01- Inversión directa y de portafolio de no residentes"
+    deuda = "02- Préstamos financieros, títulos de deuda y líneas de crédito"
+    datos = pd.DataFrame([
+        fila("2026-07-01", nr, "01-... - Ingresos", "Inversión de portafolio - Ingresos", 3_000e6),
+        fila("2026-07-01", nr, "02-... - Egresos", "Inversión de portafolio - Egresos", -100e6),
+        fila("2026-07-01", nr, "01-... - Ingresos", "Inversión directa - Ingresos", 90e6),
+        fila("2026-07-01", nr, "02-... - Egresos", "Inversión directa - Egresos", -70e6),
+        fila("2026-07-01", nr, "01-... - Ingresos", "Inversiones aplicadas a la compra de inmuebles - Ingresos", 10e6),
+        fila("2026-07-01", deuda, "01-... - Ingresos", "Otros préstamos del exterior y títulos de deuda - Ingresos", 3_600e6),
+        fila("2026-07-01", deuda, "02-... - Egresos", "Otros préstamos del exterior y títulos de deuda - Egresos", -2_500e6),
+        fila("2026-08-01", nr, "02-... - Egresos", "Inversión de portafolio - Egresos", -190e6),
+    ])
+    out = sources.parse_flujos_financieros(datos).set_index("fecha")
+    assert out.loc["2026-07", "portafolio_neto"] == 2900.0
+    assert out.loc["2026-07", "directa_neto"] == 30.0
+    assert out.loc["2026-07", "deuda_neto"] == 1100.0
+    assert out.loc["2026-08", "portafolio_neto"] == -190.0 and out.loc["2026-08", "deuda_neto"] == 0.0

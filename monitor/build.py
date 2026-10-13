@@ -138,13 +138,20 @@ def load_compras_personas_humanas(offline: bool) -> pd.DataFrame:
     last = _downloads_meta().get(f"{PH_CACHE}_ultima_descarga")
     due = (last is None or cached.empty or
            (datetime.now(timezone.utc).date() - datetime.fromisoformat(last).date()).days
-           >= config.BCRA_ANEXO_DIAS_ENTRE_DESCARGAS)
+           >= config.BCRA_ANEXO_DIAS_ENTRE_DESCARGAS
+           or not (config.SERIES_DIR / f"{FLUJOS_CACHE}.csv").exists())
     if not offline and due:
         try:
-            fresh = sources.bcra_compras_personas_humanas()
+            datos = sources.bcra_anexo_cambios()
+            fresh = sources.bcra_compras_personas_humanas(datos)
             data = pd.concat([cached, fresh]).drop_duplicates("fecha", keep="last").sort_values("fecha")
             config.SERIES_DIR.mkdir(parents=True, exist_ok=True)
             data.to_csv(path, index=False)
+            # Del mismo archivo, los flujos de la cuenta financiera.
+            try:
+                sources.parse_flujos_financieros(datos).to_csv(config.SERIES_DIR / f"{FLUJOS_CACHE}.csv", index=False)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("Anexo del BCRA: no se pudieron leer los flujos financieros (%s)", exc)
             meta = _downloads_meta()
             meta[f"{PH_CACHE}_ultima_descarga"] = datetime.now(timezone.utc).date().isoformat()
             _save_downloads_meta(meta)
@@ -152,6 +159,15 @@ def load_compras_personas_humanas(offline: bool) -> pd.DataFrame:
         except Exception as exc:  # noqa: BLE001
             log.warning("Anexo del BCRA no disponible (%s); uso copia guardada (%d meses)", exc, len(cached))
     return data
+
+
+FLUJOS_CACHE = "flujos_financieros"
+
+
+def load_flujos_financieros() -> pd.DataFrame:
+    """Flujos de la cuenta financiera (se descargan junto con la FAE)."""
+    path = config.SERIES_DIR / f"{FLUJOS_CACHE}.csv"
+    return pd.read_csv(path, dtype={"fecha": str}) if path.exists() else pd.DataFrame()
 
 
 POSICION_BCRA_CACHE = "posicion_futuros_bcra"
@@ -325,7 +341,8 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
                   fetch_status: dict[str, str],
                   raw: dict[str, pd.Series] | None = None, *,
                   series_meta: dict | None = None, blocks_cfg: dict | None = None,
-                  events: list | None = None, pais: dict | None = None) -> dict:
+                  events: list | None = None, pais: dict | None = None,
+                  flujos: pd.DataFrame | None = None) -> dict:
     """Arma el JSON del tablero. Los parámetros con nombre permiten reusarlo
     para otros países (por defecto, Argentina)."""
     raw = raw or {}
@@ -416,6 +433,10 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
                  for k, v in row.items()}
                 for row in compras.to_dict("records")
             ] if compras is not None and not compras.empty else [],
+            "flujos_financieros": [
+                {k: (v if isinstance(v, str) else _clean(v)) for k, v in row.items()}
+                for row in flujos.to_dict("records")
+            ] if flujos is not None and not flujos.empty else [],
         },
         "events": events,
         "sources_status": fetch_status,
@@ -439,7 +460,7 @@ def run(offline: bool = False) -> dict:
     # La posición del BCRA se publica con su fecha real (fin de mes), no con
     # la de entrada al índice.
     publicar = {**daily, "posicion_bcra": indicators.posicion_bcra_mensual(posicion_bcra)}
-    payload = build_payload(panel, ipd, compras, status, publicar)
+    payload = build_payload(panel, ipd, compras, status, publicar, flujos=load_flujos_financieros())
 
     # Panel diario completo, útil para análisis en Excel / R / Stata.
     out_panel = panel.copy()

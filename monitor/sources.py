@@ -252,12 +252,45 @@ def parse_compras_personas_humanas(datos: pd.DataFrame) -> pd.DataFrame:
     return out.reset_index().sort_values("fecha")
 
 
-def bcra_compras_personas_humanas() -> pd.DataFrame:
+def parse_flujos_financieros(datos: pd.DataFrame) -> pd.DataFrame:
+    """Flujos de la cuenta financiera por el mercado oficial de cambios, todos
+    los sectores, en millones de USD por mes (+ ingresan dólares, − salen):
+
+    - inversión de portafolio de no residentes (ingresos, egresos y neto);
+    - inversión directa de no residentes (neto, incluye inmuebles);
+    - préstamos financieros, títulos de deuda y líneas de crédito (neto).
+    """
+    d = datos.copy()
+    d.columns = [str(c).strip() for c in d.columns]
+    d["Monto"] = pd.to_numeric(d["Monto"], errors="coerce") / 1e6
+    d["fecha"] = pd.to_datetime(d["Mes"]).dt.strftime("%Y-%m")
+    b = d["B"].astype(str).str.strip()
+    dd = d["D"].astype(str).str.strip().str.casefold()
+    nr = b.str.startswith("01- Inversión directa y de portafolio de no residentes")
+    port = nr & dd.str.startswith("inversión de portafolio")
+    suma = lambda m: d[m].groupby("fecha")["Monto"].sum()
+    out = pd.DataFrame({
+        "portafolio_ingresos": suma(port & dd.str.endswith("ingresos")),
+        "portafolio_egresos": suma(port & dd.str.endswith("egresos")),
+        "directa_neto": suma(nr & ~port),
+        "deuda_neto": suma(b.str.startswith("02- Préstamos financieros")),
+    }).fillna(0.0)
+    out["portafolio_neto"] = out["portafolio_ingresos"] + out["portafolio_egresos"]
+    out = out.round(1)
+    out.index.name = "fecha"
+    return out.reset_index().sort_values("fecha")
+
+
+def bcra_anexo_cambios() -> pd.DataFrame:
+    """Hoja larga del anexo del Informe de Evolución del Mercado de Cambios."""
     r = _session.get(config.BCRA_ANEXO_CAMBIOS_URL, timeout=180, verify=_bcra_verify(),
                      headers={"Accept": "*/*"})
     r.raise_for_status()
-    datos = pd.read_excel(io.BytesIO(r.content), sheet_name=config.BCRA_ANEXO_HOJA, engine="openpyxl")
-    out = parse_compras_personas_humanas(datos)
+    return pd.read_excel(io.BytesIO(r.content), sheet_name=config.BCRA_ANEXO_HOJA, engine="openpyxl")
+
+
+def bcra_compras_personas_humanas(datos: pd.DataFrame | None = None) -> pd.DataFrame:
+    out = parse_compras_personas_humanas(bcra_anexo_cambios() if datos is None else datos)
     if out.empty:
         raise RuntimeError("el anexo no trae operaciones de personas humanas")
     return out
