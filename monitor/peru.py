@@ -111,7 +111,7 @@ IPD_BLOCKS = {
 }
 
 SERIES_META = {
-    "ipd": ("Índice de Presión de Dolarización", "desvíos estándar", "IPD"),
+    "ipd": ("Índice de Dolarización", "desvíos estándar", "ID"),
     "tc": ("Tipo de cambio interbancario", "S/ por USD", "BCRP"),
     "embig": ("Riesgo país (EMBIG Perú)", "pb", "BCRP (JP Morgan)"),
     "rin": ("Reservas internacionales netas", "millones de USD", "BCRP"),
@@ -312,6 +312,7 @@ def run(offline: bool = False) -> dict:
     out["ipd_n_componentes"] = ipd["n_componentes"]
     for b in ipd["blocks"].columns:
         out[f"ipd_bloque_{b}"] = ipd["blocks"][b]
+        out[f"indice_bloque_{b}"] = ipd["indices_bloque"][b]
     for c in ipd["components"].columns:
         out[f"z_{c}"] = ipd["components"][c]
     for c in ipd["aportes"].columns:

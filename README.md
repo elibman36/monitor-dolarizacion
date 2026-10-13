@@ -2,7 +2,7 @@
 
 Tablero diario para seguir la presión cambiaria y la dolarización de
 portafolios en Argentina, pensado para hacer incidencia en el ciclo electoral
-2027. Su eje es el **Índice de Presión de Dolarización (IPD)**, una adaptación
+2027. Su eje es el **Índice de Dolarización (ID)**, una adaptación
 del *Exchange Market Pressure Index* a la economía bimonetaria argentina.
 El mismo motor se aplica a Perú, Uruguay, Brasil, Chile y Colombia, con
 componentes propios, y un núcleo comparable mide la presión de los países en
@@ -14,7 +14,7 @@ las mismas unidades.
 ├── monitor/
 │   ├── config.py           ← fuentes, componentes, pesos, umbrales, eventos
 │   ├── sources.py          ← descarga (BCRA, ArgentinaDatos, A3 Mercados)
-│   ├── indicators.py       ← series derivadas e IPD
+│   ├── indicators.py       ← series derivadas e ID
 │   ├── build.py            ← orquestador de Argentina: python -m monitor.build
 │   ├── peru.py             ← Perú (BCRP): python -m monitor.peru
 │   ├── uruguay.py          ← Uruguay (BCU): python -m monitor.uruguay
@@ -40,7 +40,7 @@ El workflow `.github/workflows/actualizar.yml` corre los días hábiles a
 las 19:17 y 22:47 (hora argentina). En cada corrida:
 
 1. Descarga las series.
-2. Recalcula el IPD.
+2. Recalcula el ID.
 3. Commitea `data/`.
 
 Si una fuente falla, se usa la última copia guardada y el tablero marca la
@@ -99,7 +99,7 @@ python -m monitor.report --fecha 2026-10-05   # semana del 28/9 al 2/10
 | Posición del BCRA en futuros de dólar (ítem IV.1.b) | 2003 | mensual (fin de mes) | BCRA, Planilla de Reservas Internacionales y Liquidez en Moneda Extranjera (PDF, formato FMI) | automática |
 | Compras de USD de personas humanas | 2003 | mensual | BCRA, anexo del Informe de Evolución del Mercado de Cambios | automática (semanal) |
 
-**Historia.** El IPD se publica desde 2003 (`IPD_PUBLICAR_DESDE`). Las series
+**Historia.** El ID se publica desde 2003 (`IPD_PUBLICAR_DESDE`). Las series
 se descargan desde 1996, pero 1996–2002 sólo sirve como ventana de referencia:
 con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20–45
 puntos por semana y se desplomó con el corralito, y hay huecos en los datos.
@@ -114,7 +114,7 @@ descripción. Después de la primera corrida conviene revisar
 de forma silenciosa. Si el certificado del BCRA falla en CI, existe la opción
 `BCRA_SSL_VERIFY=0`. Esa variable sólo afecta a las llamadas al BCRA.
 
-## Metodología del IPD
+## Metodología del ID
 
 Se parte del EMP de Girton y Roper (1977) y Eichengreen, Rose y Wyplosz (1996):
 *EMP = Δe/σₑ − Δr/σᵣ + Δi/σᵢ*. La versión argentina tiene tres subíndices de
@@ -155,9 +155,9 @@ El cálculo sigue estos pasos:
    (`IPD_PONDERACION = "fija"` vuelve a los pesos manuales). Si falta un
    componente, su peso se reparte entre los demás; el índice sólo se publica si
    está disponible al menos el 40% del peso.
-3. **Índice 0–100.** El IPD se promedia en 20 días hábiles y se lleva a una
-   escala de 0 a 100 con la normal acumulada: Índice = 100 × Φ(IPD / σ), con σ el
-   desvío histórico del IPD promediado. 50 es neutral; debajo, presión
+3. **Índice 0–100.** El ID se promedia en 20 días hábiles y se lleva a una
+   escala de 0 a 100 con la normal acumulada: Índice = 100 × Φ(ID / σ), con σ el
+   desvío histórico del ID promediado. 50 es neutral; debajo, presión
    apreciatoria (alivio); arriba, presión depreciatoria. Tramos:
    - 0–10: fuerte presión apreciatoria;
    - 10–35: presión apreciatoria;
@@ -165,8 +165,12 @@ El cálculo sigue estos pasos:
    - 65–90: presión depreciatoria;
    - 90–100: fuerte presión depreciatoria.
 
-   También se publica el percentil del IPD en los últimos 2 años y el aporte de
+   También se publica el percentil del ID en los últimos 2 años y el aporte de
    cada componente en puntos del índice (los aportes suman la distancia a 50).
+   Los aportes se agrupan por subíndice y se publica también su cambio en 7 y
+   30 días: los cambios suman exactamente lo que se movió el índice, así que se
+   puede decir qué subíndice y qué componente lo movieron. Cada subíndice tiene
+   además su propia escala 0–100, calculada igual que el índice.
 
 Todo es configurable en `monitor/config.py`: horizonte, ventanas, pesos,
 componentes, suavizado y tramos del índice, y eventos.

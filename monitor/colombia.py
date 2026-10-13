@@ -79,7 +79,7 @@ IPD_BLOCKS = {
 }
 
 SERIES_META = {
-    "ipd": ("Índice de Presión de Dolarización", "desvíos estándar", "IPD"),
+    "ipd": ("Índice de Dolarización", "desvíos estándar", "ID"),
     "tc": ("Tasa representativa del mercado (TRM)", "$ por USD", "Superintendencia Financiera (datos.gov.co)"),
     "embig": ("Riesgo país (EMBIG Colombia)", "pb", "BCRP (JP Morgan)"),
     "tpm": ("Tasa de política monetaria", "% efectivo anual", "Banco de la República"),

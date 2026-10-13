@@ -81,7 +81,7 @@ IPD_BLOCKS = {
 }
 
 SERIES_META = {
-    "ipd": ("Índice de Presión de Dolarización", "desvíos estándar", "IPD"),
+    "ipd": ("Índice de Dolarización", "desvíos estándar", "ID"),
     "tc": ("Tipo de cambio PTAX", "R$ por USD", "BCB"),
     "reservas": ("Reservas internacionales (concepto caja)", "millones de USD", "BCB"),
     "swaps": ("Stock de swaps cambiales del BCB", "millones de USD", "BCB"),

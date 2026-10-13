@@ -429,3 +429,23 @@ def test_comparado_incluye_indices_0_100(tmp_path, monkeypatch):
     assert list(out) == ["ar"]
     assert out["ar"]["data"] == [["2026-10-08", 51.2], ["2026-10-10", 49.8]]
     assert out["ar"]["headline"]["indice"] == 49.8
+
+
+def test_subindices_suman_el_indice():
+    """Los puntos de los subíndices suman la distancia del índice a 50, hoy y
+    hace 7 días, y cada subíndice tiene su escala 0-100."""
+    import numpy as np
+    from monitor import build, indicators
+    idx = pd.bdate_range("2018-01-01", "2023-12-29")
+    rng = np.random.default_rng(3)
+    df = pd.DataFrame({k: rng.normal(size=len(idx)).cumsum() for k in ["a", "b", "c", "d"]}, index=idx)
+    blocks = {"x": {"label": "X", "weight": 0.5, "components": {"a": {"transform": "level", "sign": 1, "weight": 1, "label": "A"},
+                                                                 "b": {"transform": "level", "sign": 1, "weight": 1, "label": "B"}}},
+              "y": {"label": "Y", "weight": 0.5, "components": {"c": {"transform": "level", "sign": 1, "weight": 1, "label": "C"},
+                                                                 "d": {"transform": "level", "sign": -1, "weight": 1, "label": "D"}}}}
+    ipd = indicators.compute_ipd(df, blocks, "2019-06-01")
+    metas = {b: build._bloque_meta(b, blocks, ipd) for b in blocks}
+    ind = ipd["indice"].dropna()
+    assert abs(sum(m["puntos"] for m in metas.values()) - (ind.iloc[-1] - 50)) < 1e-3
+    assert abs(sum(m["puntos_7d"] for m in metas.values()) - (build._last(ind, 7)[1] - 50)) < 1e-3
+    assert all(0 <= m["indice_last"] <= 100 for m in metas.values())

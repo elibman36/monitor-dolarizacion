@@ -111,7 +111,7 @@ FUTUROS_PLAZO_CONSTANTE_DIAS = 90
 FUTUROS_PLAZO_MINIMO_DIAS = 20
 
 # ---------------------------------------------------------------------------
-# Índice de Presión de Dolarización (IPD)
+# Índice de Dolarización (ID)
 # ---------------------------------------------------------------------------
 # Inspirado en el Exchange Market Pressure Index (Girton-Roper 1977;
 # Eichengreen-Rose-Wyplosz 1996): cada componente se transforma de forma que

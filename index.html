@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Monitor de Dolarización</title>
-<meta name="description" content="Seguimiento diario de la presión cambiaria y la dolarización de portafolios en Argentina: Índice de Presión de Dolarización (IPD) y sus componentes.">
+<meta name="description" content="Seguimiento diario de la presión cambiaria y la dolarización de portafolios en Argentina: Índice de Dolarización (ID) y sus componentes.">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
 <style>
 :root {
@@ -79,6 +79,23 @@ h2 { font-size: 16px; margin: 0 0 2px; }
 .hero-num small { font-size: 20px; font-weight: 500; color: var(--muted); letter-spacing: 0; margin-left: 4px; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin-top: 14px; font-size: 13px; color: var(--ink-2); }
 .kv b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.kv b small { font-weight: 400; color: var(--muted); }
+.kv .sw { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.subs-t { margin-top: 14px; font-size: 12px; color: var(--muted); }
+.card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+table.contrib { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.contrib th { text-align: left; font-weight: 600; color: var(--ink-2); border-bottom: 1px solid var(--axis); padding: 6px 8px; white-space: nowrap; }
+table.contrib td { border-bottom: 1px solid var(--grid); padding: 5px 8px; }
+table.contrib .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.contrib td.comp { padding-left: 24px; color: var(--ink-2); }
+table.contrib tr.sub td { font-weight: 600; color: var(--ink); border-top: 1px solid var(--axis); }
+table.contrib tr.tot td { font-weight: 700; border-top: 2px solid var(--ink); }
+table.contrib .muted { color: var(--muted); font-weight: 400; }
+table.contrib td.bar { width: 28%; min-width: 120px; }
+table.contrib td.bar div { position: relative; height: 10px; }
+table.contrib td.bar div::after { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; border-left: 1px solid var(--axis); }
+table.contrib td.bar i { position: absolute; top: 0; bottom: 0; border-radius: 2px; }
+table.contrib tr td.up { color: var(--div-pos); } table.contrib tr td.down { color: var(--div-neg); }
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
 .tile .lbl { font-size: 12px; color: var(--ink-2); min-height: 32px; }
 .tile .val { font-size: 22px; font-weight: 600; margin-top: 4px; }
@@ -136,7 +153,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <div id="vista-comparado" hidden>
     <section class="card" style="margin-bottom:16px">
-      <h2>Índice de Presión de Dolarización por país</h2>
+      <h2>Índice de Dolarización por país</h2>
       <p class="note">El índice 0–100 de cada país, con el mismo método. Cada uno mide la presión respecto de la historia de su país: muestra cuándo cada país está más presionado que lo habitual, no cuál tiene más presión. <span id="comp-idx-frec"></span></p>
       <div class="chart tall" id="c-idx-comp" role="img" aria-label="Índice de presión 0 a 100 por país"></div>
     </section>
@@ -168,7 +185,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <section class="hero">
     <div class="card" id="hero">
-      <h2>Índice de Presión de Dolarización</h2>
+      <h2>Índice de Dolarización</h2>
       <p class="note">De 0 a 100. 50 es neutral; debajo, presión apreciatoria (alivio); arriba, presión depreciatoria.</p>
       <div class="hero-num" id="hero-num">–</div>
       <span class="pill" id="hero-pill"><span class="dot"></span><span>Cargando…</span></span>
@@ -177,6 +194,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         <div class="gauge-scale"><span>0 · apreciación</span><span>50</span><span>depreciación · 100</span></div>
       </div>
       <div class="kv" id="hero-kv"></div>
+      <div id="hero-subs"></div>
     </div>
     <div class="card">
       <div class="card-head">
@@ -192,23 +210,24 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <section class="tiles" id="tiles"></section>
 
-  <section class="grid2">
-    <div class="card">
-      <h2>Qué explica el índice hoy</h2>
-      <p class="note">Aporte de cada componente, en puntos del índice: los aportes suman la distancia a 50. Rojo suma presión; azul la resta. Al lado del nombre, el peso del componente.</p>
-      <div class="chart" id="c-contrib" role="img" aria-label="Contribución por componente"></div>
+  <section class="card" style="margin-bottom:16px">
+    <div class="card-head">
+      <h2>Qué explica el índice</h2>
+      <div class="seg" id="contrib-h" role="group" aria-label="Período del cambio"><button data-h="7" aria-pressed="true">Cambio en 7 días</button><button data-h="30">Cambio en 30 días</button></div>
     </div>
-    <div class="card">
-      <h2>Subíndices</h2>
-      <p class="note" id="blocks-note">En desvíos respecto de lo habitual.</p>
-      <div class="chart" id="c-blocks" role="img" aria-label="Sub-índices por bloque"></div>
-    </div>
+    <p class="note">En puntos del índice. <b>Aporte hoy</b>: cuánto suma (rojo) o resta (azul) cada parte; los aportes suman la distancia a 50. <b>Cambio</b>: cuánto cambió ese aporte en el período; los cambios suman lo que se movió el índice. Un componente puede seguir por encima de lo habitual y aun así haber restado puntos, si se acercó a lo normal.</p>
+    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
+  </section>
+  <section class="card" style="margin-bottom:16px">
+    <h2>Índice y subíndices</h2>
+    <p class="note" id="blocks-note">Cada subíndice en su propia escala de 0 a 100, con el mismo método que el índice.</p>
+    <div class="chart" id="c-blocks" role="img" aria-label="Índice y subíndices en escala 0 a 100"></div>
   </section>
 
   <section class="card" style="margin-bottom:16px">
     <h2>Medida de base del índice (desvíos)</h2>
     <p class="note">Para analistas: el promedio ponderado de los componentes estandarizados, antes de llevarlo a 0–100. Mayor a 0 = más presión que lo habitual en los últimos 2 años. Línea fina: dato diario; línea gruesa: promedio de 20 días hábiles.</p>
-    <div class="chart" id="c-ipd" role="img" aria-label="Serie diaria del IPD en desvíos"></div>
+    <div class="chart" id="c-ipd" role="img" aria-label="Serie diaria del ID en desvíos"></div>
   </section>
 
   <h2 class="section-title">Variables</h2>
@@ -264,7 +283,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <p>Fuentes: Banco de la República (portal de estadísticas: reservas, operaciones en el mercado cambiario y tasa de política), Superintendencia Financiera (TRM, vía datos.gov.co) y BCRP (EMBIG).</p>
     </div>
     <div data-metodo="ar">
-    <p>El Índice de Presión de Dolarización (IPD) adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes) y se promedia dentro de tres subíndices:</p>
+    <p>El Índice de Dolarización (ID) adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes) y se promedia dentro de tres subíndices:</p>
     <ul>
       <li><b>Presión cambiaria:</b> depreciación del oficial A3500 en 5 días, volatilidad del oficial (20 días), evolución de las reservas brutas en 5 días, suba de la tasa BADLAR en 5 días (defensa del peso) y brecha MEP / oficial, que mide cuánto pesan las restricciones para comprar al oficial.</li>
       <li><b>Dolarización de portafolios:</b> devaluación implícita en los futuros de A3 Mercados (TNA a 90 días), posición abierta en futuros de dólar (demanda de cobertura, promedio de 21 días para sacar el efecto de los vencimientos), futuros de dólar vendidos por el BCRA (cobertura que absorbe el BCRA para contener la devaluación implícita: presión que no se ve en el precio; cuenta la variación mensual de la posición vendida neta, así que ampliarla suma presión y desarmarla resta; dato de fin de mes de la planilla de reservas, que entra 35 días después), depósitos en dólares del sector privado (cuando caen suma presión; cuando crecen, alivia) y compras netas de dólares de personas humanas (FAE, dato mensual que entra un mes después de su cierre, medido contra su promedio de 12 meses para no confundir la salida del cepo con presión).</li>
@@ -276,7 +295,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="table-wrap"><table id="pesos-tbl"><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody></tbody></table></div>
     <p class="note" id="pesos-nota"></p>
     <p>Si falta un componente, su peso se reparte entre los demás de su subíndice. El índice se publica cuando hay datos para al menos el 40% del peso.</p>
-    <p><b>Índice 0–100.</b> Para comunicarlo, la medida de base se promedia en 20 días hábiles (un mes, para que el índice no salte de una semana a otra) y se lleva a una escala de 0 a 100 con la distribución normal: Índice = 100 × Φ(IPD / σ), donde σ es el desvío histórico del IPD promediado. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 2003. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. <b>Aportes en puntos:</b> la distancia del índice a 50 se reparte entre los componentes según su aporte a la medida de base, así que los aportes suman exactamente esa distancia.</p>
+    <p><b>Índice 0–100.</b> Para comunicarlo, la medida de base se promedia en 20 días hábiles (un mes, para que el índice no salte de una semana a otra) y se lleva a una escala de 0 a 100 con la distribución normal: Índice = 100 × Φ(ID / σ), donde σ es el desvío histórico del ID promediado. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 2003. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. <b>Aportes en puntos:</b> la distancia del índice a 50 se reparte entre los componentes según su aporte a la medida de base, así que los aportes suman exactamente esa distancia.</p>
     <p class="note" data-metodo="pe" hidden>Advertencias: las reservas netas incluyen los encajes en dólares de los bancos (por eso el índice usa la posición de cambio); el EMBIG se publica con algunos días de rezago.</p>
     <p class="note" data-metodo="ar">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
   </section>
@@ -544,6 +563,13 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <span>Cambio en 7 días</span><b>${d(h.indice, h.indice_7d, 0)} pts</b>
       <span>Cambio en 30 días</span><b>${d(h.indice, h.indice_30d, 0)} pts</b>
 `;
+    // Subíndices, cada uno en su escala 0-100, con su cambio en 7 días.
+    const bl = Object.values(DATA.ipd.blocks || {}).filter((b) => b.indice_last != null);
+    const cols = ["--s1", "--s2", "--s3"];
+    document.getElementById("hero-subs").innerHTML = bl.length
+      ? `<div class="subs-t">Subíndices (0–100, cambio en 7 días)</div><div class="kv">` + bl.map((b, i) =>
+        `<span><i class="sw" style="background:var(${cols[i % 3]})"></i>${b.label}</span><b>${nf(b.indice_last, 0)} <small>(${b.indice_7d == null ? "–" : (Math.round(b.indice_last - b.indice_7d) === 0 ? "0" : d(b.indice_last, b.indice_7d, 0))})</small></b>`).join("") + "</div>"
+      : "";
   }
 
   function renderTiles() {
@@ -586,7 +612,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   // ---- gráficos -----------------------------------------------------------
   function renderIPD() {
     const data = cut(DATA.ipd.data);
-    if (!data.length) return emptyState("c-ipd", "Todavía no hay historia suficiente para calcular el IPD.");
+    if (!data.length) return emptyState("c-ipd", "Todavía no hay historia suficiente para calcular el ID.");
     const c = mount("c-ipd");
     const o = base();
     o.yAxis.scale = false;
@@ -595,7 +621,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     o.tooltip.formatter = (ps) => {
       const p = ps[0];
       const n = nComp.get(p.value[0]);
-      return `${p.value[0]}<br><b>IPD ${nf(p.value[1], 2)}</b>` +
+      return `${p.value[0]}<br><b>ID ${nf(p.value[1], 2)}</b>` +
         (n != null ? `<br><span style="color:${css("--muted")}">${n} de ${nTot} componentes con datos</span>` : "");
     };
     o.grid.top = 32;
@@ -683,56 +709,67 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
 
   function renderBlocks() {
-    const labels = Object.values(DATA.ipd.blocks).map((b) => b.label);
-    document.getElementById("blocks-note").textContent = labels.join(", ").replace(/, ([^,]*)$/, " y $1") + " (en desvíos respecto de lo habitual).";
-    const keys = Object.keys(DATA.ipd.blocks);
+    const keys = Object.keys(DATA.ipd.blocks).filter((k) => (DATA.ipd.blocks[k].indice || []).length);
     if (!keys.length) return emptyState("c-blocks", "Sin datos.");
     const c = mount("c-blocks");
     const o = base();
-    o.yAxis.scale = false;
+    o.yAxis.scale = false; o.yAxis.min = 0; o.yAxis.max = 100; o.yAxis.interval = 25;
     o.grid.top = 36;
-    o.tooltip.valueFormatter = (v) => nf(v, 2);
+    o.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 0);
     o.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } };
     const cols = [css("--s1"), css("--s2"), css("--s3")];
-    const long = isLong(cut(DATA.ipd.data));
-    if (long) o.grid.top = 56;
-    o.series = keys.map((k, i) => {
-      const full = DATA.ipd.blocks[k].data;
-      const d = cut(long ? movingAvg(full, 20) : full);
-      return lineSeries(DATA.ipd.blocks[k].label + (long ? " (prom. 20 días)" : ""), d, cols[i % cols.length], {
-        endLabel: { show: false },
-        markLine: i === 0 ? { symbol: "none", silent: true, lineStyle: { color: css("--axis"), type: "solid", width: 1 }, data: [{ yAxis: 0, label: { show: false } }] } : undefined,
-      });
-    });
+    const tramos = DATA.config.tramos || [];
+    o.series = keys.map((k, i) => lineSeries(DATA.ipd.blocks[k].label, cut(DATA.ipd.blocks[k].indice), cols[i % cols.length],
+      { lineStyle: { width: 1.5, color: cols[i % cols.length] }, emphasis: { focus: "series" } }));
+    o.series.push(lineSeries("Índice", cut(DATA.ipd.indice || []), css("--ink"), {
+      lineStyle: { width: 2.5, color: css("--ink") }, emphasis: { focus: "series" }, z: 5,
+      markLine: { symbol: "none", silent: true, lineStyle: { color: css("--axis"), type: "solid", width: 1 }, data: [{ yAxis: 50, label: { show: false } }] },
+      markArea: { silent: true, data: tramos.filter((tr) => tr.key !== "neutral").map((tr) => [
+        { yAxis: tr.from, itemStyle: { color: css(`--dv-${tr.key}`), opacity: 0.07 } }, { yAxis: Math.min(tr.to, 100) }]) },
+    }));
     c.setOption(o);
   }
 
+  let contribH = 7;
+  document.querySelectorAll("#contrib-h button").forEach((b) => b.addEventListener("click", () => {
+    contribH = +b.dataset.h;
+    document.querySelectorAll("#contrib-h button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    if (DATA) renderContrib();
+  }));
+
+  // Aporte de cada subíndice y componente hoy y su cambio en 7 o 30 días, en
+  // puntos del índice: los aportes suman la distancia a 50 y los cambios, el
+  // cambio del índice.
   function renderContrib() {
     const comps = DATA.ipd.components.filter((x) => x.puntos != null);
-    if (!comps.length) return emptyState("c-contrib", "Sin componentes disponibles.");
-    comps.sort((a, b) => a.puntos - b.puntos);
-    const c = mount("c-contrib");
-    const pos = css("--div-pos"), neg = css("--div-neg");
-    c.setOption({
-      animation: false,
-      textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
-      grid: { left: 16, right: 40, top: 8, bottom: 8, containLabel: true },
-      tooltip: {
-        trigger: "item", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"),
-        textStyle: { color: css("--ink"), fontSize: 12 },
-        formatter: (p) => `${p.name}<br><b>${p.value > 0 ? "+" : ""}${nf(p.value, 1)}</b> puntos del índice<br><span style="color:${css("--muted")}">al ${comps[p.dataIndex].last_date}</span>`,
-      },
-      xAxis: { type: "value", axisLabel: { color: css("--muted"), fontSize: 11 }, splitLine: { lineStyle: { color: css("--grid") } } },
-      yAxis: { type: "category", data: comps.map((x) => x.weight_ipd == null ? x.label : `${x.label} · ${nf(x.weight_ipd * 100, 0)}%`), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--ink-2"), fontSize: 12 } },
-      series: [{
-        type: "bar", barMaxWidth: 18,
-        data: comps.map((x) => ({
-          value: x.puntos,
-          itemStyle: { color: x.puntos >= 0 ? pos : neg, borderRadius: x.puntos >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4] },
-        })),
-        label: { show: true, position: "right", color: css("--ink-2"), fontSize: 11, formatter: (p) => (p.value > 0 ? "+" : "") + nf(p.value, 1) },
-      }],
+    const tbl = document.getElementById("contrib-tbl");
+    if (!comps.length) { tbl.querySelector("tbody").innerHTML = "<tr><td>Sin componentes disponibles.</td></tr>"; return; }
+    const prevKey = contribH === 7 ? "puntos_7d" : "puntos_30d";
+    const h = DATA.headline;
+    const iPrev = contribH === 7 ? h.indice_7d : h.indice_30d;
+    const escala = Math.max(1, ...comps.map((x) => Math.abs(x.puntos)), ...Object.values(DATA.ipd.blocks).map((b) => Math.abs(b.puntos || 0)));
+    const sg = (v, dg = 1) => (v > 0 ? "+" : "") + nf(v, dg);
+    const barra = (v) => {
+      if (v == null) return "<td class='bar'></td>";
+      const w = Math.min(50, Math.abs(v) / escala * 50);
+      return `<td class="bar"><div><i style="${v >= 0 ? "left" : "right"}:50%;width:${w.toFixed(1)}%;background:var(${v >= 0 ? "--div-pos" : "--div-neg"})"></i></div></td>`;
+    };
+    const delta = (a, b) => {
+      if (a == null || b == null) return "<td class='num muted'>–</td>";
+      const v = a - b;
+      if (Math.abs(v) < 0.05) return "<td class='num muted'>0</td>";
+      return `<td class="num ${v > 0 ? "up" : "down"}">${v > 0 ? "▲" : "▼"} ${sg(v)}</td>`;
+    };
+    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Peso</th><th>Aporte hoy</th><th class="num">Puntos</th><th class="num">Cambio en ${contribH} días</th></tr>`;
+    const filas = [];
+    Object.entries(DATA.ipd.blocks).forEach(([bk, b]) => {
+      const cs = comps.filter((x) => x.block === bk).sort((x, y) => (y.weight || 0) - (x.weight || 0));
+      if (!cs.length) return;
+      filas.push(`<tr class="sub"><td>${b.label}${b.indice_last != null ? ` <span class="muted">· ${nf(b.indice_last, 0)}/100</span>` : ""}</td><td class="num">${b.weight != null ? nf(b.weight * 100, 0) + "%" : ""}</td>${barra(b.puntos)}<td class="num">${b.puntos == null ? "–" : sg(b.puntos)}</td>${delta(b.puntos, b[prevKey])}</tr>`);
+      cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td><td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td>${barra(x.puntos)}<td class="num">${sg(x.puntos)}</td>${delta(x.puntos, x[prevKey])}</tr>`));
     });
+    filas.push(`<tr class="tot"><td>Índice (distancia a 50)</td><td class="num">100%</td>${barra(h.indice - 50)}<td class="num">${sg(h.indice - 50)}</td>${delta(h.indice, iPrev)}</tr>`);
+    tbl.querySelector("tbody").innerHTML = filas.join("");
   }
 
   function renderMultiples() {

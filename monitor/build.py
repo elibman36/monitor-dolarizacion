@@ -258,7 +258,7 @@ def fetch_all(offline: bool) -> tuple[dict[str, pd.Series], dict[str, str]]:
 # ---------------------------------------------------------------------------
 
 SERIES_META = {
-    "ipd": ("Índice de Presión de Dolarización", "desvíos estándar", "IPD"),
+    "ipd": ("Índice de Dolarización", "desvíos estándar", "ID"),
     "tc_oficial_ref": ("Tipo de cambio oficial mayorista (A3500)", "$ por USD", "BCRA"),
     "usd_ccl": ("Dólar contado con liquidación", "$ por USD", "ArgentinaDatos"),
     "usd_mep": ("Dólar MEP", "$ por USD", "ArgentinaDatos"),
@@ -307,6 +307,20 @@ def _last(s: pd.Series, lag_days: int = 0):
     return s.index[-1].strftime("%Y-%m-%d"), _clean(s.iloc[-1])
 
 
+def _bloque_meta(b: str, blocks_cfg: dict, ipd: dict) -> dict:
+    """Un subíndice: su serie en desvíos, su propia escala 0-100 y sus puntos
+    en el índice (suma de los aportes de sus componentes), hoy y 7 y 30 días antes."""
+    cols = [c for c in blocks_cfg[b]["components"] if c in ipd["aportes"]]
+    pts = ipd["aportes"][cols].sum(axis=1, min_count=1) if cols else pd.Series(dtype=float)
+    ind = ipd.get("indices_bloque", pd.DataFrame()).get(b)
+    out = {"label": blocks_cfg[b]["label"], "weight": _clean(blocks_cfg[b]["weight"]), "data": _pairs(ipd["blocks"][b])}
+    if ind is not None:
+        out.update({"indice": _pairs(ind), "indice_last": _last(ind)[1], "indice_7d": _last(ind, 7)[1], "indice_30d": _last(ind, 30)[1]})
+    if not pts.dropna().empty:
+        out.update({"puntos": _last(pts)[1], "puntos_7d": _last(pts, 7)[1], "puntos_30d": _last(pts, 30)[1]})
+    return out
+
+
 def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
                   fetch_status: dict[str, str],
                   raw: dict[str, pd.Series] | None = None, *,
@@ -348,12 +362,14 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
             w_bloque = ipd["pesos"].get(bkey, {}).get(ckey)
             pts = ipd["aportes"].get(ckey)
             _, pts_last = _last(pts) if pts is not None else (None, None)
+            pts_7d = _last(pts, 7)[1] if pts is not None else None
+            pts_30d = _last(pts, 30)[1] if pts is not None else None
             components_meta.append({
                 "key": ckey, "block": bkey, "label": spec["label"],
                 "transform": spec["transform"],
                 "weight": _clean(w_bloque),
                 "weight_ipd": _clean(w_bloque * block["weight"]) if w_bloque is not None else None,
-                "last_date": d, "z": v, "puntos": pts_last,
+                "last_date": d, "z": v, "puntos": pts_last, "puntos_7d": pts_7d, "puntos_30d": pts_30d,
                 "data": _pairs(z) if z is not None else [],
             })
 
@@ -389,10 +405,7 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
             "indice": _pairs(ipd["indice"]),
             "n_components": _pairs(ipd["n_componentes"]),
             "n_components_total": sum(len(b["components"]) for b in blocks_cfg.values()),
-            "blocks": {
-                b: {"label": blocks_cfg[b]["label"], "data": _pairs(ipd["blocks"][b])}
-                for b in ipd["blocks"].columns
-            },
+            "blocks": {b: _bloque_meta(b, blocks_cfg, ipd) for b in ipd["blocks"].columns},
             "components": components_meta,
         },
         "series": series_out,
@@ -436,6 +449,7 @@ def run(offline: bool = False) -> dict:
     out_panel["ipd_n_componentes"] = ipd["n_componentes"]
     for b in ipd["blocks"].columns:
         out_panel[f"ipd_bloque_{b}"] = ipd["blocks"][b]
+        out_panel[f"indice_bloque_{b}"] = ipd["indices_bloque"][b]
     for c in ipd["components"].columns:
         out_panel[f"z_{c}"] = ipd["components"][c]
     for c in ipd["aportes"].columns:

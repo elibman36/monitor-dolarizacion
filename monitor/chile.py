@@ -63,7 +63,7 @@ IPD_BLOCKS = {
 }
 
 SERIES_META = {
-    "ipd": ("Índice de Presión de Dolarización", "desvíos estándar", "IPD"),
+    "ipd": ("Índice de Dolarización", "desvíos estándar", "ID"),
     "tc": ("Dólar observado", "$ por USD", "Banco Central de Chile (vía mindicador.cl)"),
     "cobre": ("Precio del cobre", "USD por libra", "Banco Central de Chile (vía mindicador.cl)"),
     "tpm": ("Tasa de política monetaria", "%", "Banco Central de Chile (vía mindicador.cl)"),

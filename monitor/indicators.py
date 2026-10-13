@@ -1,4 +1,4 @@
-"""Series derivadas y cálculo del Índice de Presión de Dolarización (IPD)."""
+"""Series derivadas y cálculo del Índice de Dolarización (ID)."""
 
 from __future__ import annotations
 
@@ -281,8 +281,12 @@ def compute_ipd(df: pd.DataFrame, blocks_cfg: dict | None = None,
     n_comp = comps.notna().sum(axis=1).where(ipd.notna())
     indice, sigma = pressure_index(ipd)
     aportes = contributions_points(comps, blocks, pesos, ipd, indice, sigma, blocks_cfg)
+    # Cada subíndice en su propia escala 0-100 (mismo método que el índice,
+    # con el desvío histórico del subíndice).
+    indices_bloque = pd.DataFrame({b: pressure_index(blocks[b])[0] for b in blocks.columns}, index=df.index)
     return {
         "aportes": aportes,
+        "indices_bloque": indices_bloque,
         "pesos": pesos,
         "pesos_info": pesos_info,
         "ipd": ipd,

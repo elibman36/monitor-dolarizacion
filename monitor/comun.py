@@ -103,6 +103,7 @@ def publicar(pais: dict, blocks: dict, meta: dict, events: list, raw: dict, stat
     out["ipd_n_componentes"] = ipd["n_componentes"]
     for b in ipd["blocks"].columns:
         out[f"ipd_bloque_{b}"] = ipd["blocks"][b]
+        out[f"indice_bloque_{b}"] = ipd["indices_bloque"][b]
     for c in ipd["components"].columns:
         out[f"z_{c}"] = ipd["components"][c]
     for c in ipd["aportes"].columns:
