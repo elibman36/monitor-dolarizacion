@@ -185,6 +185,8 @@ a { color: inherit; }
 (function () {
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   const nf = (v, d = 1) => v == null || !isFinite(v) ? "–" : Number(v).toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
+  // Decimales justos para cada marca del eje: 3 → "3", 2,5 → "2,5", 0,05 → "0,05".
+  const decEje = (v) => { for (let d = 0; d < 3; d++) if (Math.abs(v * 10 ** d - Math.round(v * 10 ** d)) < 1e-6) return d; return 3; };
   const COLOR_PAIS = { ar: "--s1", pe: "--s2", uy: "--s3", br: "--s4", co: "--s5", cl: "--s6", bo: "--s7", cr: "--s8" };
   const ORDEN = ["ar", "pe", "uy", "bo", "cr", "br", "cl", "co"];
   let PAIS = "ar", rangeDays = 1825;
@@ -207,7 +209,7 @@ a { color: inherit; }
     tooltip: { trigger: "axis", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 }, axisPointer: { type: "line", lineStyle: { color: css("--axis") } } },
     legend: { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } },
     xAxis: { type: "time", axisLine: { lineStyle: { color: css("--axis") } }, axisTick: { show: false }, axisLabel: { color: css("--muted"), fontSize: 11, hideOverlap: true }, splitLine: { show: false } },
-    yAxis: { type: "value", scale: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: css("--muted"), fontSize: 11, formatter: (v) => nf(v, 0) }, splitLine: { lineStyle: { color: css("--grid") } } },
+    yAxis: { type: "value", scale: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: css("--muted"), fontSize: 11, formatter: (v) => nf(v, decEje(v)) }, splitLine: { lineStyle: { color: css("--grid") } } },
   });
   const line = (name, data, color, extra = {}) => Object.assign({ name, type: "line", data, showSymbol: false, symbolSize: 7, sampling: "lttb", lineStyle: { width: 2, color }, itemStyle: { color }, emphasis: { focus: "series" } }, extra);
 
@@ -252,7 +254,6 @@ a { color: inherit; }
     const r = rows.slice(-Math.min(n, 60));
     const c = mount(id); const o = base();
     o.xAxis = { type: "category", data: r.map((x) => x[0]), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--muted"), fontSize: 11, hideOverlap: true } };
-    o.yAxis.axisLabel.formatter = (v) => nf(v, 1);
     o.tooltip.valueFormatter = (v) => v == null ? "–" : (v > 0 ? "+" : "") + nf(v, 2) + " pp";
     o.legend.itemHeight = 8;
     o.series = [
@@ -301,7 +302,9 @@ a { color: inherit; }
       const fb = d.indicadores.fae_en_bancos;
       const c2 = mount("c-fae-bancos"); const o2 = base(); o2.legend = undefined; o2.grid.top = 16;
       o2.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 0) + "% de lo comprado";
-      o2.series = [line("Quedó en depósitos", fb ? fb.data : [], css("--s3"), { showSymbol: true, symbolSize: 5 })];
+      // Sólo hay dato cuando las compras de 12 meses superan USD 5.000 millones: se corta la línea en los huecos.
+      const tramos = []; (fb ? cut(fb.data, 1095) : []).forEach((p, i, a) => { if (i && new Date(p[0]) - new Date(a[i - 1][0]) > 45 * 864e5) tramos.push([p[0], null]); tramos.push(p); });
+      o2.series = [line("Quedó en depósitos", tramos, css("--s3"), { showSymbol: true, symbolSize: 5 })];
       c2.setOption(o2);
     }
     const m3 = d.indicadores.m3;
