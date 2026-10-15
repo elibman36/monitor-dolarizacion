@@ -1,10 +1,32 @@
-import requests, urllib3, io, pandas as pd
+import requests, urllib3, re, io, pandas as pd
 urllib3.disable_warnings()
-r=requests.get("https://www.bcu.gub.uy/Servicios-Financieros-SSF/Series%20IF/Creditos.xlsx",timeout=90,verify=False,headers={"User-Agent":"Mozilla/5.0"})
-d=pd.read_excel(io.BytesIO(r.content),sheet_name="Total Sist. Banc.",header=None)
-print("SHAPE",d.shape)
-for c in range(d.shape[1]):
-    col=[str(x)[:45] for x in d.iloc[5:12,c].tolist()]
-    if any(x!="nan" for x in col): print(c, " | ".join(col), "| ult:", d.iloc[-4,c] if d.shape[0]>4 else "")
-# última fila con fecha
-fechas=pd.to_datetime(d.iloc[:,0],errors="coerce"); ult=fechas.last_valid_index(); print("ULT FILA",ult,d.iloc[ult,:].tolist()[:60])
+H={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"}
+def get(u, **kw):
+    try:
+        r=requests.get(u,timeout=60,headers=H,verify=False,**kw); return r
+    except Exception as e: print("ERR",u,e); return None
+def links(u, pat):
+    r=get(u)
+    if r is None: return
+    print("PAGE",u,r.status_code,len(r.text))
+    hs=sorted(set(re.findall(r'href=["\']([^"\']+)["\']',r.text)))
+    for h in hs:
+        if re.search(pat,h,re.I): print("   ",h[:180])
+# Bolivia
+for u in ["https://www.bcb.gob.bo/?q=estadisticas/semanales","https://www.bcb.gob.bo/?q=estadisticas_semanales","https://www.bcb.gob.bo/?q=estadisticas/series_estadisticas","https://www.bcb.gob.bo/?q=servicios/boletines_estadisticos","https://www.bcb.gob.bo"]:
+    links(u, r"xls|semanal|mensual|bolivian|estadist")
+for u in ["https://www.asfi.gob.bo/index.php/int-fin-estadisticas.html","https://www.asfi.gob.bo"]:
+    links(u, r"xls|estadist|boletin")
+# Costa Rica
+for u in ["https://gee.bccr.fi.cr/indicadoreseconomicos/","https://gee.bccr.fi.cr/indicadoreseconomicos/Cuadros/frmMenuCatalogos.aspx","https://www.bccr.fi.cr/indicadores-economicos"]:
+    links(u, r"dolar|moneda|cuadro|catalogo|xls")
+r=get("https://gee.bccr.fi.cr/Indicadores/Suscripciones/WS/wsindicadoreseconomicos.asmx/ObtenerIndicadoresEconomicosXML?Indicador=317&FechaInicio=01/01/2026&FechaFinal=10/01/2026&Nombre=x&SubNiveles=N&CorreoElectronico=x@x.com&Token=x")
+if r is not None: print("BCCR WS",r.status_code,r.text[:300])
+# BIS
+for c in ["BO","CR"]:
+    r=get(f"https://stats.bis.org/api/v1/data/WS_LBS_D_PUB/Q.S.L.A.TO1.A.5J.A.5A.N.{c}.N?startPeriod=2025&format=csv")
+    if r is not None: print("BIS",c,r.status_code,r.text.splitlines()[-1][-60:] if r.ok else r.text[:100])
+# IMF FSI
+for u in ["https://api.imf.org/external/sdmx/2.1/dataflow","https://dataservices.imf.org/REST/SDMX_JSON.svc/Dataflow"]:
+    r=get(u); 
+    if r is not None: print("IMF",u,r.status_code,len(r.text), "FSI" in r.text)
