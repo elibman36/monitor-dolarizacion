@@ -1,21 +1,29 @@
-import io, requests, pandas as pd, urllib3
+import requests, urllib3, io, pandas as pd, json
 urllib3.disable_warnings()
-URL = "https://www.bcra.gob.ar/archivos/Pdfs/PublicacionesEstadisticas/informes/anexo-estadistico-mercado-cambios-balance-cambiario.xlsx"
-r = requests.get(URL, timeout=180, verify=False, headers={"Accept": "*/*", "User-Agent": "Mozilla/5.0"})
-d = pd.read_excel(io.BytesIO(r.content), sheet_name="Datos Mercado de Cambios", engine="openpyxl")
-d.columns = [str(c).strip() for c in d.columns]
-d["mes"] = pd.to_datetime(d["Mes"]).dt.strftime("%Y-%m")
-pd.set_option("display.width", 250); pd.set_option("display.max_rows", 500); pd.set_option("display.max_columns", 30)
-for b in d["B"].astype(str).unique():
-    if "03- Cuenta" in "": pass
-print("B DE CUENTA FINANCIERA:", sorted(d.loc[d["A"].astype(str).str.contains("Financiera"), "B"].astype(str).unique()))
-nr = d[d["B"].astype(str).str.startswith("01- Inversi")]
-print("D NO RESIDENTES:", sorted(nr["D"].astype(str).unique()))
-print("PRIMER MES NR:", nr["mes"].min())
-t = (nr.groupby(["mes", "D"])["Monto"].sum() / 1e6).unstack().round(0)
-print(t.loc["2023-01":].to_string())
-for pref in ["02- Pr", "04- Op", "05-", "06-"]:
-    x = d[d["B"].astype(str).str.startswith(pref)]
-    if x.empty: continue
-    print("B", x["B"].iloc[0], "| D:", sorted(x["D"].astype(str).unique())[:12])
-    print((x.groupby(["mes", "C"])["Monto"].sum() / 1e6).unstack().round(0).loc["2024-06":].to_string())
+H={"User-Agent":"Mozilla/5.0"}
+def bcrp(codes):
+    url="https://estadisticas.bcrp.gob.pe/estadisticas/series/api/"+"-".join(codes)+"/json/2025-01/2026-12"
+    try:
+        r=requests.get(url,timeout=60,headers=H).json()
+        for s,c in zip(r["config"]["series"],codes): print("BCRP",c,"|",s["name"][:110],"| ult:",r["periods"][-1]["name"] if r.get("periods") else None)
+    except Exception as e: print("BCRP err",codes[:2],e)
+cands=[f"PN{n:05d}MM" for n in list(range(20,34))+list(range(505,520))]
+for i in range(0,len(cands),6): bcrp(cands[i:i+6])
+# semanales candidatos
+for c in ["PS00000SM","PN01207PM","PD37960DS"]: bcrp([c])
+# Uruguay BCU: archivos de series IF
+for f in ["Depositos.xlsx","Creditos.xlsx","Credito.xlsx","Creditos%20al%20SNF.xlsx","Activos.xlsx","Colocaciones.xlsx"]:
+    u="https://www.bcu.gub.uy/Servicios-Financieros-SSF/Series%20IF/"+f
+    try:
+        r=requests.get(u,timeout=60,verify=False,headers=H); print("BCU",f,r.status_code,len(r.content))
+        if r.status_code==200 and len(r.content)>1000:
+            x=pd.ExcelFile(io.BytesIO(r.content)); print("   hojas",x.sheet_names[:15])
+            d=pd.read_excel(x,sheet_name=x.sheet_names[0],header=None); print(d.iloc[:12,:8].to_string()[:1500])
+    except Exception as e: print("BCU",f,e)
+# BIS LBS
+for key in ["Q.S.L.A.TO1.A.5J.A.5A.N.AR.N","Q.S.L.D.TO1.A.5J.A.5A.N.AR.N","Q.S.L.A.USD.A.5J.A.5A.N.AR.N"]:
+    for base in ["https://stats.bis.org/api/v2/data/dataflow/BIS/WS_LBS_D_PUB/1.0/","https://stats.bis.org/api/v1/data/WS_LBS_D_PUB/"]:
+        u=base+key+"?startPeriod=2023&format=csv"
+        try:
+            r=requests.get(u,timeout=60,headers=H); print("BIS",base[-30:],key,r.status_code,r.text[:300].replace("\n"," | "))
+        except Exception as e: print("BIS err",e)
