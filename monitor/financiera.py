@@ -61,12 +61,15 @@ BCRP_CODES = {
 }
 BCU_CREDITOS_XLSX = "https://www.bcu.gub.uy/Servicios-Financieros-SSF/Series%20IF/Creditos.xlsx"
 BIS_URL = "https://stats.bis.org/api/v1/data/WS_LBS_D_PUB/Q.S.L.A.TO1.A.5J.A.5A.N.{pais}.N?startPeriod=2000&format=csv"
-BIS_PAISES = {"ar": "AR", "pe": "PE", "uy": "UY", "br": "BR", "cl": "CL", "co": "CO"}
-NOMBRES = {"ar": "Argentina", "pe": "Perú", "uy": "Uruguay", "br": "Brasil", "cl": "Chile", "co": "Colombia"}
+BIS_PAISES = {"ar": "AR", "pe": "PE", "uy": "UY", "bo": "BO", "cr": "CR", "br": "BR", "cl": "CL", "co": "CO"}
+NOMBRES = {"ar": "Argentina", "pe": "Perú", "uy": "Uruguay", "bo": "Bolivia", "cr": "Costa Rica",
+           "br": "Brasil", "cl": "Chile", "co": "Colombia"}
 NOTAS = {
-    "br": "En Brasil los residentes no pueden tener depósitos en dólares en el sistema local (salvo excepciones), así que la dolarización financiera local es prácticamente nula. La que existe se ve afuera: depósitos en bancos del exterior.",
-    "co": "En Colombia los depósitos locales en moneda extranjera de residentes están muy restringidos: la dolarización local es baja por regulación. La medida comparable es la de depósitos en bancos del exterior.",
-    "cl": "Chile permite depósitos en dólares, pero la serie del Banco Central requiere registro en su API. Mientras tanto se muestran los depósitos en bancos del exterior.",
+    "bo": "Bolivia se desdolarizó con fuerza desde 2006 (bolivianización). La devaluación de 2026 subió la dolarización medida en bolivianos: la descomposición separa cuánto fue valuación y cuánto decisión de los ahorristas.",
+    "cr": "Costa Rica no publica una serie abierta sin registro: se usan los indicadores de solidez financiera del FMI (bancos), mensuales y con varios meses de rezago. Los pasivos en moneda extranjera aproximan la dolarización de los depósitos.",
+    "br": "En Brasil los residentes no pueden tener depósitos en dólares en el sistema local (salvo excepciones), así que la dolarización de los depósitos es prácticamente nula. Se muestran el crédito en moneda extranjera de los bancos (FMI) y los depósitos en bancos del exterior (BIS).",
+    "co": "En Colombia los depósitos locales en moneda extranjera de residentes están muy restringidos: la dolarización local es baja por regulación. Se muestran el crédito y los pasivos en moneda extranjera de los bancos (FMI) y los depósitos en bancos del exterior (BIS).",
+    "cl": "Chile permite depósitos en dólares, pero la serie del Banco Central requiere registro en su API. Mientras tanto se muestran el crédito en moneda extranjera de los bancos (FMI) y los depósitos en bancos del exterior (BIS).",
 }
 
 
@@ -172,6 +175,7 @@ def argentina(offline: bool) -> dict:
     # Antes de mediados de los setenta no había depósitos en moneda extranjera.
     m3 = m3[m3.index >= m3[m3 > 0.5].index.min()] if (m3 > 0.5).any() else m3
     fuente = "BCRA (API de series estadísticas)"
+    fae = fae_indicadores(raw["dep_usd"])
     return {
         "frecuencia": "diaria",
         "indicadores": {
@@ -180,11 +184,40 @@ def argentina(offline: bool) -> dict:
             "liquidez": indicador(liq, "Dolarización de la liquidez (circulante + depósitos privados)", "% en dólares", "diaria", fuente),
             "m3": indicador(m3, "Dolarización de M3 (serie larga)", "% en moneda extranjera", "mensual", "BCRA, agregados monetarios"),
             "depositos_usd": indicador(raw["dep_usd"], "Depósitos privados en dólares", "millones de USD", "diaria", fuente, 0),
+            **fae,
         },
         "descomposicion": {
             "depositos": _desc_pairs(descomponer(raw["dep_pesos"], raw["dep_usd"], tc)),
             "credito": _desc_pairs(descomponer(raw["cred_pesos"], raw["cred_usd"], tc)),
         },
+    }
+
+
+def fae_indicadores(dep_usd: pd.Series) -> dict:
+    """Compras netas de dólares de personas humanas (formación de activos
+    externos, anexo del balance cambiario del BCRA): los dólares que la gente
+    compra para atesorar. Comparadas con la variación de los depósitos en
+    dólares, aproximan cuánto de lo comprado queda en los bancos y cuánto se va
+    al colchón o al exterior."""
+    path = config.SERIES_DIR / "compras_personas_humanas.csv"
+    if not path.exists():
+        return {}
+    d = pd.read_csv(path, dtype={"fecha": str})
+    s = pd.Series((d["compras_usd_millones"] - d["ventas_usd_millones"]).values,
+                  index=pd.to_datetime(d["fecha"]) + pd.offsets.MonthEnd(0)).sort_index()
+    s = s[~s.index.duplicated(keep="last")]
+    s12 = s.rolling(12, min_periods=12).sum()
+    acum = s.cumsum()
+    dep_m = dep_usd.resample("ME").last()
+    # Con compras chicas (cepo) o depósitos inflados por el blanqueo de 2024 el cociente no tiene sentido.
+    queda = (dep_m.diff(12).reindex(s12.index) / s12 * 100).where(s12 > 5000)
+    fuente = "BCRA, anexo del balance cambiario"
+    return {
+        "fae_mensual": indicador(s, "Compras netas de dólares de personas (FAE), por mes", "millones de USD", "mensual", fuente, 0),
+        "fae_12m": indicador(s12, "Compras netas de dólares de personas, últimos 12 meses", "millones de USD", "mensual", fuente, 0),
+        "fae_acum": indicador(acum, f"Compras netas de dólares de personas, acumulado desde {s.index[0].year}", "millones de USD", "mensual", fuente, 0),
+        "fae_en_bancos": indicador(queda, "Parte de lo comprado en 12 meses que quedó en depósitos", "% de las compras", "mensual",
+                                   "BCRA (anexo del balance cambiario y depósitos en dólares)", 1),
     }
 
 
@@ -283,6 +316,125 @@ def uruguay(offline: bool) -> dict:
     return {"frecuencia": "mensual", "indicadores": ind, "descomposicion": desc}
 
 
+BCB_LISTADO = "https://www.bcb.gob.bo/?q=estad-sticas-semanales"
+
+
+def _fila(df: pd.DataFrame, texto: str, desde: int = 0) -> int:
+    etiquetas = df.iloc[:, 1:4].apply(lambda fila: " ".join("" if pd.isna(x) else str(x) for x in fila), axis=1).str.strip()
+    for i in range(desde, len(df)):
+        if etiquetas.iloc[i].lower().startswith(texto.lower()):
+            return i
+    raise ValueError(f"BCB: no encuentro la fila {texto!r}")
+
+
+def parse_bcb_semanal(df: pd.DataFrame) -> pd.DataFrame:
+    """Hoja 'Estadística Semanal' del BCB: una columna por fecha (anual desde
+    1987, mensual y los últimos días hábiles) y una fila por variable."""
+    fechas = []
+    for c in range(df.shape[1]):
+        f = None
+        for fila in (3, 2):
+            v = df.iloc[fila, c]
+            if isinstance(v, (pd.Timestamp, datetime)) or (isinstance(v, str) and len(v) >= 10 and v[:4].isdigit()):
+                f = pd.to_datetime(v, errors="coerce")
+                if f is not pd.NaT and f is not None:
+                    break
+        fechas.append(f)
+    cols = [c for c, f in enumerate(fechas) if f is not None and not pd.isna(f)]
+    idx = pd.DatetimeIndex([fechas[c] for c in cols]).normalize()
+    val = lambda fila: pd.Series(pd.to_numeric(df.iloc[fila, cols], errors="coerce").values, index=idx)  # noqa: E731
+    dep = _fila(df, "Depósitos en entidades de intermediación financiera")
+    cre = _fila(df, "Crédito del sistema financiero al sector privado")
+    m3 = _fila(df, "M’3") if any("M’3" in str(x) for x in df.iloc[:, 1:4].values.ravel()) else _fila(df, "M'3")
+    # Las filas de cada bloque: moneda nacional (USD), memo en Bs y moneda extranjera (USD).
+    out = pd.DataFrame({
+        "dep_mn_usd": val(dep + 1), "dep_mn_bs": val(dep + 2), "dep_me_usd": val(dep + 3),
+        "cred_mn_usd": val(cre + 1), "cred_mn_bs": val(cre + 2), "cred_me_usd": val(cre + 3),
+        "m3_mn_bs": val(m3 + 1), "m3_me_bs": val(m3 + 2),
+    })
+    out = out[~out.index.duplicated(keep="last")].sort_index()
+    return out.dropna(how="all")
+
+
+def bolivia(offline: bool) -> dict:
+    import re
+    path = SERIES_DIR / "bo" / "bcb_semanal.csv"
+    if not offline:
+        try:
+            html = comun.get(BCB_LISTADO, verify=False).text
+            links = re.findall(r'href="([^"]*Semanal[^"]*?(\d+)_\s*(\d{4})[^"]*\.xlsx)"', html.replace("%20", " "))
+            url = max(links, key=lambda x: (int(x[2]), int(x[1])))[0].replace(" ", "%20")
+            df = pd.read_excel(io.BytesIO(comun.get(url if url.startswith("http") else "https://www.bcb.gob.bo" + url, verify=False).content), header=None)
+            nuevo = parse_bcb_semanal(df)
+            viejo = pd.read_csv(path, parse_dates=["fecha"]).set_index("fecha") if path.exists() else pd.DataFrame()
+            d = nuevo.combine_first(viejo) if not viejo.empty else nuevo
+            path.parent.mkdir(parents=True, exist_ok=True)
+            d.rename_axis("fecha").to_csv(path, date_format="%Y-%m-%d", float_format="%.6g")
+        except Exception as exc:  # noqa: BLE001
+            log.warning("BCB: %s; uso copia guardada", exc)
+    if not path.exists():
+        return {"frecuencia": "diaria", "indicadores": {}, "descomposicion": {}}
+    d = pd.read_csv(path, parse_dates=["fecha"]).set_index("fecha")
+    tc = (d["dep_mn_bs"] / d["dep_mn_usd"]).dropna()
+    fuente = "BCB, información estadística semanal"
+    return {
+        "frecuencia": "diaria",
+        "indicadores": {
+            "depositos": indicador(ratio(d["dep_me_usd"], d["dep_mn_usd"]), "Dolarización de los depósitos (100 − bolivianización)", "% en moneda extranjera", "diaria", fuente),
+            "credito": indicador(ratio(d["cred_me_usd"], d["cred_mn_usd"]), "Dolarización del crédito al sector privado", "% en moneda extranjera", "diaria", fuente),
+            "liquidez": indicador(ratio(d["m3_me_bs"], d["m3_mn_bs"]), "Dolarización de la liquidez (M'3)", "% en moneda extranjera", "diaria", fuente),
+            "depositos_usd": indicador(d["dep_me_usd"], "Depósitos en moneda extranjera", "millones de USD", "diaria", fuente, 0),
+        },
+        "descomposicion": {
+            "depositos": _desc_pairs(descomponer(d["dep_mn_bs"], d["dep_me_usd"], tc)),
+            "credito": _desc_pairs(descomponer(d["cred_mn_bs"], d["cred_me_usd"], tc)),
+        },
+    }
+
+
+IMF_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,FSIC/{iso3}..?startPeriod=2005"
+IMF_ISO3 = {"ar": "ARG", "pe": "PER", "uy": "URY", "bo": "BOL", "cr": "CRI", "br": "BRA", "cl": "CHL", "co": "COL"}
+IMF_FSI = {
+    "credito_fmi": ("FSI131_AFSI_PT", "Crédito en moneda extranjera de los bancos (FMI)"),
+    "pasivos_fmi": ("FSI680_AFSI_PT", "Pasivos en moneda extranjera de los bancos (FMI)"),
+}
+
+
+def parse_imf_fsi(texto: str, indicador: str) -> pd.Series:
+    """Serie de un indicador de solidez financiera del FMI (bancos, sector
+    S12CFSI): mensual si la hay, si no trimestral."""
+    df = pd.read_csv(io.StringIO(texto), low_memory=False)
+    if df.empty or "INDICATOR" not in df:
+        return pd.Series(dtype=float)
+    df = df[(df["INDICATOR"] == indicador) & (df.get("SECTOR", "S12CFSI") == "S12CFSI")]
+    for freq, fmt in [("M", "M"), ("Q", "Q")]:
+        x = df[df["FREQUENCY"] == freq]
+        if not x.empty:
+            per = pd.PeriodIndex(x["TIME_PERIOD"].astype(str).str.replace(f"-{fmt}", "-" + ("" if fmt == "M" else "Q"), regex=False), freq=fmt)
+            s = pd.Series(pd.to_numeric(x["OBS_VALUE"], errors="coerce").values,
+                          index=per.to_timestamp(how="end").normalize())
+            return s.sort_index().dropna()
+    return pd.Series(dtype=float)
+
+
+def imf(pais: str, offline: bool) -> dict:
+    """Crédito y pasivos en moneda extranjera de los bancos (FMI, FSI)."""
+    cache = {}
+
+    def texto():
+        if "t" not in cache:
+            cache["t"] = comun.get(IMF_URL.format(iso3=IMF_ISO3[pais]),
+                                   headers={"Accept": "application/vnd.sdmx.data+csv;version=1.0.0"}).text
+        return cache["t"]
+    out = {}
+    for key, (cod, label) in IMF_FSI.items():
+        s, _ = comun.actualizar(SERIES_DIR / pais, key, lambda d, h, cod=cod: parse_imf_fsi(texto(), cod),
+                                "2005-01-01", solapamiento_dias=100000, offline=offline)
+        if not s.empty:
+            out[key] = s
+    return out
+
+
 def parse_bis(texto: str) -> pd.Series:
     df = pd.read_csv(io.StringIO(texto))
     if df.empty or "TIME_PERIOD" not in df:
@@ -304,8 +456,17 @@ def bis(pais: str, offline: bool) -> pd.Series:
 
 # ---------------------------------------------------------------------------
 
+def _mensual(ind: dict, claves: list[str]) -> dict:
+    """Serie mensual del primer indicador disponible (y cuál se usó)."""
+    for k in claves:
+        if k in ind and ind[k]["data"]:
+            s = pd.Series({pd.Timestamp(d): v for d, v in ind[k]["data"]}).resample("ME").last()
+            return {"fuente": k, "data": _pairs(s)}
+    return {"fuente": None, "data": []}
+
+
 def run(offline: bool = False) -> dict:
-    builders = {"ar": argentina, "pe": peru, "uy": uruguay}
+    builders = {"ar": argentina, "pe": peru, "uy": uruguay, "bo": bolivia}
     resumen = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "paises": {}}
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     for k, nombre in NOMBRES.items():
@@ -314,6 +475,16 @@ def run(offline: bool = False) -> dict:
         except Exception as exc:  # noqa: BLE001
             log.warning("%s: %s", nombre, exc)
             out = {"frecuencia": None, "indicadores": {}, "descomposicion": {}}
+        # Donde no hay serie local, los indicadores de solidez financiera del FMI.
+        if k in ("cr", "br", "cl", "co"):
+            try:
+                for key, s in imf(k, offline).items():
+                    out["indicadores"][key] = indicador(s, IMF_FSI[key][1], "% en moneda extranjera", "mensual" if (s.index[-1] - s.index[-2]).days < 40 else "trimestral",
+                                                        "FMI, indicadores de solidez financiera (bancos)")
+                if out["indicadores"]:
+                    out["frecuencia"] = out["indicadores"][next(iter(out["indicadores"]))]["frecuencia"]
+            except Exception as exc:  # noqa: BLE001
+                log.warning("%s FMI: %s", nombre, exc)
         try:
             ext = bis(k, offline)
             if not ext.empty:
@@ -330,8 +501,8 @@ def run(offline: bool = False) -> dict:
             "ultimos": {i: {f: v[f] for f in ["label", "unidad", "frecuencia", "last", "last_date", "cambio_1m", "cambio_12m"]}
                         for i, v in out["indicadores"].items()},
             # Serie mensual de dolarización de depósitos, para comparar entre países.
-            "depositos_mensual": _pairs(pd.Series({pd.Timestamp(d): v for d, v in out["indicadores"]["depositos"]["data"]})
-                                        .resample("ME").last()) if "depositos" in out["indicadores"] else [],
+            "depositos_mensual": _mensual(out["indicadores"], ["depositos", "pasivos_fmi"]),
+            "credito_mensual": _mensual(out["indicadores"], ["credito", "credito_fmi"]),
             "exterior": out["indicadores"].get("exterior", {}).get("data", []),
         }
         ultimos = {i: v["last"] for i, v in out["indicadores"].items()}

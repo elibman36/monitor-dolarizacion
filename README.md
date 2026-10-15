@@ -248,8 +248,14 @@ de los depósitos, el crédito y la liquidez está en moneda extranjera.
 | Argentina | sí | sí | sí (con circulante); M3 desde 1940 | diaria | BCRA |
 | Perú | sí | sí | sí (coeficiente del BCRP) | mensual | BCRP |
 | Uruguay | sí | sí | – | mensual | BCU (SSF) |
-| Brasil, Colombia | – (los residentes no pueden tener depósitos locales en dólares, salvo excepciones) | – | – | – | – |
-| Chile | pendiente (API del BCCh con registro) | – | – | – | – |
+| Bolivia | sí | sí | sí (M'3) | diaria las últimas semanas, mensual hacia atrás | BCB, información estadística semanal |
+| Costa Rica | pasivos en ME de los bancos (aproximación) | sí | – | mensual, con rezago | FMI, indicadores de solidez financiera |
+| Colombia | pasivos en ME de los bancos | sí | – | mensual, con rezago | FMI |
+| Brasil, Chile | – | sí | – | trimestral / mensual, con rezago | FMI |
+
+En Argentina se suman las compras netas de dólares de personas (FAE): por
+mes, en 12 meses, acumuladas, y qué parte de lo comprado en 12 meses quedó en
+depósitos (el resto va al colchón, al exterior o a otros activos).
 
 Cada cambio se separa en **efecto valuación** (sólo el tipo de cambio) y
 **efecto portafolio** (con el tipo de cambio del mes anterior); suman el

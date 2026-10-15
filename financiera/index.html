@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dolarización Financiera</title>
-<meta name="description" content="Monitor de dolarización financiera: qué parte de los depósitos, el crédito y el dinero está en dólares en Argentina, Perú, Uruguay, Brasil, Chile y Colombia.">
+<meta name="description" content="Monitor de dolarización financiera: qué parte de los depósitos, el crédito y el dinero está en dólares en Argentina, Perú, Uruguay, Bolivia, Costa Rica, Brasil, Chile y Colombia.">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
 <style>
 /* Mismo sistema visual que el Monitor de Dolarización: tarjetas sobre fondo
@@ -13,7 +13,7 @@
   color-scheme: light;
   --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
   --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10); --wash: rgba(11,11,11,0.05);
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
   --up: #b42318; --down: #2a78d6;
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
@@ -22,7 +22,7 @@
     color-scheme: dark;
     --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
     --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
     --up: #f97066; --down: #3987e5;
   }
 }
@@ -30,7 +30,7 @@
   color-scheme: dark;
   --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
   --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
-  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
   --up: #f97066; --down: #3987e5;
 }
 * { box-sizing: border-box; }
@@ -85,7 +85,7 @@ a { color: inherit; }
     </div>
     <div class="controls">
       <div class="seg" id="pais" role="group" aria-label="País">
-        <button data-p="ar">Argentina</button><button data-p="pe">Perú</button><button data-p="uy">Uruguay</button><button data-p="br">Brasil</button><button data-p="cl">Chile</button><button data-p="co">Colombia</button><button data-p="comparado">Comparar países</button>
+        <button data-p="ar">Argentina</button><button data-p="pe">Perú</button><button data-p="uy">Uruguay</button><button data-p="bo">Bolivia</button><button data-p="cr">Costa Rica</button><button data-p="br">Brasil</button><button data-p="cl">Chile</button><button data-p="co">Colombia</button><button data-p="comparado">Comparar países</button>
       </div>
       <div class="seg" id="range" role="group" aria-label="Período">
         <button data-r="365">1A</button><button data-r="1825" aria-pressed="true">5A</button><button data-r="3650">10A</button><button data-r="0">Todo</button>
@@ -127,6 +127,18 @@ a { color: inherit; }
         <div class="chart" id="c-ext" role="img" aria-label="Depósitos de residentes en bancos del exterior"></div>
       </div>
     </section>
+    <section class="grid2" id="sec-fae" hidden>
+      <div class="card">
+        <h2>Dólares que compran las personas (FAE)</h2>
+        <p class="note">Compras netas de billetes y divisas de personas humanas, millones de USD por mes, y su promedio de 12 meses. BCRA, anexo del balance cambiario.</p>
+        <div class="chart" id="c-fae" role="img" aria-label="Compras netas de dólares de personas"></div>
+      </div>
+      <div class="card">
+        <h2>¿Cuánto de lo comprado queda en los bancos?</h2>
+        <p class="note">Variación de los depósitos privados en dólares en 12 meses sobre las compras netas de las personas en el mismo período. El resto va al colchón, al exterior o a otros activos. Aproximado: los depósitos también cambian por otros motivos (el blanqueo de 2024, por ejemplo), y por eso sólo se calcula cuando las compras de 12 meses superan USD 5.000 millones.</p>
+        <div class="chart" id="c-fae-bancos" role="img" aria-label="Parte de las compras de dólares que quedó en depósitos"></div>
+      </div>
+    </section>
     <section class="card section" id="sec-m3" hidden>
       <h2>Dolarización de M3, serie larga</h2>
       <p class="note">Moneda extranjera en M3 (circulante y depósitos de los sectores privado y público), fin de cada mes. La caída de 2002 es la pesificación de los depósitos. BCRA, agregados monetarios.</p>
@@ -137,8 +149,13 @@ a { color: inherit; }
   <div id="vista-comparado" hidden>
     <section class="card section">
       <h2>Dolarización de los depósitos</h2>
-      <p class="note">Porcentaje de los depósitos en moneda extranjera, fin de cada mes. A diferencia de un índice de presión, este nivel sí se compara entre países. Brasil, Chile y Colombia no tienen una serie local pública (ver cada país).</p>
+      <p class="note">Porcentaje de los depósitos en moneda extranjera, fin de cada mes. A diferencia de un índice de presión, este nivel sí se compara entre países. En línea punteada, los pasivos en moneda extranjera de los bancos (FMI), que aproximan los depósitos donde no hay serie local.</p>
       <div class="chart tall" id="c-comp-dep" role="img" aria-label="Dolarización de depósitos por país"></div>
+    </section>
+    <section class="card section">
+      <h2>Dolarización del crédito</h2>
+      <p class="note">Porcentaje del crédito al sector privado en moneda extranjera, fin de cada mes. En línea punteada, el crédito en moneda extranjera de los bancos según los indicadores de solidez financiera del FMI, para los países sin serie local.</p>
+      <div class="chart tall" id="c-comp-cred" role="img" aria-label="Dolarización del crédito por país"></div>
     </section>
     <section class="card section">
       <h2>Depósitos en bancos del exterior</h2>
@@ -147,6 +164,7 @@ a { color: inherit; }
     </section>
     <section class="card section table-wrap">
       <h2>Último dato</h2>
+      <p class="note">* Indicador del FMI (pasivos o crédito en moneda extranjera de los bancos), donde no hay serie local.</p>
       <table id="comp-tbl"><thead><tr><th>País</th><th class="num">Depósitos</th><th class="num">Crédito</th><th class="num">Liquidez</th><th class="num">Exterior (miles de M USD)</th><th>Frecuencia local</th></tr></thead><tbody></tbody></table>
     </section>
   </div>
@@ -156,8 +174,9 @@ a { color: inherit; }
     <p>La <b>dolarización financiera</b> es la parte de los activos y pasivos del sistema financiero que está en moneda extranjera (Ize y Levy Yeyati, 2003). Se mide con tres cocientes: <b>depósitos</b> en dólares sobre depósitos totales del sector privado, <b>crédito</b> en dólares sobre crédito total al sector privado y <b>liquidez</b> (dinero amplio) en dólares sobre la liquidez total, que en Argentina incluye el circulante en pesos. Los saldos en dólares se valúan al tipo de cambio de cada fecha.</p>
     <p>Como los saldos en dólares se valúan en moneda local, una devaluación sube la dolarización aunque nadie haya cambiado sus depósitos. Por eso cada cambio se separa en <b>efecto valuación</b> (el cambio que produce sólo el tipo de cambio) y <b>efecto portafolio</b> (el cambio con el tipo de cambio del mes anterior, es decir, lo que movió la gente). Los dos suman exactamente el cambio total.</p>
     <p>La dolarización que sale del sistema local no se ve en estos cocientes: los dólares en efectivo fuera de los bancos y los depósitos en el exterior. Para lo segundo se usan las estadísticas bancarias territoriales del Banco de Pagos Internacionales (BIS): depósitos de personas y empresas de cada país en bancos de otros países, trimestrales y con unos cuatro meses de rezago. Es la única medida comparable para Brasil y Colombia, donde los residentes no pueden tener depósitos en dólares en el sistema local (salvo excepciones), y para Chile mientras no esté disponible la serie del Banco Central.</p>
-    <p><b>Frecuencia.</b> Argentina: diaria (API del BCRA), con M3 mensual desde 1940. Perú: mensual (BCRP). Uruguay: mensual (BCU, Superintendencia de Servicios Financieros). Exterior: trimestral (BIS). Todo se descarga automáticamente todos los días.</p>
-    <p><b>Fuentes.</b> BCRA: depósitos y préstamos del sector privado por moneda, billetes y monedas en poder del público, agregados monetarios; tipo de cambio A3500. BCRP: liquidez y crédito de las sociedades creadoras de depósito. BCU: depósitos y créditos del sector no financiero, sistema bancario; tipo de cambio interbancario. BIS: Locational Banking Statistics.</p>
+    <p><b>Frecuencia.</b> Argentina: diaria (API del BCRA), con M3 mensual desde 1940. Bolivia: diaria en las últimas semanas y mensual hacia atrás (información estadística semanal del BCB). Perú: mensual (BCRP). Uruguay: mensual (BCU, Superintendencia de Servicios Financieros). Costa Rica, Brasil, Chile y Colombia: indicadores de solidez financiera del FMI (crédito y pasivos en moneda extranjera de los bancos), mensuales o trimestrales y con varios meses de rezago. Exterior: trimestral (BIS). Todo se descarga automáticamente todos los días.</p>
+    <p><b>Compras de dólares de las personas (Argentina).</b> La formación de activos externos de personas humanas (FAE) mide los dólares que la gente compra para atesorar. Comparada con la variación de los depósitos en dólares, aproxima qué parte queda en los bancos y qué parte va al colchón, al exterior o a otros activos.</p>
+    <p><b>Fuentes.</b> BCRA: depósitos y préstamos del sector privado por moneda, billetes y monedas en poder del público, agregados monetarios; tipo de cambio A3500. BCRP: liquidez y crédito de las sociedades creadoras de depósito. BCU: depósitos y créditos del sector no financiero, sistema bancario; tipo de cambio interbancario. BCB: información estadística semanal. FMI: Financial Soundness Indicators. BIS: Locational Banking Statistics.</p>
   </section>
   <footer id="foot"></footer>
 </div>
@@ -166,8 +185,8 @@ a { color: inherit; }
 (function () {
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   const nf = (v, d = 1) => v == null || !isFinite(v) ? "–" : Number(v).toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
-  const COLOR_PAIS = { ar: "--s1", pe: "--s2", uy: "--s3", br: "--s4", co: "--s5", cl: "--s6" };
-  const ORDEN = ["ar", "pe", "uy", "br", "cl", "co"];
+  const COLOR_PAIS = { ar: "--s1", pe: "--s2", uy: "--s3", br: "--s4", co: "--s5", cl: "--s6", bo: "--s7", cr: "--s8" };
+  const ORDEN = ["ar", "pe", "uy", "bo", "cr", "br", "cl", "co"];
   let PAIS = "ar", rangeDays = 1825;
   try { const q = new URLSearchParams(location.search).get("pais"); if (q && (ORDEN.includes(q) || q === "comparado")) PAIS = q; } catch (e) {}
   const cache = {};
@@ -194,19 +213,20 @@ a { color: inherit; }
 
   function tiles(d) {
     const box = document.getElementById("tiles");
-    const orden = ["depositos", "credito", "liquidez", "exterior", "depositos_usd"];
+    const orden = ["depositos", "pasivos_fmi", "credito", "credito_fmi", "liquidez", "exterior", "depositos_usd", "fae_12m", "fae_en_bancos", "fae_acum"];
     box.innerHTML = orden.filter((k) => d.indicadores[k]).map((k) => {
       const x = d.indicadores[k];
-      const pct = x.unidad.startsWith("%");
+      const pct = x.unidad === "%" || x.unidad.startsWith("% en");
+      const pctCompras = x.unidad.startsWith("% de");
       const chg = (v, lbl) => {
         if (v == null) return `<span>${lbl}: –</span>`;
-        const txt = pct ? `${v > 0 ? "+" : ""}${nf(v, 1)} pp` : `${v > 0 ? "+" : ""}${nf(v, pct ? 1 : (x.unidad.startsWith("miles") ? 1 : 0))}`;
+        const txt = pct || x.unidad.startsWith("% de") ? `${v > 0 ? "+" : ""}${nf(v, 1)} pp` : `${v > 0 ? "+" : ""}${nf(v, pct ? 1 : (x.unidad.startsWith("miles") ? 1 : 0))}`;
         // Más dolarización (o más depósitos afuera) en rojo; menos, en azul. Los saldos en USD van sin color.
-        const cls = k === "depositos_usd" ? "" : v > 0 ? "up" : v < 0 ? "down" : "";
+        const cls = k === "depositos_usd" || k.startsWith("fae_en") ? "" : v > 0 ? "up" : v < 0 ? "down" : "";
         return `<span>${lbl}: <b class="${cls}">${txt}</b></span>`;
       };
-      const dec = pct ? 1 : (x.unidad.startsWith("miles") ? 1 : 0);
-      const corta = pct ? "%" : x.unidad.startsWith("miles") ? "mil M USD" : x.unidad.startsWith("millones") ? "M USD" : x.unidad;
+      const dec = pct || pctCompras ? 1 : (x.unidad.startsWith("miles") ? 1 : 0);
+      const corta = pct || pctCompras ? "%" : x.unidad.startsWith("miles") ? "mil M USD" : x.unidad.startsWith("millones") ? "M USD" : x.unidad;
       const per = x.frecuencia === "trimestral" ? "1 trimestre" : "1 mes";
       return `<div class="card tile"><div class="lbl">${x.label}<span class="badge">${x.frecuencia}</span></div>` +
         `<div class="val">${nf(x.last, dec)}<small>${corta}</small></div>` +
@@ -216,7 +236,7 @@ a { color: inherit; }
   }
 
   function ratios(d) {
-    const ser = [["depositos", "Depósitos", "--s1"], ["credito", "Crédito", "--s2"], ["liquidez", "Liquidez", "--s3"]].filter(([k]) => d.indicadores[k]);
+    const ser = [["depositos", "Depósitos", "--s1"], ["pasivos_fmi", "Pasivos de los bancos (FMI)", "--s1"], ["credito", "Crédito", "--s2"], ["credito_fmi", "Crédito de los bancos (FMI)", "--s2"], ["liquidez", "Liquidez", "--s3"]].filter(([k]) => d.indicadores[k]);
     document.getElementById("sec-ratios").hidden = !ser.length;
     if (!ser.length) return;
     const c = mount("c-ratios"); const o = base();
@@ -265,6 +285,25 @@ a { color: inherit; }
     // Si un país sólo tiene el dato del exterior, la tarjeta ocupa todo el ancho.
     document.getElementById("card-ext").parentElement.style.gridTemplateColumns = d.indicadores.depositos_usd ? "" : "1fr";
     simple("c-ext", d.indicadores.exterior, "--s2", "card-ext", 3650);
+    const fm = d.indicadores.fae_mensual;
+    document.getElementById("sec-fae").hidden = !fm;
+    if (fm) {
+      const rows = cut(fm.data, 730);
+      const prom = fm.data.map((p, i, a) => [p[0], i >= 11 ? a.slice(i - 11, i + 1).reduce((s, q) => s + q[1], 0) / 12 : null]);
+      const desde = rows.length ? rows[0][0] : "";
+      const c = mount("c-fae"); const o = base();
+      o.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 0) + " M USD"; o.legend.itemHeight = 8;
+      o.series = [
+        { name: "Compras netas", type: "bar", data: rows, barMaxWidth: 14, itemStyle: { color: css("--s1"), borderRadius: [3, 3, 0, 0] } },
+        line("Promedio 12 meses", prom.filter((p) => p[0] >= desde), css("--s2")),
+      ];
+      c.setOption(o);
+      const fb = d.indicadores.fae_en_bancos;
+      const c2 = mount("c-fae-bancos"); const o2 = base(); o2.legend = undefined; o2.grid.top = 16;
+      o2.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 0) + "% de lo comprado";
+      o2.series = [line("Quedó en depósitos", fb ? fb.data : [], css("--s3"), { showSymbol: true, symbolSize: 5 })];
+      c2.setOption(o2);
+    }
     const m3 = d.indicadores.m3;
     document.getElementById("sec-m3").hidden = !m3;
     if (m3) { const c = mount("c-m3"); const o = base(); o.legend = undefined; o.grid.top = 16; o.tooltip.valueFormatter = (v) => nf(v, 1) + "%"; o.series = [line("M3 en moneda extranjera", m3.data, css("--s1"))]; c.setOption(o); }
@@ -275,15 +314,28 @@ a { color: inherit; }
     const ps = ORDEN.filter((k) => r.paises[k]);
     const c1 = mount("c-comp-dep"); const o1 = base();
     o1.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 1) + "%";
-    o1.series = ps.filter((k) => r.paises[k].depositos_mensual.length).map((k) => line(r.paises[k].nombre, cut(r.paises[k].depositos_mensual), css(COLOR_PAIS[k])));
+    const serie = (campo) => ps.filter((k) => r.paises[k][campo] && r.paises[k][campo].data.length).map((k) => {
+      const x = r.paises[k][campo];
+      const aprox = x.fuente && x.fuente.endsWith("_fmi");
+      return line(r.paises[k].nombre + (aprox ? " (FMI)" : ""), cut(x.data), css(COLOR_PAIS[k]), aprox ? { lineStyle: { width: 2, type: "dashed", color: css(COLOR_PAIS[k]) } } : {});
+    });
+    o1.series = serie("depositos_mensual");
     c1.setOption(o1);
+    const c3 = mount("c-comp-cred"); const o3 = base();
+    o3.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 1) + "%";
+    o3.series = serie("credito_mensual");
+    c3.setOption(o3);
     const c2 = mount("c-comp-ext"); const o2 = base();
     o2.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 1) + " mil M USD";
     o2.series = ps.filter((k) => r.paises[k].exterior.length).map((k) => line(r.paises[k].nombre, cut(r.paises[k].exterior, 3650), css(COLOR_PAIS[k]), { showSymbol: true, symbolSize: 5 }));
     c2.setOption(o2);
-    const v = (p, k, dec = 1, suf = "%") => { const x = p.ultimos[k]; return x && x.last != null ? `${nf(x.last, dec)}${suf} <span class="note">(${x.last_date.slice(0, 7)})</span>` : "–"; };
+    const v = (p, k, dec = 1, suf = "%", alt = null) => {
+      let x = p.ultimos[k], fmi = false;
+      if ((!x || x.last == null) && alt && p.ultimos[alt]) { x = p.ultimos[alt]; fmi = true; }
+      return x && x.last != null ? `${nf(x.last, dec)}${suf}${fmi ? "*" : ""} <span class="note">(${x.last_date.slice(0, 7)})</span>` : "–";
+    };
     document.querySelector("#comp-tbl tbody").innerHTML = ps.map((k) => { const p = r.paises[k];
-      return `<tr><td><span style="display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px;background:var(${COLOR_PAIS[k]})"></span><a href="?pais=${k}" data-ir="${k}">${p.nombre}</a></td><td class="num">${v(p, "depositos")}</td><td class="num">${v(p, "credito")}</td><td class="num">${v(p, "liquidez")}</td><td class="num">${v(p, "exterior", 1, "")}</td><td>${p.frecuencia || "–"}</td></tr>`; }).join("");
+      return `<tr><td><span style="display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px;background:var(${COLOR_PAIS[k]})"></span><a href="?pais=${k}" data-ir="${k}">${p.nombre}</a></td><td class="num">${v(p, "depositos", 1, "%", "pasivos_fmi")}</td><td class="num">${v(p, "credito", 1, "%", "credito_fmi")}</td><td class="num">${v(p, "liquidez")}</td><td class="num">${v(p, "exterior", 1, "")}</td><td>${p.frecuencia || "–"}</td></tr>`; }).join("");
     document.querySelectorAll("#comp-tbl [data-ir]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); document.querySelector(`#pais button[data-p="${a.dataset.ir}"]`).click(); }));
     document.getElementById("foot").textContent = `Actualizado: ${new Date(r.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina).`;
   }

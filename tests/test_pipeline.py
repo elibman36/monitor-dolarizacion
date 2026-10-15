@@ -512,3 +512,41 @@ def test_financiera_creditos_bcu():
     r = d.iloc[-1]
     assert d.index[-1] == pd.Timestamp("2026-08-31")
     assert round(r["me"] / r["total"] * 100, 1) == 46.8 and r["me_usd"] == 13138.8
+
+
+def test_financiera_parse_imf():
+    from monitor import financiera as f
+    txt = ("DATAFLOW,COUNTRY,SECTOR,INDICATOR,FREQUENCY,TIME_PERIOD,OBS_VALUE\n"
+           "x,CRI,S12CFSI,FSI131_AFSI_PT,M,2025-M11,31.0\n"
+           "x,CRI,S12CFSI,FSI131_AFSI_PT,M,2025-M12,31.4\n"
+           "x,CRI,S12CFSI,FSI131_AFSI_PT,Q,2025-Q4,31.4\n"
+           "x,BRA,S12CFSI,FSI680_AFSI_PT,Q,2026-Q2,11.3\n")
+    s = f.parse_imf_fsi(txt, "FSI131_AFSI_PT")
+    assert list(s.index.strftime("%Y-%m-%d")) == ["2025-11-30", "2025-12-31"] and s.iloc[-1] == 31.4
+    q = f.parse_imf_fsi(txt, "FSI680_AFSI_PT")
+    assert q.index[-1] == pd.Timestamp("2026-06-30")
+
+
+def test_financiera_parse_bcb():
+    from monitor import financiera as f
+    n = 8
+    filas = [[None] * n for _ in range(20)]
+    filas[2][4] = pd.Timestamp("2026-09-30"); filas[2][5] = "Semana 1"; filas[3][5] = pd.Timestamp("2026-10-02")
+    filas[3][6] = pd.Timestamp("2026-10-09")
+    def bloque(i, titulo, mn_usd, mn_bs, me_usd):
+        filas[i][3] = titulo
+        for j, v in enumerate([mn_usd, mn_bs, me_usd]):
+            filas[i + 1 + j][3] = ["Moneda nacional", "Pro Memoria: Moneda nacional (en millones de Bs)", "Moneda extranjera"][j]
+            for c in (4, 5, 6):
+                filas[i + 1 + j][c] = v
+    filas[5][3] = "  M’3   "
+    for c in (4, 5, 6):
+        filas[6][c] = 328574.0; filas[7][c] = 30716.0
+    filas[6][3] = "Moneda nacional"; filas[7][3] = "Moneda extranjera"
+    bloque(9, "Depósitos en entidades de intermediación financiera", 19953.6, 236450.5, 2592.1)
+    bloque(14, "Crédito del sistema financiero al sector privado7 (en millones de USD)", 19353.3, 229336.2, 94.9)
+    d = f.parse_bcb_semanal(pd.DataFrame(filas))
+    assert list(d.index.strftime("%Y-%m-%d")) == ["2026-09-30", "2026-10-02", "2026-10-09"]
+    r = d.iloc[-1]
+    assert round(r["dep_me_usd"] / (r["dep_me_usd"] + r["dep_mn_usd"]) * 100, 1) == 11.5
+    assert round(r["dep_mn_bs"] / r["dep_mn_usd"], 2) == 11.85
