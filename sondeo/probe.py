@@ -1,30 +1,21 @@
-import requests, urllib3, re, io, pandas as pd, json
+import requests, urllib3, re, io, pandas as pd
 urllib3.disable_warnings()
 H={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"}
-def get(u, **kw):
-    try: return requests.get(u,timeout=90,headers={**H,**kw.pop("headers",{})},verify=False,**kw)
-    except Exception as e: print("ERR",u,e); return None
-def links(u, pat, n=40):
-    r=get(u)
-    if r is None: return
-    print("PAGE",u,r.status_code,len(r.text))
-    hs=sorted(set(re.findall(r'href=["\']([^"\']+)["\']',r.text)))
-    k=0
-    for h in hs:
-        if re.search(pat,h,re.I):
-            print("   ",h[:200]); k+=1
-            if k>=n: break
-links("https://www.asfi.gob.bo/pb/estadisticas-intermediacion-financiera", r"xls|zip|boletin|mensual|estadist", 60)
-links("https://www.bcb.gob.bo/?q=estad-sticas-semanales", r"xls|pdf|semanal", 30)
-links("https://www.bcb.gob.bo/bcb_estadisticas/index.php", r".", 40)
-links("https://sdd.bccr.fi.cr/es/IndicadoresEconomicos/Inicio/Contenedor/6?Cuadro=1", r".", 60)
-# IMF: dataflows con FSI
-r=get("https://api.imf.org/external/sdmx/2.1/dataflow")
-if r is not None:
-    for m in re.finditer(r'<str:Dataflow[^>]*id="([^"]+)"[^>]*agencyID="([^"]+)"[^>]*version="([^"]+)".*?<com:Name[^>]*>([^<]+)<', r.text, re.S):
-        if re.search("FSI|Soundness|Monetary|MFS",m.group(4)+m.group(1),re.I): print("DF",m.group(2),m.group(1),m.group(3),m.group(4)[:80])
-for u in ["https://api.imf.org/external/sdmx/2.1/data/IMF.STA,FSIC/BOL..?startPeriod=2024&format=csv",
-          "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,FSIC/BOL?startPeriod=2024",
-          "https://api.imf.org/external/sdmx/3.0/data/dataflow/IMF.STA/FSIC/+/BOL.*.*?c[TIME_PERIOD]=ge:2024"]:
-    r=get(u, headers={"Accept":"application/vnd.sdmx.data+csv;version=1.0.0"})
-    if r is not None: print("IMFDATA",u[-60:],r.status_code,r.text[:1500].replace("\n"," || "))
+pd.set_option("display.width",250); pd.set_option("display.max_colwidth",70); pd.set_option("display.max_columns",20)
+# IMF FSIC: indicadores de moneda extranjera
+for c in ["BOL","CRI","CHL","COL","BRA","URY","PER","ARG"]:
+    r=requests.get(f"https://api.imf.org/external/sdmx/2.1/data/IMF.STA,FSIC/{c}?startPeriod=2025&format=csv",timeout=120,headers=H)
+    if not r.ok: print(c,r.status_code); continue
+    d=pd.read_csv(io.StringIO(r.text),low_memory=False)
+    m=d[d["SERIES_NAME"].astype(str).str.contains("oreign|urrency",regex=True)]
+    g=m.groupby(["INDICATOR","FREQUENCY"]).agg(n=("OBS_VALUE","size"),ult=("TIME_PERIOD","max"),val=("OBS_VALUE","last"),name=("SERIES_NAME","first"))
+    print("==",c); print(g.to_string()[:3000])
+# BCB semanal
+r=requests.get("https://www.bcb.gob.bo/webdocs/05_estadisticassemanales/Semanal%2042_2026.xlsx",timeout=120,headers=H,verify=False)
+print("BCB",r.status_code,len(r.content))
+x=pd.ExcelFile(io.BytesIO(r.content)); print("HOJAS",x.sheet_names)
+for s in x.sheet_names:
+    d=pd.read_excel(x,sheet_name=s,header=None)
+    txt=d.astype(str).apply(lambda col: col.str.contains("olivianiz|oneda extranjera|M/E|ME ",regex=True)).any(axis=1)
+    if txt.any():
+        print("--- HOJA",s,d.shape); print(d.iloc[:14,:10].to_string()[:2500])
