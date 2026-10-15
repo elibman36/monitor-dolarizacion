@@ -5,7 +5,8 @@ on:
 jobs:
   sondeo:
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - run: pip install requests pandas openpyxl xlrd
-      - run: python sondeo/probe.py
+      - run: timeout 600 python -u sondeo/probe.py

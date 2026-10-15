@@ -4,7 +4,7 @@ H={"User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 S
 pd.set_option("display.width",250); pd.set_option("display.max_columns",60)
 def g(u, **kw):
     try:
-        r=requests.get(u,timeout=90,headers={**H,**kw.pop("headers",{})},verify=False,**kw)
+        r=requests.get(u,timeout=(15,45),headers={**H,**kw.pop("headers",{})},verify=False,**kw)
         print("\n###",u,r.status_code,r.headers.get("content-type"),len(r.content)); return r
     except Exception as e:
         print("\n###",u,"ERR",e); return None
