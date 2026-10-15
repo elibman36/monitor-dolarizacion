@@ -206,9 +206,11 @@ a { color: inherit; }
         return `<span>${lbl}: <b class="${cls}">${txt}</b></span>`;
       };
       const dec = pct ? 1 : (x.unidad.startsWith("miles") ? 1 : 0);
+      const corta = pct ? "%" : x.unidad.startsWith("miles") ? "mil M USD" : x.unidad.startsWith("millones") ? "M USD" : x.unidad;
+      const per = x.frecuencia === "trimestral" ? "1 trimestre" : "1 mes";
       return `<div class="card tile"><div class="lbl">${x.label}<span class="badge">${x.frecuencia}</span></div>` +
-        `<div class="val">${nf(x.last, dec)}<small>${pct ? "%" : x.unidad}</small></div>` +
-        `<div class="chg">${chg(x.cambio_1m, "1 mes")}${chg(x.cambio_12m, "12 meses")}</div>` +
+        `<div class="val">${nf(x.last, dec)}<small>${corta}</small></div>` +
+        `<div class="chg">${chg(x.cambio_1m, per)}${chg(x.cambio_12m, "12 meses")}</div>` +
         `<div class="meta">Dato al ${x.last_date || "–"} · ${x.fuente}</div></div>`;
     }).join("");
   }
@@ -260,6 +262,8 @@ a { color: inherit; }
     document.getElementById("sec-desc").hidden = !hayDesc;
     if (hayDesc) { desc("c-desc-dep", d.descomposicion.depositos); desc("c-desc-cred", d.descomposicion.credito, "card-desc-cred"); }
     simple("c-usd", d.indicadores.depositos_usd, "--s1", "card-usd");
+    // Si un país sólo tiene el dato del exterior, la tarjeta ocupa todo el ancho.
+    document.getElementById("card-ext").parentElement.style.gridTemplateColumns = d.indicadores.depositos_usd ? "" : "1fr";
     simple("c-ext", d.indicadores.exterior, "--s2", "card-ext", 3650);
     const m3 = d.indicadores.m3;
     document.getElementById("sec-m3").hidden = !m3;

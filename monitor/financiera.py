@@ -103,6 +103,9 @@ def _cambio(s: pd.Series, dias: int) -> float | None:
     s = s.dropna()
     if s.empty:
         return None
+    # En series trimestrales, "1 mes" es el trimestre anterior.
+    if len(s) > 2 and (s.index[-1] - s.index[-2]).days > 80 and dias < 80:
+        dias = 85
     prev = s[s.index <= s.index[-1] - pd.Timedelta(days=dias)]
     return None if prev.empty else float(s.iloc[-1] - prev.iloc[-1])
 
