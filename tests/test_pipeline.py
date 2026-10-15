@@ -472,3 +472,27 @@ def test_flujos_financieros_del_anexo():
     assert out.loc["2026-07", "directa_neto"] == 30.0
     assert out.loc["2026-07", "deuda_neto"] == 1100.0
     assert out.loc["2026-08", "portafolio_neto"] == -190.0 and out.loc["2026-08", "deuda_neto"] == 0.0
+
+
+def test_financiera_ratio_y_descomposicion():
+    from monitor import financiera as f
+    idx = pd.to_datetime(["2026-01-31", "2026-02-28", "2026-03-31"])
+    mn = pd.Series([800.0, 800.0, 800.0], index=idx)       # pesos
+    me = pd.Series([100.0, 100.0, 110.0], index=idx)       # dólares
+    tc = pd.Series([2.0, 3.0, 3.0], index=idx)
+    r = f.ratio(me * tc, mn)
+    assert round(r.iloc[0], 2) == 20.0
+    d = f.descomponer(mn, me, tc)
+    # Febrero: sólo cambió el tipo de cambio -> todo es valuación.
+    assert abs(d.loc["2026-02-28", "portafolio"]) < 1e-9 and d.loc["2026-02-28", "valuacion"] > 0
+    # Marzo: sólo cambiaron los saldos -> todo es portafolio.
+    assert abs(d.loc["2026-03-31", "valuacion"]) < 1e-9 and d.loc["2026-03-31", "portafolio"] > 0
+    assert (abs(d["total"] - d["valuacion"] - d["portafolio"]) < 1e-9).all()
+
+
+def test_financiera_parse_bis():
+    from monitor import financiera as f
+    txt = "FREQ,UNIT_MULT,TIME_PERIOD,OBS_VALUE\nQ,6,2025-Q4,120500\nQ,6,2026-Q1,121000\n"
+    s = f.parse_bis(txt)
+    assert list(s.index.strftime("%Y-%m-%d")) == ["2025-12-31", "2026-03-31"]
+    assert s.iloc[-1] == 121.0  # miles de millones de USD
