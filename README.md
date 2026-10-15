@@ -236,6 +236,27 @@ República (los NDF, como cambio del stock vigente). No incluye
 las ventas del Tesoro argentino ni las tasas de interés, y con cepo subestima
 la presión argentina, que se va a la brecha.
 
+## Monitor de Dolarización Financiera
+
+Proyecto aparte, en `financiera/` (tablero) y `monitor/financiera.py`
+(datos, `python -m monitor.financiera`). No mide estrés cambiario sino la
+dolarización como la define la literatura (Ize y Levy Yeyati, 2003): qué parte
+de los depósitos, el crédito y la liquidez está en moneda extranjera.
+
+| País | Depósitos | Crédito | Liquidez | Frecuencia | Fuente |
+|---|---|---|---|---|---|
+| Argentina | sí | sí | sí (con circulante); M3 desde 1940 | diaria | BCRA |
+| Perú | sí | sí | sí (coeficiente del BCRP) | mensual | BCRP |
+| Uruguay | sí | sí | – | mensual | BCU (SSF) |
+| Brasil, Colombia | – (los residentes no pueden tener depósitos locales en dólares, salvo excepciones) | – | – | – | – |
+| Chile | pendiente (API del BCCh con registro) | – | – | – | – |
+
+Cada cambio se separa en **efecto valuación** (sólo el tipo de cambio) y
+**efecto portafolio** (con el tipo de cambio del mes anterior); suman el
+cambio total. Para los seis países se agregan los depósitos de residentes no
+bancarios en bancos del exterior (BIS, estadísticas bancarias territoriales,
+trimestral). Datos en `data/financiera/`.
+
 ## Próximos pasos posibles
 
 - Uruguay: tasa de política monetaria y riesgo país (UBI) cuando haya una fuente automática.

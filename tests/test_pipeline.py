@@ -496,3 +496,19 @@ def test_financiera_parse_bis():
     s = f.parse_bis(txt)
     assert list(s.index.strftime("%Y-%m-%d")) == ["2025-12-31", "2026-03-31"]
     assert s.iloc[-1] == 121.0  # miles de millones de USD
+
+
+def test_financiera_creditos_bcu():
+    from monitor import financiera as f
+    filas = [[None] * 39 for _ in range(12)]
+    filas[5][1] = "TOTAL (MN + ME) en millones de pesos"
+    filas[5][19] = "MONEDA NACIONAL en millones de pesos"
+    filas[5][29] = "MONEDA EXTRANJERA en millones de dólares"
+    filas[7][0] = "Mes"
+    fila = [None] * 39
+    fila[0] = pd.Timestamp("2026-08-01"); fila[3] = 1130517.8; fila[21] = 601758.5; fila[31] = 13138.8
+    filas.append(fila)
+    d = f.parse_creditos_bcu(pd.DataFrame(filas))
+    r = d.iloc[-1]
+    assert d.index[-1] == pd.Timestamp("2026-08-31")
+    assert round(r["me"] / r["total"] * 100, 1) == 46.8 and r["me_usd"] == 13138.8

@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dolarización Financiera</title>
+<meta name="description" content="Monitor de dolarización financiera: qué parte de los depósitos, el crédito y el dinero está en dólares en Argentina, Perú, Uruguay, Brasil, Chile y Colombia.">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<style>
+/* Mismo sistema visual que el Monitor de Dolarización: tarjetas sobre fondo
+   neutro, una columna de lectura y gráficos con la paleta categórica validada. */
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10); --wash: rgba(11,11,11,0.05);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300;
+  --up: #b42318; --down: #2a78d6;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
+    --up: #f97066; --down: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.06);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
+  --up: #f97066; --down: #3987e5;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+[hidden] { display: none !important; }
+body { background: var(--page); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.45; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
+header.top { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }
+h1 { font-size: 24px; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 16px; margin: 0 0 2px; }
+.sub { color: var(--ink-2); margin: 4px 0 0; }
+.note { color: var(--muted); font-size: 13px; margin: 0; }
+.controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: inherit; font-size: 13px; border: 0; background: none; color: var(--ink-2); padding: 6px 10px; cursor: pointer; }
+.seg button:hover { background: var(--wash); }
+.seg button[aria-pressed="true"] { color: var(--ink); font-weight: 600; background: var(--wash); }
+.seg button:focus-visible, .btn:focus-visible { outline: 2px solid var(--s1); outline-offset: -2px; }
+.btn { font: inherit; font-size: 13px; color: var(--ink-2); text-decoration: none; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; background: var(--surface); cursor: pointer; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile .lbl { font-size: 13px; color: var(--ink-2); min-height: 2.6em; }
+.tile .val { font-size: 30px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; margin-top: 4px; }
+.tile .val small { font-size: 14px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+.tile .chg { display: flex; gap: 14px; font-size: 13px; color: var(--ink-2); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.tile .meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.up { color: var(--up); } .down { color: var(--down); }
+.badge { display: inline-block; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); background: var(--wash); border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; }
+.chart { height: 320px; margin-top: 8px; }
+.chart.tall { height: 380px; }
+.aviso { border-left: 3px solid var(--s4); padding: 10px 14px; margin-bottom: 16px; color: var(--ink-2); }
+.section { margin-bottom: 16px; }
+.method p { margin: 0 0 10px; max-width: 80ch; color: var(--ink-2); }
+.method h2 { margin-bottom: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-weight: 600; color: var(--ink-2); border-bottom: 1px solid var(--axis); padding: 6px 8px; white-space: nowrap; }
+td { border-bottom: 1px solid var(--grid); padding: 6px 8px; }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.table-wrap { overflow-x: auto; }
+footer { color: var(--muted); font-size: 12px; margin-top: 20px; }
+a { color: inherit; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Monitor de Dolarización Financiera</h1>
+      <p class="sub" id="sub">Qué parte de los depósitos, el crédito y el dinero está en dólares.</p>
+    </div>
+    <div class="controls">
+      <div class="seg" id="pais" role="group" aria-label="País">
+        <button data-p="ar">Argentina</button><button data-p="pe">Perú</button><button data-p="uy">Uruguay</button><button data-p="br">Brasil</button><button data-p="cl">Chile</button><button data-p="co">Colombia</button><button data-p="comparado">Comparar países</button>
+      </div>
+      <div class="seg" id="range" role="group" aria-label="Período">
+        <button data-r="365">1A</button><button data-r="1825" aria-pressed="true">5A</button><button data-r="3650">10A</button><button data-r="0">Todo</button>
+      </div>
+      <a class="btn" href="../">Índice de Dolarización (estrés cambiario)</a>
+      <button class="btn" id="theme" type="button" aria-label="Cambiar tema">◐</button>
+    </div>
+  </header>
+
+  <div id="vista-pais">
+    <div class="card aviso" id="aviso" hidden></div>
+    <section class="tiles" id="tiles"></section>
+    <section class="card section" id="sec-ratios">
+      <h2>Dolarización por instrumento</h2>
+      <p class="note" id="ratios-note">Porcentaje en moneda extranjera de cada agregado, con los saldos en dólares valuados al tipo de cambio del día.</p>
+      <div class="chart tall" id="c-ratios" role="img" aria-label="Dolarización de depósitos, crédito y liquidez"></div>
+    </section>
+    <section class="grid2" id="sec-desc">
+      <div class="card">
+        <h2>Por qué cambió la dolarización de los depósitos</h2>
+        <p class="note">Cambio mensual, en puntos porcentuales. <b>Portafolio</b>: la gente pasó saldos de una moneda a otra. <b>Valuación</b>: el tipo de cambio revaluó los saldos en dólares, sin que nadie moviera nada. Los dos suman el cambio total (punto).</p>
+        <div class="chart" id="c-desc-dep" role="img" aria-label="Descomposición del cambio de la dolarización de depósitos"></div>
+      </div>
+      <div class="card" id="card-desc-cred">
+        <h2>Por qué cambió la dolarización del crédito</h2>
+        <p class="note">Misma descomposición, para el crédito al sector privado.</p>
+        <div class="chart" id="c-desc-cred" role="img" aria-label="Descomposición del cambio de la dolarización del crédito"></div>
+      </div>
+    </section>
+    <section class="grid2">
+      <div class="card" id="card-usd">
+        <h2>Depósitos en dólares</h2>
+        <p class="note">Saldo, millones de USD.</p>
+        <div class="chart" id="c-usd" role="img" aria-label="Depósitos en dólares"></div>
+      </div>
+      <div class="card" id="card-ext">
+        <h2>Depósitos en bancos del exterior</h2>
+        <p class="note">Depósitos de residentes no bancarios (personas y empresas) en bancos del exterior, miles de millones de USD, trimestral. BIS, estadísticas bancarias territoriales.</p>
+        <div class="chart" id="c-ext" role="img" aria-label="Depósitos de residentes en bancos del exterior"></div>
+      </div>
+    </section>
+    <section class="card section" id="sec-m3" hidden>
+      <h2>Dolarización de M3, serie larga</h2>
+      <p class="note">Moneda extranjera en M3 (circulante y depósitos de los sectores privado y público), fin de cada mes. La caída de 2002 es la pesificación de los depósitos. BCRA, agregados monetarios.</p>
+      <div class="chart" id="c-m3" role="img" aria-label="Dolarización de M3 desde 1970"></div>
+    </section>
+  </div>
+
+  <div id="vista-comparado" hidden>
+    <section class="card section">
+      <h2>Dolarización de los depósitos</h2>
+      <p class="note">Porcentaje de los depósitos en moneda extranjera, fin de cada mes. A diferencia de un índice de presión, este nivel sí se compara entre países. Brasil, Chile y Colombia no tienen una serie local pública (ver cada país).</p>
+      <div class="chart tall" id="c-comp-dep" role="img" aria-label="Dolarización de depósitos por país"></div>
+    </section>
+    <section class="card section">
+      <h2>Depósitos en bancos del exterior</h2>
+      <p class="note">Depósitos de residentes no bancarios en bancos del exterior, miles de millones de USD, trimestral (BIS).</p>
+      <div class="chart tall" id="c-comp-ext" role="img" aria-label="Depósitos en bancos del exterior por país"></div>
+    </section>
+    <section class="card section table-wrap">
+      <h2>Último dato</h2>
+      <table id="comp-tbl"><thead><tr><th>País</th><th class="num">Depósitos</th><th class="num">Crédito</th><th class="num">Liquidez</th><th class="num">Exterior (miles de M USD)</th><th>Frecuencia local</th></tr></thead><tbody></tbody></table>
+    </section>
+  </div>
+
+  <section class="card method">
+    <h2>Qué mide y cómo</h2>
+    <p>La <b>dolarización financiera</b> es la parte de los activos y pasivos del sistema financiero que está en moneda extranjera (Ize y Levy Yeyati, 2003). Se mide con tres cocientes: <b>depósitos</b> en dólares sobre depósitos totales del sector privado, <b>crédito</b> en dólares sobre crédito total al sector privado y <b>liquidez</b> (dinero amplio) en dólares sobre la liquidez total, que en Argentina incluye el circulante en pesos. Los saldos en dólares se valúan al tipo de cambio de cada fecha.</p>
+    <p>Como los saldos en dólares se valúan en moneda local, una devaluación sube la dolarización aunque nadie haya cambiado sus depósitos. Por eso cada cambio se separa en <b>efecto valuación</b> (el cambio que produce sólo el tipo de cambio) y <b>efecto portafolio</b> (el cambio con el tipo de cambio del mes anterior, es decir, lo que movió la gente). Los dos suman exactamente el cambio total.</p>
+    <p>La dolarización que sale del sistema local no se ve en estos cocientes: los dólares en efectivo fuera de los bancos y los depósitos en el exterior. Para lo segundo se usan las estadísticas bancarias territoriales del Banco de Pagos Internacionales (BIS): depósitos de personas y empresas de cada país en bancos de otros países, trimestrales y con unos cuatro meses de rezago. Es la única medida comparable para Brasil y Colombia, donde los residentes no pueden tener depósitos en dólares en el sistema local (salvo excepciones), y para Chile mientras no esté disponible la serie del Banco Central.</p>
+    <p><b>Frecuencia.</b> Argentina: diaria (API del BCRA), con M3 mensual desde 1940. Perú: mensual (BCRP). Uruguay: mensual (BCU, Superintendencia de Servicios Financieros). Exterior: trimestral (BIS). Todo se descarga automáticamente todos los días.</p>
+    <p><b>Fuentes.</b> BCRA: depósitos y préstamos del sector privado por moneda, billetes y monedas en poder del público, agregados monetarios; tipo de cambio A3500. BCRP: liquidez y crédito de las sociedades creadoras de depósito. BCU: depósitos y créditos del sector no financiero, sistema bancario; tipo de cambio interbancario. BIS: Locational Banking Statistics.</p>
+  </section>
+  <footer id="foot"></footer>
+</div>
+
+<script>
+(function () {
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const nf = (v, d = 1) => v == null || !isFinite(v) ? "–" : Number(v).toLocaleString("es-AR", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const COLOR_PAIS = { ar: "--s1", pe: "--s2", uy: "--s3", br: "--s4", co: "--s5", cl: "--s6" };
+  const ORDEN = ["ar", "pe", "uy", "br", "cl", "co"];
+  let PAIS = "ar", rangeDays = 1825;
+  try { const q = new URLSearchParams(location.search).get("pais"); if (q && (ORDEN.includes(q) || q === "comparado")) PAIS = q; } catch (e) {}
+  const cache = {};
+  const charts = [];
+  const mount = (id) => { const el = document.getElementById(id); let c = echarts.getInstanceByDom(el); if (c) c.dispose(); c = echarts.init(el, null, { renderer: "svg" }); charts.push(c); return c; };
+  window.addEventListener("resize", () => charts.forEach((c) => c.resize()));
+  const empty = (id, txt) => { const el = document.getElementById(id); const c = echarts.getInstanceByDom(el); if (c) c.dispose(); el.innerHTML = `<p class="note" style="padding:24px 0">${txt}</p>`; };
+  const cut = (pairs, minDays = 0) => {
+    if (!rangeDays || !pairs.length) return pairs;
+    const last = new Date(pairs[pairs.length - 1][0]);
+    const from = new Date(last - Math.max(rangeDays, minDays) * 864e5).toISOString().slice(0, 10);
+    return pairs.filter((p) => p[0] >= from);
+  };
+  const base = () => ({
+    animation: false,
+    textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
+    grid: { left: 8, right: 16, top: 36, bottom: 8, containLabel: true },
+    tooltip: { trigger: "axis", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 }, axisPointer: { type: "line", lineStyle: { color: css("--axis") } } },
+    legend: { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } },
+    xAxis: { type: "time", axisLine: { lineStyle: { color: css("--axis") } }, axisTick: { show: false }, axisLabel: { color: css("--muted"), fontSize: 11, hideOverlap: true }, splitLine: { show: false } },
+    yAxis: { type: "value", scale: true, axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: css("--muted"), fontSize: 11, formatter: (v) => nf(v, 0) }, splitLine: { lineStyle: { color: css("--grid") } } },
+  });
+  const line = (name, data, color, extra = {}) => Object.assign({ name, type: "line", data, showSymbol: false, symbolSize: 7, sampling: "lttb", lineStyle: { width: 2, color }, itemStyle: { color }, emphasis: { focus: "series" } }, extra);
+
+  function tiles(d) {
+    const box = document.getElementById("tiles");
+    const orden = ["depositos", "credito", "liquidez", "exterior", "depositos_usd"];
+    box.innerHTML = orden.filter((k) => d.indicadores[k]).map((k) => {
+      const x = d.indicadores[k];
+      const pct = x.unidad.startsWith("%");
+      const chg = (v, lbl) => {
+        if (v == null) return `<span>${lbl}: –</span>`;
+        const txt = pct ? `${v > 0 ? "+" : ""}${nf(v, 1)} pp` : `${v > 0 ? "+" : ""}${nf(v, pct ? 1 : (x.unidad.startsWith("miles") ? 1 : 0))}`;
+        // Más dolarización (o más depósitos afuera) en rojo; menos, en azul. Los saldos en USD van sin color.
+        const cls = k === "depositos_usd" ? "" : v > 0 ? "up" : v < 0 ? "down" : "";
+        return `<span>${lbl}: <b class="${cls}">${txt}</b></span>`;
+      };
+      const dec = pct ? 1 : (x.unidad.startsWith("miles") ? 1 : 0);
+      return `<div class="card tile"><div class="lbl">${x.label}<span class="badge">${x.frecuencia}</span></div>` +
+        `<div class="val">${nf(x.last, dec)}<small>${pct ? "%" : x.unidad}</small></div>` +
+        `<div class="chg">${chg(x.cambio_1m, "1 mes")}${chg(x.cambio_12m, "12 meses")}</div>` +
+        `<div class="meta">Dato al ${x.last_date || "–"} · ${x.fuente}</div></div>`;
+    }).join("");
+  }
+
+  function ratios(d) {
+    const ser = [["depositos", "Depósitos", "--s1"], ["credito", "Crédito", "--s2"], ["liquidez", "Liquidez", "--s3"]].filter(([k]) => d.indicadores[k]);
+    document.getElementById("sec-ratios").hidden = !ser.length;
+    if (!ser.length) return;
+    const c = mount("c-ratios"); const o = base();
+    o.tooltip.valueFormatter = (v) => nf(v, 1) + "%";
+    o.series = ser.map(([k, n, col]) => line(n, cut(d.indicadores[k].data), css(col)));
+    c.setOption(o);
+  }
+
+  function desc(id, rows, card) {
+    if (card) document.getElementById(card).hidden = !rows || !rows.length;
+    if (!rows || !rows.length) return empty(id, "Sin datos para descomponer.");
+    const n = rangeDays ? Math.max(12, Math.round(rangeDays / 30.44)) : rows.length;
+    const r = rows.slice(-Math.min(n, 60));
+    const c = mount(id); const o = base();
+    o.xAxis = { type: "category", data: r.map((x) => x[0]), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--muted"), fontSize: 11, hideOverlap: true } };
+    o.yAxis.axisLabel.formatter = (v) => nf(v, 1);
+    o.tooltip.valueFormatter = (v) => v == null ? "–" : (v > 0 ? "+" : "") + nf(v, 2) + " pp";
+    o.legend.itemHeight = 8;
+    o.series = [
+      { name: "Portafolio", type: "bar", stack: "d", data: r.map((x) => x[3]), itemStyle: { color: css("--s1"), borderColor: css("--surface"), borderWidth: 1 }, barMaxWidth: 16 },
+      { name: "Valuación", type: "bar", stack: "d", data: r.map((x) => x[2]), itemStyle: { color: css("--s4"), borderColor: css("--surface"), borderWidth: 1 }, barMaxWidth: 16 },
+      { name: "Cambio total", type: "line", data: r.map((x) => x[1]), showSymbol: true, symbol: "circle", symbolSize: 7, lineStyle: { width: 0 }, itemStyle: { color: css("--ink"), borderColor: css("--surface"), borderWidth: 2 }, z: 4 },
+    ];
+    c.setOption(o);
+  }
+
+  function simple(id, x, color, card, minDays = 0) {
+    document.getElementById(card).hidden = !x;
+    if (!x) return;
+    const c = mount(id); const o = base();
+    const dec = x.unidad.startsWith("miles") ? 1 : 0;
+    o.legend = undefined; o.grid.top = 16;
+    o.tooltip.valueFormatter = (v) => nf(v, dec) + " " + (x.unidad.startsWith("miles") ? "mil M USD" : "M USD");
+    o.series = [line(x.label, cut(x.data, minDays), css(color), x.frecuencia === "trimestral" ? { showSymbol: true, symbolSize: 6 } : {})];
+    c.setOption(o);
+  }
+
+  function renderPais(d) {
+    const av = document.getElementById("aviso");
+    av.hidden = !d.nota; av.textContent = d.nota || "";
+    tiles(d); ratios(d);
+    const hayDesc = d.descomposicion && d.descomposicion.depositos && d.descomposicion.depositos.length;
+    document.getElementById("sec-desc").hidden = !hayDesc;
+    if (hayDesc) { desc("c-desc-dep", d.descomposicion.depositos); desc("c-desc-cred", d.descomposicion.credito, "card-desc-cred"); }
+    simple("c-usd", d.indicadores.depositos_usd, "--s1", "card-usd");
+    simple("c-ext", d.indicadores.exterior, "--s2", "card-ext", 3650);
+    const m3 = d.indicadores.m3;
+    document.getElementById("sec-m3").hidden = !m3;
+    if (m3) { const c = mount("c-m3"); const o = base(); o.legend = undefined; o.grid.top = 16; o.tooltip.valueFormatter = (v) => nf(v, 1) + "%"; o.series = [line("M3 en moneda extranjera", m3.data, css("--s1"))]; c.setOption(o); }
+    document.getElementById("foot").textContent = `Actualizado: ${new Date(d.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina).`;
+  }
+
+  function renderComp(r) {
+    const ps = ORDEN.filter((k) => r.paises[k]);
+    const c1 = mount("c-comp-dep"); const o1 = base();
+    o1.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 1) + "%";
+    o1.series = ps.filter((k) => r.paises[k].depositos_mensual.length).map((k) => line(r.paises[k].nombre, cut(r.paises[k].depositos_mensual), css(COLOR_PAIS[k])));
+    c1.setOption(o1);
+    const c2 = mount("c-comp-ext"); const o2 = base();
+    o2.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 1) + " mil M USD";
+    o2.series = ps.filter((k) => r.paises[k].exterior.length).map((k) => line(r.paises[k].nombre, cut(r.paises[k].exterior, 3650), css(COLOR_PAIS[k]), { showSymbol: true, symbolSize: 5 }));
+    c2.setOption(o2);
+    const v = (p, k, dec = 1, suf = "%") => { const x = p.ultimos[k]; return x && x.last != null ? `${nf(x.last, dec)}${suf} <span class="note">(${x.last_date.slice(0, 7)})</span>` : "–"; };
+    document.querySelector("#comp-tbl tbody").innerHTML = ps.map((k) => { const p = r.paises[k];
+      return `<tr><td><span style="display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px;background:var(${COLOR_PAIS[k]})"></span><a href="?pais=${k}" data-ir="${k}">${p.nombre}</a></td><td class="num">${v(p, "depositos")}</td><td class="num">${v(p, "credito")}</td><td class="num">${v(p, "liquidez")}</td><td class="num">${v(p, "exterior", 1, "")}</td><td>${p.frecuencia || "–"}</td></tr>`; }).join("");
+    document.querySelectorAll("#comp-tbl [data-ir]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); document.querySelector(`#pais button[data-p="${a.dataset.ir}"]`).click(); }));
+    document.getElementById("foot").textContent = `Actualizado: ${new Date(r.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina).`;
+  }
+
+  function cargar() {
+    document.querySelectorAll("#pais button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p === PAIS)));
+    const comp = PAIS === "comparado";
+    document.getElementById("vista-pais").hidden = comp;
+    document.getElementById("vista-comparado").hidden = !comp;
+    const src = comp ? "../data/financiera/resumen.json" : `../data/financiera/${PAIS}.json`;
+    const p = cache[src] ? Promise.resolve(cache[src]) : fetch(src, { cache: "no-store" }).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).then((d) => (cache[src] = d));
+    return p.then((d) => { charts.forEach((c) => c.dispose()); charts.length = 0; comp ? renderComp(d) : renderPais(d); })
+      .catch(() => { document.getElementById("foot").textContent = "No se pudieron cargar los datos. Probá recargar la página."; });
+  }
+  const redibujar = () => { const src = PAIS === "comparado" ? "../data/financiera/resumen.json" : `../data/financiera/${PAIS}.json`; if (cache[src]) { charts.forEach((c) => c.dispose()); charts.length = 0; PAIS === "comparado" ? renderComp(cache[src]) : renderPais(cache[src]); } };
+  document.querySelectorAll("#pais button").forEach((b) => b.addEventListener("click", () => {
+    PAIS = b.dataset.p;
+    try { const u = new URL(location.href); u.searchParams.set("pais", PAIS); history.replaceState(null, "", u.toString()); } catch (e) {}
+    cargar();
+  }));
+  document.querySelectorAll("#range button").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("#range button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    rangeDays = +b.dataset.r; redibujar();
+  }));
+  document.getElementById("theme").addEventListener("click", () => {
+    const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.dataset.theme = dark ? "light" : "dark";
+    redibujar();
+  });
+  cargar();
+})();
+</script>
+</body>
+</html>

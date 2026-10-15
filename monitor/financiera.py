@@ -60,7 +60,7 @@ BCRP_CODES = {
     "cred_coef": "PN00511MM",     # coeficiente de dolarización del crédito (%)
 }
 BCU_CREDITOS_XLSX = "https://www.bcu.gub.uy/Servicios-Financieros-SSF/Series%20IF/Creditos.xlsx"
-BIS_URL = "https://stats.bis.org/api/v1/data/WS_LBS_D_PUB/Q.S.L.D.TO1.A.5J.A.5A.N.{pais}.N?startPeriod=2000&format=csv"
+BIS_URL = "https://stats.bis.org/api/v1/data/WS_LBS_D_PUB/Q.S.L.A.TO1.A.5J.A.5A.N.{pais}.N?startPeriod=2000&format=csv"
 BIS_PAISES = {"ar": "AR", "pe": "PE", "uy": "UY", "br": "BR", "cl": "CL", "co": "CO"}
 NOMBRES = {"ar": "Argentina", "pe": "Perú", "uy": "Uruguay", "br": "Brasil", "cl": "Chile", "co": "Colombia"}
 NOTAS = {
@@ -166,7 +166,8 @@ def argentina(offline: bool) -> dict:
     cred = ratio(alc(raw["cred_usd"]) * alc(tc), alc(raw["cred_pesos"]))
     liq = ratio(al(raw["dep_usd"]) * e, al(raw["dep_pesos"]) + al(raw["circulante"]))
     m3 = ((raw["m3_total"] - raw["m3_local"]) / raw["m3_total"] * 100).dropna()
-    m3 = m3[m3.index >= "1970-01-01"]
+    # Antes de mediados de los setenta no había depósitos en moneda extranjera.
+    m3 = m3[m3.index >= m3[m3 > 0.5].index.min()] if (m3 > 0.5).any() else m3
     fuente = "BCRA (API de series estadísticas)"
     return {
         "frecuencia": "diaria",
@@ -212,6 +213,32 @@ def peru(offline: bool) -> dict:
     }
 
 
+def parse_creditos_bcu(df: pd.DataFrame) -> pd.DataFrame:
+    """Hoja 'Total Sist. Banc.' de Creditos.xlsx: tres bloques (total MN+ME en
+    pesos, moneda nacional en pesos y moneda extranjera en dólares), cada uno
+    con sector privado (vigentes, vencidos, total) primero. Se toma el total
+    del sector privado de cada bloque, ubicándolo por el título del bloque."""
+    fila = next(i for i in range(min(40, len(df))) if str(df.iloc[i, 0]).strip().lower() == "mes")
+    cab = df.iloc[max(0, fila - 6):fila + 1].astype(str)
+
+    def col_total(clave: str) -> int:
+        for c in range(df.shape[1]):
+            if cab[c].str.upper().str.contains(clave, regex=False).any():
+                return c + 2
+        raise ValueError(f"Créditos BCU: no encuentro el bloque {clave!r}")
+    c_tot, c_mn, c_me = col_total("TOTAL (MN + ME)"), col_total("MONEDA NACIONAL"), col_total("MONEDA EXTRANJERA")
+    d = df.iloc[fila + 1:, [0, c_tot, c_mn, c_me]].copy()
+    d.columns = ["fecha", "total", "mn", "me_usd"]
+    d["fecha"] = pd.to_datetime(d["fecha"], errors="coerce")
+    d = d.dropna(subset=["fecha"])
+    for c in ["total", "mn", "me_usd"]:
+        d[c] = pd.to_numeric(d[c], errors="coerce")
+    d = d.dropna(subset=["total", "mn"])
+    d["fecha"] = d["fecha"] + pd.offsets.MonthEnd(0)
+    d["me"] = d["total"] - d["mn"]          # moneda extranjera, en pesos
+    return d.set_index("fecha")[["mn", "me", "total", "me_usd"]].sort_index()
+
+
 def _bcu_hoja(url: str, key: str, offline: bool) -> pd.DataFrame:
     """Hoja 'Total Sist. Banc.' de un archivo de la SSF (depósitos o créditos):
     sector no financiero en MN y ME, millones de pesos."""
@@ -221,7 +248,7 @@ def _bcu_hoja(url: str, key: str, offline: bool) -> pd.DataFrame:
     if not offline:
         try:
             hoja = pd.read_excel(io.BytesIO(uy._get(url).content), sheet_name=uy.DEPOSITOS_HOJA, header=None)
-            d = uy.parse_depositos(hoja)[["mn", "me", "total"]]
+            d = parse_creditos_bcu(hoja) if key == "creditos" else uy.parse_depositos(hoja)[["mn", "me", "total"]]
             path.parent.mkdir(parents=True, exist_ok=True)
             d.to_csv(path, date_format="%Y-%m-%d")
         except Exception as exc:  # noqa: BLE001
@@ -248,8 +275,8 @@ def uruguay(offline: bool) -> dict:
             desc["depositos"] = _desc_pairs(descomponer(dep["mn"], me_usd, tc))
     if not cred.empty:
         ind["credito"] = indicador(ratio(cred["me"], cred["mn"]), "Dolarización del crédito al sector no financiero", "% en moneda extranjera", "mensual", fuente)
-        if not tc.empty:
-            desc["credito"] = _desc_pairs(descomponer(cred["mn"], cred["me"] / tc.reindex(cred.index, method="ffill"), tc))
+        if "me_usd" in cred:
+            desc["credito"] = _desc_pairs(descomponer(cred["mn"], cred["me_usd"], (cred["me"] / cred["me_usd"]).dropna()))
     return {"frecuencia": "mensual", "indicadores": ind, "descomposicion": desc}
 
 
