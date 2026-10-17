@@ -296,6 +296,23 @@ def parse_creditos_bcu(df: pd.DataFrame) -> pd.DataFrame:
     return d.set_index("fecha")[["mn", "me", "total", "me_usd"]].sort_index()
 
 
+def parse_vista_bcu(df: pd.DataFrame) -> pd.DataFrame:
+    """Anexo de la hoja 'Total Sist. Banc.' de Depositos.xlsx: depósitos del
+    sector privado según modalidad (vista y plazo), en moneda nacional y
+    extranjera, millones de pesos. Devuelve las dos columnas a la vista."""
+    fila = next(i for i in range(min(40, len(df))) if str(df.iloc[i, 0]).strip().lower() == "mes")
+    vistas = [c for c in range(df.shape[1]) if str(df.iloc[fila + 1, c]).strip().lower() == "vista"]
+    if len(vistas) < 2:
+        raise ValueError("Depósitos BCU: no encuentro el anexo por modalidad")
+    d = df.iloc[fila + 2:, [0, vistas[0], vistas[1]]].copy()
+    d.columns = ["fecha", "vista_mn", "vista_me"]
+    d["fecha"] = pd.to_datetime(d["fecha"], errors="coerce") + pd.offsets.MonthEnd(0)
+    d = d.dropna(subset=["fecha"])
+    for c in ["vista_mn", "vista_me"]:
+        d[c] = pd.to_numeric(d[c], errors="coerce")
+    return d.dropna(subset=["vista_mn", "vista_me"]).set_index("fecha").sort_index()
+
+
 def _bcu_hoja(url: str, key: str, offline: bool) -> pd.DataFrame:
     """Hoja 'Total Sist. Banc.' de un archivo de la SSF (depósitos o créditos):
     sector no financiero en MN y ME, millones de pesos."""
@@ -305,7 +322,14 @@ def _bcu_hoja(url: str, key: str, offline: bool) -> pd.DataFrame:
     if not offline:
         try:
             hoja = pd.read_excel(io.BytesIO(uy._get(url).content), sheet_name=uy.DEPOSITOS_HOJA, header=None)
-            d = parse_creditos_bcu(hoja) if key == "creditos" else uy.parse_depositos(hoja)[["mn", "me", "total"]]
+            if key == "creditos":
+                d = parse_creditos_bcu(hoja)
+            else:
+                d = uy.parse_depositos(hoja)[["mn", "me", "total"]]
+                try:
+                    d = d.join(parse_vista_bcu(hoja))
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("BCU depósitos a la vista: %s", exc)
             path.parent.mkdir(parents=True, exist_ok=True)
             d.to_csv(path, date_format="%Y-%m-%d")
         except Exception as exc:  # noqa: BLE001
@@ -326,6 +350,8 @@ def uruguay(offline: bool) -> dict:
     desc = {}
     if not dep.empty:
         ind["depositos"] = indicador(ratio(dep["me"], dep["mn"]), "Dolarización de los depósitos del sector no financiero", "% en moneda extranjera", "mensual", fuente)
+        if "vista_me" in dep and dep["vista_me"].notna().any():
+            ind["vista"] = indicador(ratio(dep["vista_me"], dep["vista_mn"]), "Dolarización de los depósitos privados a la vista", "% en moneda extranjera", "mensual", fuente)
         if not tc.empty:
             me_usd = dep["me"] / tc.reindex(dep.index, method="ffill")
             ind["depositos_usd"] = indicador(me_usd, "Depósitos en moneda extranjera", "millones de USD", "mensual", fuente, 0)
@@ -373,6 +399,13 @@ def parse_bcb_semanal(df: pd.DataFrame) -> pd.DataFrame:
         "cred_mn_usd": val(cre + 1), "cred_mn_bs": val(cre + 2), "cred_me_usd": val(cre + 3),
         "m3_mn_bs": val(m3 + 1), "m3_me_bs": val(m3 + 2),
     })
+    # Depósitos a la vista y en caja de ahorro (medio de pago), si el archivo los trae.
+    for clave, texto in (("vista", "A la vista"), ("ca", "Caja de ahorro")):
+        try:
+            f = _fila(df, texto, desde=dep)
+            out[f"{clave}_mn_usd"], out[f"{clave}_me_usd"] = val(f + 1), val(f + 3)
+        except ValueError:
+            pass
     out = out[~out.index.duplicated(keep="last")].sort_index()
     return out.dropna(how="all")
 
@@ -405,6 +438,9 @@ def bolivia(offline: bool) -> dict:
             "credito": indicador(ratio(d["cred_me_usd"], d["cred_mn_usd"]), "Dolarización del crédito al sector privado", "% en moneda extranjera", "diaria", fuente),
             "liquidez": indicador(ratio(d["m3_me_bs"], d["m3_mn_bs"]), "Dolarización de la liquidez (M'3)", "% en moneda extranjera", "diaria", fuente),
             "depositos_usd": indicador(d["dep_me_usd"], "Depósitos en moneda extranjera", "millones de USD", "diaria", fuente, 0),
+            **({"vista": indicador(ratio(d["vista_me_usd"] + d["ca_me_usd"], d["vista_mn_usd"] + d["ca_mn_usd"]),
+                                   "Dolarización de los depósitos a la vista y en caja de ahorro", "% en moneda extranjera", "diaria", fuente)}
+               if {"vista_me_usd", "ca_me_usd"} <= set(d.columns) and d["vista_me_usd"].notna().any() else {}),
         },
         "descomposicion": {
             "depositos": _desc_pairs(descomponer(d["dep_mn_bs"], d["dep_me_usd"], tc)),
@@ -648,9 +684,54 @@ def traspaso_pais(pais: str, offline: bool, ext: pd.Series | None) -> tuple[dict
     }, principal
 
 
+# Medio de pago donde no hay serie local de depósitos a la vista por moneda.
+MEDIO_PAGO_CERO = {
+    "br": "En Brasil los residentes no pueden tener depósitos en dólares en bancos locales (salvo excepciones): el medio de pago se toma como 0.",
+    "co": "En Colombia los depósitos en moneda extranjera de residentes en bancos locales están muy restringidos: el medio de pago se toma como 0.",
+}
+SIN_MEDIO_PAGO = {
+    "pe": "El BCRP no publica los depósitos a la vista en dólares por separado: falta la pata de medio de pago.",
+    "cl": "La serie de depósitos a la vista por moneda del Banco Central de Chile requiere registro: falta la pata de medio de pago.",
+    "cr": "No hay una serie abierta de depósitos a la vista por moneda en Costa Rica: falta la pata de medio de pago.",
+}
+
+
+def funciones_pais(pais: str, ind: dict, traspaso_pct: pd.Series | None) -> dict | None:
+    """Las tres patas del índice de funciones del dinero con lo que hay en cada
+    país. La reserva de valor usa depósitos y crédito locales o, si no hay, los
+    pasivos y el crédito en moneda extranjera de los bancos (FMI)."""
+    serie = lambda i: _serie(ind.get(i))  # noqa: E731
+    dep = serie("depositos")
+    if dep.empty:
+        dep = serie("pasivos_fmi")
+    cred = serie("credito")
+    if cred.empty:
+        cred = serie("credito_fmi")
+    notas = {}
+    vista = serie("vista")
+    if pais in MEDIO_PAGO_CERO:
+        base = cred if not cred.empty else dep
+        vista = pd.Series(0.0, index=base.index)
+        notas["medio_pago"] = MEDIO_PAGO_CERO[pais]
+        if dep.empty:
+            dep = pd.Series(0.0, index=base.index)   # tampoco hay depósitos en dólares
+            notas["reserva_valor"] = "Sin depósitos en dólares en bancos locales: la reserva de valor es la mitad de la dolarización del crédito (depósitos = 0)."
+    elif vista.empty and pais in SIN_MEDIO_PAGO:
+        notas["medio_pago"] = SIN_MEDIO_PAGO[pais]
+    if serie("depositos").empty and not serie("pasivos_fmi").empty:
+        notas.setdefault("reserva_valor", "Reserva de valor con los pasivos y el crédito en moneda extranjera de los bancos (FMI).")
+    if dep.empty and not cred.empty:
+        notas.setdefault("reserva_valor", "Sin serie de depósitos: la reserva de valor usa sólo la dolarización del crédito (FMI).")
+    tr = None if traspaso_pct is None else traspaso_pct / 100
+    if tr is None or tr.dropna().empty:
+        notas["unidad_cuenta"] = "Sin traspaso identificado (tipo de cambio fijo o casi sin movimientos): falta la pata de unidad de cuenta."
+    return funciones.bloque(vista if not vista.empty else None, tr, dep if not dep.empty else None,
+                            cred if not cred.empty else None, notas)
+
+
 def _serie(ind: dict | None) -> pd.Series:
     if not ind or not ind["data"]:
-        return pd.Series(dtype=float)
+        return pd.Series(dtype=float, index=pd.DatetimeIndex([]))
     return pd.Series({pd.Timestamp(d): v for d, v in ind["data"]})
 
 
@@ -708,14 +789,12 @@ def run(offline: bool = False) -> dict:
                         f"Cálculo propio con el IPC (" + FUENTE_IPC[k] + ") y el tipo de cambio " + ("paralelo" if k == "ar" else "del BIS"), 1)
         except Exception as exc:  # noqa: BLE001
             log.warning("%s traspaso: %s", nombre, exc)
-        if k == "ar" and principal is not None:
-            try:
-                serie = lambda i: _serie(out["indicadores"].get(i))  # noqa: E731
-                f = funciones.bloque(serie("vista"), principal / 100, serie("depositos"), serie("credito"))
-                if f:
-                    out["funciones"] = f
-            except Exception as exc:  # noqa: BLE001
-                log.warning("%s funciones del dinero: %s", nombre, exc)
+        try:
+            f = funciones_pais(k, out["indicadores"], principal)
+            if f:
+                out["funciones"] = f
+        except Exception as exc:  # noqa: BLE001
+            log.warning("%s funciones del dinero: %s", nombre, exc)
         out.update({"codigo": k, "nombre": nombre, "nota": NOTAS.get(k),
                     "generated_at": resumen["generated_at"]})
         (DATA_DIR / f"{k}.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -727,6 +806,9 @@ def run(offline: bool = False) -> dict:
             "depositos_mensual": _mensual(out["indicadores"], ["depositos", "pasivos_fmi"]),
             "credito_mensual": _mensual(out["indicadores"], ["credito", "credito_fmi"]),
             "exterior": out["indicadores"].get("exterior", {}).get("data", []),
+            "funciones": None if "funciones" not in out else {
+                "ultimo": out["funciones"]["ultimo"], "faltan": out["funciones"]["faltan"],
+                "indice": out["funciones"]["indice"], "triangulo": out["funciones"]["triangulo"][-1:]},
             "traspaso_mensual": [] if principal is None else [[d.strftime("%Y-%m-%d"), None if pd.isna(v) else round(float(v), 1)]
                                                               for d, v in principal.items()],
         }

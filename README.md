@@ -234,25 +234,31 @@ cociente de proyecciones locales a 6 meses.
 En el JSON de cada país, `traspaso.variantes[].data` = `[fecha, Σβ, límite
 inferior, superior]` en %; `indicadores.traspaso` es la serie principal.
 
-### Índice de las tres funciones del dinero (Argentina)
+### Índice de las tres funciones del dinero
 
 `monitor/funciones.py`. Cuánto cumple el dólar cada función del dinero, de 0
-a 1 en la escala natural de cada pata:
+a 1 en la escala natural de cada pata, para los ocho países:
 
-- **Medio de pago**: dólares en los depósitos a la vista del sector privado
-  (cuentas corrientes, otras a la vista y cajas de ahorro; BCRA, variables
-  1528/1530/1532 en pesos y 1565/1567/1569 en dólares, diarias desde 1999).
-  Variante con el circulante en pesos en el denominador (`vista_circulante`).
-- **Unidad de cuenta**: traspaso acumulado a 7 meses con el dólar paralelo,
-  acotado a [0, 1].
-- **Reserva de valor**: promedio de la dolarización de depósitos y crédito.
-  Alternativa: plazos fijos (`plazo_fijo`, variables 1534/1571).
+- **Medio de pago**: dólares en los depósitos a la vista del sector privado.
+  Argentina: BCRA, variables 1528/1530/1532 (pesos) y 1565/1567/1569 (dólares),
+  diarias desde 1999, con la variante que suma el circulante
+  (`vista_circulante`). Uruguay: anexo por modalidad de `Depositos.xlsx` (BCU).
+  Bolivia: depósitos a la vista y caja de ahorro del BCB semanal. Brasil y
+  Colombia: 0 (depósitos en dólares de residentes prohibidos o muy
+  restringidos). Perú, Chile y Costa Rica: sin serie abierta, falta la pata.
+- **Unidad de cuenta**: traspaso acumulado a 7 meses, acotado a [0, 1]
+  (Argentina con el dólar paralelo). Bolivia: sin dato (tipo de cambio fijo).
+- **Reserva de valor**: promedio de la dolarización de depósitos y crédito; si
+  no hay series locales, pasivos y crédito en moneda extranjera de los bancos
+  (FMI); Chile, sólo crédito. Alternativa: plazos fijos (`plazo_fijo`, AR).
 
-Índice = promedio simple (meses con las tres patas). Chequeo: ponderación por
-el primer componente principal (`indicators.pca_weights`, como el Índice de
-Dolarización). El tablero muestra un triángulo estilo Aizenman–Chinn–Ito con
-los promedios de 2007, 2015, 2019, 2023 y los últimos 12 meses. En `ar.json`,
-bloque `funciones`.
+Índice = promedio simple de las patas disponibles (meses con todas). Con una
+pata faltante el índice es **parcial** (se marca y no se compara con los
+completos); con una sola pata no hay índice. Chequeo: ponderación por el
+primer componente principal (`indicators.pca_weights`). Triángulo estilo
+Aizenman–Chinn–Ito por país (2007, 2015, 2019, 2023 y últimos 12 meses) y, en
+la comparación, uno por país con las tres patas. JSON: bloque `funciones` de
+cada país y `resumen.json` → `paises[].funciones`.
 
 ## Próximos pasos posibles
 

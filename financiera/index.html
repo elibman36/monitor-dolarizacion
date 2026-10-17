@@ -82,7 +82,7 @@ td { border-bottom: 1px solid var(--grid); padding: 6px 8px; }
 .patas span { font-size: 12px; color: var(--ink-2); }
 .chart.tri { height: 360px; }
 @media (max-width: 600px) { .chart.tri { height: 300px; } }
-#fn-tbl td:first-child { white-space: nowrap; }
+#fn-tbl td:first-child, #comp-fn-tbl td:first-child { white-space: nowrap; }
 footer { color: var(--muted); font-size: 12px; margin-top: 20px; }
 a { color: inherit; }
 </style>
@@ -110,17 +110,19 @@ a { color: inherit; }
     <div class="card aviso" id="aviso" hidden></div>
     <section class="card section" id="sec-funciones" hidden>
       <h2>Índice de las tres funciones del dinero</h2>
-      <p class="note">Cuánto cumple el dólar cada función del dinero en Argentina, de 0 (nada) a 1 (todo). <b>Medio de pago</b>: parte de los depósitos a la vista (cuentas corrientes y cajas de ahorro) en dólares. <b>Unidad de cuenta</b>: traspaso del dólar a los precios en siete meses. <b>Reserva de valor</b>: promedio de la dolarización de los depósitos y del crédito. El índice es el promedio simple de las tres.</p>
+      <p class="note">Cuánto cumple el dólar cada función del dinero, de 0 (nada) a 1 (todo). <b>Medio de pago</b>: parte de los depósitos a la vista (cuentas corrientes y cajas de ahorro) en dólares. <b>Unidad de cuenta</b>: traspaso del dólar a los precios en siete meses. <b>Reserva de valor</b>: promedio de la dolarización de los depósitos y del crédito. El índice es el promedio simple de las tres.</p>
       <div class="hero">
         <div>
           <div class="note" id="fn-fecha"></div>
           <div class="big" id="fn-valor">–</div>
           <div class="note" id="fn-pca"></div>
           <div class="patas" id="fn-patas"></div>
+          <ul class="note" id="fn-notas" style="padding-left:18px;margin:12px 0 0"></ul>
         </div>
         <div>
+          <p class="note" id="fn-sin-tri" hidden></p>
           <div class="chart tri" id="c-triangulo" role="img" aria-label="Triángulo de las tres funciones del dinero, promedios anuales"></div>
-          <p class="note">Cada punta va de 0 (centro) a 1; los anillos marcan 0,25, 0,50, 0,75 y 1.</p>
+          <p class="note" id="fn-anillos">Cada punta va de 0 (centro) a 1; los anillos marcan 0,25, 0,50, 0,75 y 1.</p>
           <div class="table-wrap"><table id="fn-tbl"><thead><tr><th>Período</th><th class="num">Medio de pago</th><th class="num">Unidad de cuenta</th><th class="num">Reserva de valor</th><th class="num">Índice</th></tr></thead><tbody></tbody></table></div>
         </div>
       </div>
@@ -200,6 +202,18 @@ a { color: inherit; }
       <div class="chart tall" id="c-comp-ext" role="img" aria-label="Depósitos en bancos del exterior por país"></div>
     </section>
     <section class="card section">
+      <h2>Índice de las tres funciones del dinero</h2>
+      <p class="note">Cuánto cumple el dólar cada función del dinero, de 0 a 1: medio de pago (depósitos a la vista en dólares), unidad de cuenta (traspaso a precios) y reserva de valor (dolarización de depósitos y crédito). Índice = promedio simple. En línea punteada, los índices parciales: les falta una pata y no son comparables con los completos.</p>
+      <div class="hero" style="margin-top:8px">
+        <div>
+          <div class="chart tri" id="c-comp-tri" role="img" aria-label="Triángulo de las tres funciones del dinero por país, últimos 12 meses"></div>
+          <p class="note">Últimos 12 meses, sólo países con las tres patas.</p>
+        </div>
+        <div class="chart tall" id="c-comp-fn" role="img" aria-label="Índice de las tres funciones del dinero por país"></div>
+      </div>
+      <div class="table-wrap" style="margin-top:12px"><table id="comp-fn-tbl"><thead><tr><th>País</th><th class="num">Medio de pago</th><th class="num">Unidad de cuenta</th><th class="num">Reserva de valor</th><th class="num">Índice</th><th>Dato a</th></tr></thead><tbody></tbody></table></div>
+    </section>
+    <section class="card section">
       <h2>Traspaso del tipo de cambio a precios</h2>
       <p class="note">Parte de una depreciación que aparece en el IPC en siete meses, regresión móvil de 36 meses. Un proxy de la dolarización de la unidad de cuenta: cuánto se fijan los precios mirando el dólar. Sin línea donde el tipo de cambio casi no se movió (Bolivia hasta 2026). Argentina, con el dólar paralelo en los años de cepo.</p>
       <div class="chart tall" id="c-comp-traspaso" role="img" aria-label="Traspaso del tipo de cambio a precios por país"></div>
@@ -220,7 +234,7 @@ a { color: inherit; }
     <p><b>Compras de dólares de las personas (Argentina).</b> La formación de activos externos de personas humanas (FAE) mide los dólares que la gente compra para atesorar. Comparada con la variación de los depósitos en dólares, aproxima qué parte queda en los bancos y qué parte va al colchón, al exterior o a otros activos.</p>
     <p><b>Traspaso del tipo de cambio a precios: la dolarización de la unidad de cuenta.</b> Los cocientes anteriores miden el dólar como reserva de valor. Para ver cuánto se usa como unidad de cuenta (cuántos precios se fijan mirando el dólar) se estima cuánto de una depreciación pasa a la inflación. Para cada país y cada mes se corre una regresión con los últimos 36 meses: la inflación mensual del IPC (sin estacionalidad) sobre la depreciación del tipo de cambio de ese mes y de los seis anteriores (promedios mensuales), la inflación del mes anterior y la inflación de las materias primas en dólares (índice del FMI) como control externo. El indicador es la suma de los siete coeficientes: qué porcentaje de una depreciación aparece en los precios en siete meses. La banda es el intervalo del 95% con errores de Newey-West, robustos a autocorrelación. Como chequeo se muestran proyecciones locales (Jordà): la suba acumulada de los precios a seis meses dividida por la del tipo de cambio, después de una depreciación.</p>
     <p>Cuidados. Con tipo de cambio fijo (Bolivia hasta junio de 2026) el traspaso no está identificado: si en la ventana el tipo de cambio se movió menos de 0,5% en al menos ocho meses, no se reporta. En Argentina, en los años de cepo el precio relevante del dólar para quien fija precios fue el paralelo (blue hasta 2012, contado con liquidación desde 2013), así que la serie principal usa ese tipo de cambio y se muestra también la del oficial. Un cambio de régimen (fin de la convertibilidad, cepo, flotación) hace que la ventana mezcle dos comportamientos: los 36 meses posteriores van sombreados. Y el traspaso no es sólo dolarización: también sube con la inflación alta, con la credibilidad baja del banco central y con depreciaciones grandes, así que conviene leerlo como un indicador de cuán atados al dólar están los precios, no como una medida pura. Algunos precios directamente se fijan en dólares (inmuebles y autos usados en Argentina y Uruguay, alquileres turísticos): ahí el traspaso es completo e inmediato, pero no hay series públicas mensuales comparables entre países.</p>
-    <p><b>Índice de las tres funciones del dinero.</b> El dinero sirve como medio de pago, unidad de cuenta y reserva de valor, y el dólar puede ocupar cualquiera de esas funciones por separado. El índice mide cada una entre 0 y 1, en su escala natural para que se lea directo. <b>Medio de pago</b>: participación de los dólares en los depósitos a la vista del sector privado (cuentas corrientes, otras cuentas a la vista y cajas de ahorro, con los dólares al tipo de cambio del día; BCRA, depósitos por tipo de cuenta, desde 1999). Como variante se muestra el mismo cociente con el circulante en pesos en el denominador. Es una cota alta: buena parte de las cajas de ahorro en dólares son ahorro y no se usan para pagar, y hasta hace poco casi no se podía pagar con ellas. <b>Unidad de cuenta</b>: el traspaso acumulado a siete meses, acotado entre 0 y 1, con el dólar paralelo, porque en los años de cepo fue el precio del dólar que siguieron los precios (con el oficial, el traspaso de 2024-2026 sale casi nulo aunque los precios ya habían seguido al CCL). <b>Reserva de valor</b>: promedio de la dolarización de los depósitos y del crédito al sector privado; una alternativa es la dolarización de los plazos fijos, que también se muestra. El índice es el promedio simple de las tres patas, sólo en los meses con las tres. Como chequeo se pondera por el primer componente principal de las tres series (cargas negativas en cero y un piso de 10% por pata, igual que en el Índice de Dolarización). El triángulo, en la línea del índice del trilema de Aizenman, Chinn e Ito, muestra los promedios anuales de algunos años: hacia qué punta crece el polígono dice en qué función avanzó el dólar.</p>
+    <p><b>Índice de las tres funciones del dinero.</b> El dinero sirve como medio de pago, unidad de cuenta y reserva de valor, y el dólar puede ocupar cualquiera de esas funciones por separado. El índice mide cada una entre 0 y 1, en su escala natural, para que se lea directo. <b>Medio de pago</b>: participación de los dólares en los depósitos a la vista del sector privado (cuentas corrientes y cajas de ahorro), con los dólares al tipo de cambio de cada fecha. Argentina: BCRA, depósitos por tipo de cuenta, diarios desde 1999 (se muestra también la variante con el circulante en pesos en el denominador). Uruguay: BCU, depósitos del sector privado según modalidad. Bolivia: BCB, depósitos a la vista y en caja de ahorro. En Brasil y Colombia los residentes no pueden tener (o tienen muy restringidos) depósitos en dólares en bancos locales, así que esta pata vale 0. Perú, Chile y Costa Rica no publican una serie abierta de depósitos a la vista por moneda: ahí falta la pata. Es una cota alta del uso del dólar para pagar: buena parte de las cajas de ahorro en dólares son ahorro. <b>Unidad de cuenta</b>: el traspaso acumulado a siete meses, acotado entre 0 y 1. En Argentina se usa el dólar paralelo, porque en los años de cepo fue el precio del dólar que siguieron los precios (con el oficial, el traspaso de 2024-2026 sale casi nulo aunque los precios ya habían seguido al contado con liquidación). En Bolivia, con tipo de cambio fijo, el traspaso no está identificado y falta la pata. <b>Reserva de valor</b>: promedio de la dolarización de los depósitos y del crédito; donde no hay series locales se usan los pasivos y el crédito en moneda extranjera de los bancos (FMI); en Chile, sólo el crédito. Una alternativa es la dolarización de los plazos fijos (en Argentina se muestra). El índice es el promedio simple de las patas, sólo en los meses con todas. Cuando a un país le falta una pata entera el índice es <b>parcial</b>, se marca así y no es comparable con los completos. Como chequeo se pondera por el primer componente principal de las patas (cargas negativas en cero y un piso de 10% por pata, igual que en el Índice de Dolarización). El triángulo, en la línea del índice del trilema de Aizenman, Chinn e Ito, muestra los promedios de algunos años: hacia qué punta crece el polígono dice en qué función avanzó el dólar.</p>
     <p><b>Fuentes.</b> BCRA: depósitos y préstamos del sector privado por moneda, billetes y monedas en poder del público, agregados monetarios; tipo de cambio A3500. BCRP: liquidez y crédito de las sociedades creadoras de depósito. BCU: depósitos y créditos del sector no financiero, sistema bancario; tipo de cambio interbancario. BCB: información estadística semanal. FMI: Financial Soundness Indicators, IPC de Uruguay, Bolivia y Costa Rica e índice de precios de materias primas. BIS: Locational Banking Statistics, precios al consumidor y tipos de cambio promedio mensuales. Inflación de Argentina: API del BCRA (INDEC).</p>
   </section>
   <footer id="foot"></footer>
@@ -357,6 +371,7 @@ a { color: inherit; }
     c.setOption(o);
   }
 
+  const prom = (xs) => { const v = xs.filter((x) => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
   const PATAS = [["medio_pago", "Medio de pago", "--s1"], ["unidad_cuenta", "Unidad de cuenta", "--s2"], ["reserva_valor", "Reserva de valor", "--s3"]];
   // Índice de las tres funciones: número grande, triángulo por año (estilo Aizenman–Chinn–Ito) y serie mensual.
   function funciones(d) {
@@ -365,12 +380,22 @@ a { color: inherit; }
     if (!f) return;
     const u = f.ultimo;
     document.getElementById("fn-fecha").textContent = `Dato a ${u.fecha ? u.fecha.slice(5, 7) + "/" + u.fecha.slice(0, 4) : "–"}`;
-    document.getElementById("fn-valor").textContent = nf(u.indice, 2);
-    document.getElementById("fn-pca").textContent = f.pca ? `Ponderado por componentes principales: ${nf(f.indice_pca.length ? f.indice_pca[f.indice_pca.length - 1][1] : null, 2)} (pesos ${PATAS.map(([k, n]) => n.toLowerCase() + " " + nf(f.pca.pesos[k] * 100, 0) + "%").join(", ")}).` : "";
+    const parcial = f.faltan && f.faltan.length;
+    const nombre = (k) => PATAS.find((x) => x[0] === k)[1].toLowerCase();
+    document.getElementById("fn-valor").innerHTML = nf(u.indice, 2) + (parcial ? ` <span class="badge">parcial</span>` : "");
+    document.getElementById("fn-notas").innerHTML = (parcial ? [`Índice parcial: promedio de ${3 - f.faltan.length === 1 ? "una pata" : "dos patas"}; falta ${f.faltan.map(nombre).join(" y ")}. No es comparable con un índice completo.`] : [])
+      .concat(Object.values(f.notas || {})).map((t) => `<li>${t}</li>`).join("");
+    document.getElementById("fn-pca").textContent = f.pca ? `Ponderado por componentes principales: ${nf(f.indice_pca.length ? f.indice_pca[f.indice_pca.length - 1][1] : null, 2)} (pesos ${PATAS.filter(([k]) => f.pca.pesos[k] != null).map(([k, n]) => n.toLowerCase() + " " + nf(f.pca.pesos[k] * 100, 0) + "%").join(", ")}).` : "";
     document.getElementById("fn-patas").innerHTML = PATAS.map(([k, n, c]) => `<div style="--c:var(${c})"><span>${n}</span><b>${nf(u[k], 2)}</b></div>`).join("");
     const tri = f.triangulo || [];
+    // El triángulo necesita las tres patas: con una punta sin dato el polígono engañaría.
+    document.getElementById("fn-sin-tri").hidden = !parcial;
+    document.getElementById("fn-sin-tri").textContent = parcial ? `Sin triángulo: falta ${f.faltan.map(nombre).join(" y ")}. Abajo, la tabla con las patas que hay.` : "";
+    document.getElementById("c-triangulo").hidden = !!parcial;
+    document.getElementById("fn-anillos").hidden = !!parcial;
     const cols = ["--s4", "--s5", "--s6", "--s7", "--ink"];
     const colTri = (i) => css(i === tri.length - 1 ? "--ink" : cols[i % 4]);
+    if (!parcial) {
     const c = mount("c-triangulo");
     const angosto = document.getElementById("c-triangulo").clientWidth < 420;
     c.setOption({
@@ -399,14 +424,15 @@ a { color: inherit; }
         }),
       }],
     });
+    }
     document.querySelector("#fn-tbl tbody").innerHTML = tri.map((t, i) => `<tr><td><span style="display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px;background:${colTri(i)}"></span>${t.etiqueta}</td>` +
-      PATAS.map(([k]) => `<td class="num">${nf(t[k], 2)}</td>`).join("") + `<td class="num">${nf((t.medio_pago + t.unidad_cuenta + t.reserva_valor) / 3, 2)}</td></tr>`).join("");
+      PATAS.map(([k]) => `<td class="num">${nf(t[k], 2)}</td>`).join("") + `<td class="num">${nf(prom(PATAS.map(([k]) => t[k])), 2)}</td></tr>`).join("");
     const c2 = mount("c-funciones"); const o = base();
     o.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 2);
     o.yAxis.min = 0; o.yAxis.max = 1; o.yAxis.scale = false;
     if (document.getElementById("c-funciones").clientWidth < 600) o.grid.top = 56;
-    o.series = PATAS.map(([k, n, col]) => line(n, cut(f.patas[k].data, 9000), css(col), { connectNulls: false }))
-      .concat([line("Índice (promedio simple)", cut(f.indice, 9000), css("--ink"), { lineStyle: { width: 3, color: css("--ink") }, connectNulls: false })]);
+    o.series = PATAS.filter(([k]) => f.patas[k].data.some((p) => p[1] != null)).map(([k, n, col]) => line(n, cut(f.patas[k].data, 9000), css(col), { connectNulls: false }))
+      .concat([line(parcial ? "Índice parcial" : "Índice (promedio simple)", cut(f.indice, 9000), css("--ink"), { lineStyle: { width: 3, color: css("--ink") }, connectNulls: false })]);
     c2.setOption(o);
   }
 
@@ -468,6 +494,35 @@ a { color: inherit; }
     o2.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 1) + " mil M USD";
     o2.series = ps.filter((k) => r.paises[k].exterior.length).map((k) => line(r.paises[k].nombre, cut(r.paises[k].exterior, 3650), css(COLOR_PAIS[k]), { showSymbol: true, symbolSize: 5 }));
     c2.setOption(o2);
+    // Índice de las tres funciones: triángulo de los países completos, serie del índice y tabla.
+    const conFn = ps.filter((k) => r.paises[k].funciones);
+    const completos = conFn.filter((k) => !r.paises[k].funciones.faltan.length);
+    const ct = mount("c-comp-tri");
+    const angostoT = document.getElementById("c-comp-tri").clientWidth < 420;
+    ct.setOption({
+      animation: false,
+      textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
+      legend: { top: 0, left: "center", icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } },
+      tooltip: { trigger: "item", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 },
+        formatter: (p) => `<b>${p.name}</b><br>` + PATAS.map(([, n], i) => `${n}: ${nf(p.value[i], 2)}`).join("<br>") },
+      radar: { shape: "polygon", center: ["50%", "58%"], radius: angostoT ? "52%" : "66%", splitNumber: 4,
+        indicator: PATAS.map(([, n]) => ({ name: angostoT ? n.replace(" de ", "\nde ") : n, max: 1, min: 0 })),
+        axisName: { color: css("--ink"), fontSize: 12, fontWeight: 600 }, axisLine: { lineStyle: { color: css("--axis") } },
+        splitLine: { lineStyle: { color: css("--grid") } }, splitArea: { show: false }, axisLabel: { show: false } },
+      series: [{ type: "radar", symbolSize: 8, data: completos.map((k) => { const t = r.paises[k].funciones.triangulo[0]; const col = css(COLOR_PAIS[k]);
+        return { name: r.paises[k].nombre, value: PATAS.map(([q]) => t[q]), symbol: "circle", lineStyle: { width: 2, color: col }, itemStyle: { color: col, borderColor: css("--surface"), borderWidth: 2 }, areaStyle: { color: col, opacity: 0.06 } }; }) }],
+    });
+    const cf = mount("c-comp-fn"); const of = base();
+    of.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 2);
+    of.yAxis.min = 0; of.yAxis.max = 1; of.yAxis.scale = false;
+    of.grid.top = document.getElementById("c-comp-fn").clientWidth < 600 ? 84 : 64;
+    of.series = conFn.map((k) => { const f = r.paises[k].funciones; const parc = f.faltan.length;
+      return line(r.paises[k].nombre + (parc ? " (parcial)" : ""), cut(f.indice, 9000), css(COLOR_PAIS[k]), parc ? { lineStyle: { width: 2, type: "dashed", color: css(COLOR_PAIS[k]) }, connectNulls: false } : { connectNulls: false }); });
+    cf.setOption(of);
+    document.querySelector("#comp-fn-tbl tbody").innerHTML = conFn.map((k) => { const f = r.paises[k].funciones, u = f.ultimo;
+      return `<tr><td><span style="display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px;background:var(${COLOR_PAIS[k]})"></span><a href="?pais=${k}" data-ir="${k}">${r.paises[k].nombre}</a></td>` +
+        PATAS.map(([q]) => `<td class="num">${u[q] == null ? "sin dato" : nf(u[q], 2)}</td>`).join("") +
+        `<td class="num"><b>${nf(u.indice, 2)}</b>${f.faltan.length ? " (parcial)" : ""}</td><td>${u.fecha ? u.fecha.slice(5, 7) + "/" + u.fecha.slice(0, 4) : "–"}</td></tr>`; }).join("");
     const c4 = mount("c-comp-traspaso"); const o4 = base();
     o4.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 0) + "%";
     o4.yAxis.axisLabel.formatter = (v) => nf(v, 0) + "%";
@@ -480,7 +535,7 @@ a { color: inherit; }
     };
     document.querySelector("#comp-tbl tbody").innerHTML = ps.map((k) => { const p = r.paises[k];
       return `<tr><td><span style="display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px;background:var(${COLOR_PAIS[k]})"></span><a href="?pais=${k}" data-ir="${k}">${p.nombre}</a></td><td class="num">${v(p, "depositos", 1, "%", "pasivos_fmi")}</td><td class="num">${v(p, "credito", 1, "%", "credito_fmi")}</td><td class="num">${v(p, "liquidez")}</td><td class="num">${v(p, "exterior", 1, "")}</td><td class="num">${v(p, "traspaso", 0)}</td><td>${p.frecuencia || "–"}</td></tr>`; }).join("");
-    document.querySelectorAll("#comp-tbl [data-ir]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); document.querySelector(`#pais button[data-p="${a.dataset.ir}"]`).click(); }));
+    document.querySelectorAll("#comp-tbl [data-ir], #comp-fn-tbl [data-ir]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); document.querySelector(`#pais button[data-p="${a.dataset.ir}"]`).click(); }));
     document.getElementById("foot").textContent = `Actualizado: ${new Date(r.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina).`;
   }
 

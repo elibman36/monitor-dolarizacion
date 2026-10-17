@@ -32,10 +32,9 @@ AÑOS_TRIANGULO = [2007, 2015, 2019, 2023]
 def _mensual(s: pd.Series | None) -> pd.Series:
     """Promedio mensual; las series trimestrales (FMI) se extienden a los dos
     meses siguientes."""
-    if s is None:
-        return pd.Series(dtype=float)
-    s = s.dropna()
-    return s.resample("ME").mean().ffill(limit=2) if len(s) else s
+    if s is None or s.dropna().empty:
+        return pd.Series(dtype=float, index=pd.DatetimeIndex([]))
+    return s.dropna().resample("ME").mean().ffill(limit=2)
 
 
 def patas(vista: pd.Series | None, traspaso: pd.Series | None, depositos: pd.Series | None,
@@ -65,7 +64,8 @@ def indice(p: pd.DataFrame) -> tuple[pd.Series, pd.Series, dict | None]:
     falta una pata entera, el índice es parcial. Devuelve (simple, PCA,
     {pesos, varianza explicada})."""
     ks = disponibles(p)
-    if not ks:
+    # Con una sola pata no hay índice: sería esa misma serie.
+    if len(ks) < 2:
         return pd.Series(dtype=float), pd.Series(dtype=float), None
     comun = p[ks].dropna()
     simple = comun.mean(axis=1)

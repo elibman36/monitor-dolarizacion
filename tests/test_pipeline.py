@@ -647,3 +647,23 @@ def test_funciones_del_dinero():
     q = cred.resample("QE").last()
     p2 = fn.patas(None, tr, None, q)
     assert p2["reserva_valor"].notna().sum() >= len(q) * 3 - 2
+
+
+def test_funciones_con_una_sola_pata_no_hay_indice():
+    from monitor import funciones as fn
+    idx = pd.date_range("2010-01-31", periods=36, freq="ME")
+    b = fn.bloque(None, None, pd.Series(20.0, idx), pd.Series(10.0, idx))
+    assert b["faltan"] == ["medio_pago", "unidad_cuenta"] and b["indice"] == [] and b["ultimo"]["indice"] is None
+    assert b["ultimo"]["reserva_valor"] == 0.15
+
+
+def test_parse_vista_bcu():
+    from monitor import financiera as f
+    filas = [[None] * 8 for _ in range(4)]
+    filas[0][0] = "Mes"; filas[0][4] = "MN"; filas[0][6] = "ME"
+    filas[1][4:8] = ["Vista", "Plazo", "Vista", "Plazo"]
+    filas[2][0] = pd.Timestamp("2026-07-01"); filas[2][4:8] = [100.0, 50.0, 300.0, 200.0]
+    filas[3][0] = pd.Timestamp("2026-08-01"); filas[3][4:8] = [110.0, 50.0, 330.0, 200.0]
+    d = f.parse_vista_bcu(pd.DataFrame(filas))
+    assert list(d.index.strftime("%Y-%m-%d")) == ["2026-07-31", "2026-08-31"]
+    assert d.iloc[-1].tolist() == [110.0, 330.0]
