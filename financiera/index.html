@@ -295,8 +295,13 @@ a { color: inherit; }
     document.getElementById("sec-traspaso").hidden = !t;
     if (!t) return;
     document.getElementById("traspaso-pie").textContent = t.nota || "";
+    const box = document.getElementById("c-traspaso");
+    box.style.height = ok ? "" : "auto";
     if (!ok) return empty("c-traspaso", "Sin dato: el tipo de cambio casi no se movió en la ventana, así que el traspaso no está identificado.");
+    const angosto = box.clientWidth < 600;
     const c = mount("c-traspaso"); const o = base();
+    // En pantallas angostas la leyenda ocupa varias filas: se baja el gráfico y se ocultan los rótulos de los quiebres.
+    if (angosto) o.grid.top = 104;
     o.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 0) + "%";
     const cols = ["--s1", "--s2"];
     o.series = [];
@@ -313,7 +318,7 @@ a { color: inherit; }
     const r0 = cut(t.variantes[0].data, 3650); const desde = r0.length ? r0[0][0] : "";
     o.series[o.series.length - 1].markArea = {
       silent: true, itemStyle: { color: css("--wash") },
-      data: (t.quiebres || []).filter((q) => q[2] >= desde).map((q) => [{ xAxis: q[0] < desde ? desde : q[0], name: q[1], label: { color: css("--muted"), fontSize: 11, position: "insideTopLeft" } }, { xAxis: q[2] }]),
+      data: (t.quiebres || []).filter((q) => q[2] >= desde).map((q) => [{ xAxis: q[0] < desde ? desde : q[0], name: q[1], label: { show: !angosto, color: css("--muted"), fontSize: 11, position: "insideTopLeft" } }, { xAxis: q[2] }]),
     };
     o.legend.data = o.series.map((x) => x.name).filter((n) => n !== "lo");
     o.yAxis.axisLabel.formatter = (v) => nf(v, 0) + "%";

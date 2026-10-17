@@ -464,12 +464,12 @@ IMF_CPI_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,CPI/{iso3}.CPI
 COMMODITIES_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.RES,PCPS/G001.PALLFNF.INDEX.M?startPeriod=1990"
 SGS_IPCA_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/01/1990"
 # De dónde sale el IPC de cada país (el BIS no publica Uruguay, Bolivia ni Costa Rica).
-FUENTE_IPC = {"ar": "BCRA (INDEC)", "br": "IPCA, BCB-SGS", "pe": "BIS", "cl": "BIS", "co": "BIS",
+FUENTE_IPC = {"ar": "BCRA, INDEC", "br": "IPCA, BCB-SGS", "pe": "BIS", "cl": "BIS", "co": "BIS",
               "uy": "FMI", "bo": "FMI", "cr": "FMI"}
 # Cambios de régimen cambiario: la ventana de 36 meses que los cruza mezcla dos regímenes.
 QUIEBRES = {
     "ar": [("2002-01-31", "Fin de la convertibilidad"), ("2011-10-31", "Cepo"), ("2015-12-31", "Unificación"),
-           ("2019-09-30", "Vuelve el cepo"), ("2025-04-30", "Bandas, fin del cepo para personas")],
+           ("2019-09-30", "Vuelve el cepo"), ("2025-04-30", "Fin del cepo")],
     "br": [("1994-07-31", "Plan Real"), ("1999-01-31", "Flotación")],
     "cl": [("1999-09-30", "Flotación")],
     "co": [("1999-09-30", "Flotación")],
@@ -678,7 +678,7 @@ def run(offline: bool = False) -> dict:
                 if not ultimo.empty:
                     out["indicadores"]["traspaso"] = indicador(
                         principal, "Traspaso del tipo de cambio a precios (7 meses)", "% de la depreciación", "mensual",
-                        f"Cálculo propio: IPC ({FUENTE_IPC[k]}) y tipo de cambio " + ("paralelo" if k == "ar" else "(BIS)"), 1)
+                        f"Cálculo propio con el IPC (" + FUENTE_IPC[k] + ") y el tipo de cambio " + ("paralelo" if k == "ar" else "del BIS"), 1)
         except Exception as exc:  # noqa: BLE001
             log.warning("%s traspaso: %s", nombre, exc)
         out.update({"codigo": k, "nombre": nombre, "nota": NOTAS.get(k),
