@@ -73,7 +73,7 @@ def triangulo(p: pd.DataFrame, años: list[int] = AÑOS_TRIANGULO) -> list[dict]
     if len(comun):
         fin = comun.index.max()
         x = comun[comun.index > fin - pd.DateOffset(months=12)]
-        out.append({"etiqueta": f"Últimos 12 meses (a {fin:%m/%Y})", **{k: round(float(x[k].mean()), 3) for k in PATAS}})
+        out.append({"etiqueta": "Últimos 12 meses", "hasta": fin.strftime("%Y-%m-%d"), **{k: round(float(x[k].mean()), 3) for k in PATAS}})
     return out
 
 

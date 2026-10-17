@@ -74,12 +74,15 @@ td { border-bottom: 1px solid var(--grid); padding: 6px 8px; }
 .table-wrap { overflow-x: auto; }
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; align-items: start; }
 @media (max-width: 860px) { .hero { grid-template-columns: 1fr; } }
+.hero > div { min-width: 0; }
 .hero .big { font-size: 44px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin: 6px 0 2px; }
 .patas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .patas div { border-top: 3px solid var(--c); padding-top: 6px; }
 .patas b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
 .patas span { font-size: 12px; color: var(--ink-2); }
-.chart.tri { height: 400px; }
+.chart.tri { height: 360px; }
+@media (max-width: 600px) { .chart.tri { height: 300px; } }
+#fn-tbl td:first-child { white-space: nowrap; }
 footer { color: var(--muted); font-size: 12px; margin-top: 20px; }
 a { color: inherit; }
 </style>
@@ -117,11 +120,12 @@ a { color: inherit; }
         </div>
         <div>
           <div class="chart tri" id="c-triangulo" role="img" aria-label="Triángulo de las tres funciones del dinero, promedios anuales"></div>
+          <p class="note">Cada punta va de 0 (centro) a 1; los anillos marcan 0,25, 0,50, 0,75 y 1.</p>
           <div class="table-wrap"><table id="fn-tbl"><thead><tr><th>Período</th><th class="num">Medio de pago</th><th class="num">Unidad de cuenta</th><th class="num">Reserva de valor</th><th class="num">Índice</th></tr></thead><tbody></tbody></table></div>
         </div>
       </div>
       <h2 style="margin-top:20px">Las tres patas en el tiempo</h2>
-      <p class="note">Promedios mensuales. La unidad de cuenta es la más ruidosa: sale de una regresión con 36 meses de datos.</p>
+      <p class="note">Promedios mensuales, desde 2002. La unidad de cuenta es la más ruidosa: sale de una regresión con 36 meses de datos.</p>
       <div class="chart tall" id="c-funciones" role="img" aria-label="Medio de pago, unidad de cuenta, reserva de valor e índice, mensual"></div>
     </section>
     <section class="tiles" id="tiles"></section>
@@ -372,17 +376,18 @@ a { color: inherit; }
     c.setOption({
       animation: false,
       textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
-      legend: { bottom: 0, left: "center", icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } },
+      legend: { top: 0, left: "center", icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } },
       tooltip: { trigger: "item", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 },
         formatter: (p) => `<b>${p.name}</b><br>` + PATAS.map(([, n], i) => `${n}: ${nf(p.value[i], 2)}`).join("<br>") },
       radar: {
-        shape: "polygon", center: ["50%", "48%"], radius: angosto ? "58%" : "66%", splitNumber: 4,
-        indicator: PATAS.map(([, n]) => ({ name: n, max: 1, min: 0 })),
-        axisName: { color: css("--ink"), fontSize: 13, fontWeight: 600 },
+        shape: "polygon", center: ["50%", angosto ? "58%" : "56%"], radius: angosto ? "52%" : "74%", splitNumber: 4,
+        // En pantallas angostas los nombres van en dos líneas para que no se corten en las puntas.
+        indicator: PATAS.map(([, n]) => ({ name: angosto ? n.replace(" de ", "\nde ") : n, max: 1, min: 0 })),
+        axisName: { color: css("--ink"), fontSize: angosto ? 12 : 13, fontWeight: 600 },
         axisLine: { lineStyle: { color: css("--axis") } },
         splitLine: { lineStyle: { color: css("--grid") } },
         splitArea: { show: false },
-        axisLabel: { show: true, color: css("--muted"), fontSize: 10, formatter: (v) => nf(v, 2) },
+        axisLabel: { show: false },
       },
       series: [{
         type: "radar", symbolSize: 8,
@@ -400,8 +405,8 @@ a { color: inherit; }
     o.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 2);
     o.yAxis.min = 0; o.yAxis.max = 1; o.yAxis.scale = false;
     if (document.getElementById("c-funciones").clientWidth < 600) o.grid.top = 56;
-    o.series = PATAS.map(([k, n, col]) => line(n, cut(f.patas[k].data), css(col), { connectNulls: false }))
-      .concat([line("Índice (promedio simple)", cut(f.indice), css("--ink"), { lineStyle: { width: 3, color: css("--ink") }, connectNulls: false })]);
+    o.series = PATAS.map(([k, n, col]) => line(n, cut(f.patas[k].data, 9000), css(col), { connectNulls: false }))
+      .concat([line("Índice (promedio simple)", cut(f.indice, 9000), css("--ink"), { lineStyle: { width: 3, color: css("--ink") }, connectNulls: false })]);
     c2.setOption(o);
   }
 
