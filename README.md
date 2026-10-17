@@ -263,6 +263,30 @@ cambio total. Para los seis países se agregan los depósitos de residentes no
 bancarios en bancos del exterior (BIS, estadísticas bancarias territoriales,
 trimestral). Datos en `data/financiera/`.
 
+### Traspaso del tipo de cambio a precios (unidad de cuenta)
+
+`monitor/traspaso.py`. Proxy de cuánto se "piensa en dólares": qué parte de
+una depreciación pasa al IPC. Por país y por mes, regresión móvil de 36 meses
+(mínimo 30 observaciones) de la inflación mensual desestacionalizada sobre la
+depreciación del tipo de cambio promedio del mes con rezagos 0–6, la inflación
+rezagada y la inflación de materias primas en dólares (FMI, vía FRED). El
+indicador es Σβ (traspaso acumulado a 7 meses), con banda del 95% por
+Newey-West; se guarda también el de largo plazo Σβ/(1−ρ) y, como chequeo, el
+cociente de proyecciones locales a 6 meses.
+
+- Sin dato cuando el tipo de cambio casi no se mueve en la ventana (menos de
+  8 meses con |depreciación| ≥ 0,5% o desvío < 0,5 pp): Bolivia hasta 2026.
+- Argentina: variante principal con el dólar paralelo (blue 2011–2012, CCL
+  desde 2013) y variante con el oficial. Inflación de la API del BCRA
+  (variable 27, INDEC; subestimada 2007–2015).
+- Los demás países: IPC (WS_LONG_CPI) y tipo de cambio promedio (WS_XRU) del
+  BIS.
+- Los cambios de régimen (`QUIEBRES` en `financiera.py`) se sombrean en el
+  gráfico durante los 36 meses siguientes.
+
+En el JSON de cada país, `traspaso.variantes[].data` = `[fecha, Σβ, límite
+inferior, superior]` en %; `indicadores.traspaso` es la serie principal.
+
 ## Próximos pasos posibles
 
 - Uruguay: tasa de política monetaria y riesgo país (UBI) cuando haya una fuente automática.

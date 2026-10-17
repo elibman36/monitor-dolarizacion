@@ -33,7 +33,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 
-from . import comun, config, sources
+from . import comun, config, sources, traspaso
 
 log = logging.getLogger("monitor.financiera")
 
@@ -455,6 +455,177 @@ def bis(pais: str, offline: bool) -> pd.Series:
 
 
 # ---------------------------------------------------------------------------
+# Traspaso del tipo de cambio a precios (dolarización de la unidad de cuenta)
+# ---------------------------------------------------------------------------
+
+BIS_CPI_URL = "https://stats.bis.org/api/v1/data/WS_LONG_CPI/M.{pais}.628?format=csv&startPeriod=1990-01"
+BIS_XRU_URL = "https://stats.bis.org/api/v1/data/WS_XRU/M.{pais}..A?format=csv&startPeriod=1990-01"
+IMF_CPI_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,CPI/{iso3}.CPI._T.IX.M?startPeriod=1990"
+COMMODITIES_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.RES,PCPS/W00.PALLFNF.IX.M?startPeriod=1990"
+SGS_IPCA_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/01/1990"
+# De dónde sale el IPC de cada país (el BIS no publica Uruguay, Bolivia ni Costa Rica).
+FUENTE_IPC = {"ar": "BCRA (INDEC)", "br": "IPCA, BCB-SGS", "pe": "BIS", "cl": "BIS", "co": "BIS",
+              "uy": "FMI", "bo": "FMI", "cr": "FMI"}
+# Cambios de régimen cambiario: la ventana de 36 meses que los cruza mezcla dos regímenes.
+QUIEBRES = {
+    "ar": [("2002-01-31", "Fin de la convertibilidad"), ("2011-10-31", "Cepo"), ("2015-12-31", "Unificación"),
+           ("2019-09-30", "Vuelve el cepo"), ("2025-04-30", "Bandas, fin del cepo para personas")],
+    "br": [("1999-01-31", "Flotación")],
+    "cl": [("1999-09-30", "Flotación")],
+    "co": [("1999-09-30", "Flotación")],
+    "uy": [("2002-06-30", "Flotación")],
+    "cr": [("2006-10-31", "Bandas cambiarias"), ("2015-02-28", "Flotación administrada")],
+    "bo": [("2026-06-30", "Devaluación")],
+}
+NOTAS_TRASPASO = {
+    "uy": "IPC del FMI (INE). Uruguay tiene precios de inmuebles y autos fijados en dólares: ahí el traspaso es completo, pero esos bienes pesan poco en el IPC.",
+    "ar": "Con el dólar paralelo: blue entre 2011 y 2012 y contado con liquidación desde 2013, que es el precio marginal del dólar en los años de cepo; fuera del cepo coincide casi con el oficial. IPC: inflación mensual de la API del BCRA (INDEC); entre 2007 y 2015 el IPC oficial subestimó la inflación.",
+    "bo": "Bolivia tuvo tipo de cambio fijo hasta la devaluación de 2026: sin movimientos del tipo de cambio el traspaso no está identificado, y todavía no hay meses suficientes después del salto.",
+}
+
+
+def _bis_mensual(url: str) -> pd.Series:
+    df = pd.read_csv(io.StringIO(comun.get(url).text))
+    if df.empty or "TIME_PERIOD" not in df:
+        return pd.Series(dtype=float)
+    idx = pd.PeriodIndex(df["TIME_PERIOD"].astype(str), freq="M").to_timestamp(how="end").normalize()
+    return pd.Series(pd.to_numeric(df["OBS_VALUE"], errors="coerce").values, index=idx).sort_index().dropna()
+
+
+def parse_imf_mensual(texto: str) -> pd.Series:
+    """Serie mensual de la API SDMX del FMI en CSV (TIME_PERIOD = 2026-M08)."""
+    df = pd.read_csv(io.StringIO(texto), low_memory=False)
+    if df.empty or "TIME_PERIOD" not in df:
+        return pd.Series(dtype=float)
+    per = pd.PeriodIndex(df["TIME_PERIOD"].astype(str).str.replace("-M", "-", regex=False), freq="M")
+    s = pd.Series(pd.to_numeric(df["OBS_VALUE"], errors="coerce").values, index=per.to_timestamp(how="end").normalize())
+    return s[~s.index.duplicated(keep="last")].sort_index().dropna()
+
+
+def _imf_mensual(url: str) -> pd.Series:
+    return parse_imf_mensual(comun.get(url, headers={"Accept": "application/vnd.sdmx.data+csv;version=1.0.0"}).text)
+
+
+def _sgs_variacion(url: str) -> pd.Series:
+    d = pd.DataFrame(comun.get(url).json())
+    return pd.Series(pd.to_numeric(d["valor"], errors="coerce").values,
+                     index=pd.to_datetime(d["data"], dayfirst=True) + pd.offsets.MonthEnd(0)).dropna()
+
+
+def ipc_mensual(pais: str, offline: bool) -> pd.Series:
+    """Inflación mensual del IPC (%, variación logarítmica)."""
+    if pais == "ar":
+        # Inflación mensual de la API del BCRA (INDEC), desde 1943: se arma un índice encadenado.
+        base = None
+        if not offline:
+            try:
+                base, _ = sources.bcra_catalog()
+            except Exception as exc:  # noqa: BLE001
+                log.warning("BCRA no disponible (%s)", exc)
+        s = _bcra(base, 27, "inflacion_mensual", offline)
+        s = s.resample("ME").last().dropna()
+        return (np.log1p(s / 100) * 100)["1990":]
+    if pais == "br":
+        s, _ = comun.actualizar(SERIES_DIR / pais, "ipca_mensual", lambda d, h: _sgs_variacion(SGS_IPCA_URL),
+                                "1990-01-01", solapamiento_dias=100000, offline=offline)
+        return np.log1p(s / 100) * 100
+    if FUENTE_IPC[pais] == "FMI":
+        fetch = lambda d, h: _imf_mensual(IMF_CPI_URL.format(iso3=IMF_ISO3[pais]))  # noqa: E731
+    else:
+        fetch = lambda d, h: _bis_mensual(BIS_CPI_URL.format(pais=BIS_PAISES[pais]))  # noqa: E731
+    lvl, _ = comun.actualizar(SERIES_DIR / pais, "ipc", fetch, "1990-01-01", solapamiento_dias=100000, offline=offline)
+    return traspaso.variacion(lvl.resample("ME").last())
+
+
+def tc_mensual(pais: str, offline: bool) -> pd.Series:
+    """Tipo de cambio promedio del mes (moneda local por dólar)."""
+    s, _ = comun.actualizar(SERIES_DIR / pais, "tc_mensual", lambda d, h: _bis_mensual(BIS_XRU_URL.format(pais=BIS_PAISES[pais])),
+                            "1990-01-01", solapamiento_dias=100000, offline=offline)
+    if pais == "bo":
+        # El BIS llega con atraso para Bolivia: se encadena el tipo de cambio
+        # implícito en la estadística semanal del BCB (Bs por USD de los depósitos).
+        path = SERIES_DIR / "bo" / "bcb_semanal.csv"
+        if path.exists() and not s.empty:
+            d = pd.read_csv(path, parse_dates=["fecha"]).set_index("fecha")
+            bcb = traspaso.mensual_promedio((d["dep_mn_bs"] / d["dep_mn_usd"]).dropna())
+            s = encadenar(s, bcb)
+    return s
+
+
+def encadenar(base: pd.Series, nueva: pd.Series) -> pd.Series:
+    """Extiende `base` con las variaciones de `nueva` después de su último dato."""
+    base = base.dropna()
+    nueva = nueva.dropna()
+    ult = base.index.max()
+    if nueva.empty or ult not in nueva.index or nueva.index.max() <= ult:
+        return base
+    ext = nueva[nueva.index > ult] / nueva[ult] * base[ult]
+    return pd.concat([base, ext]).sort_index()
+
+
+def tc_paralelo_ar() -> pd.Series:
+    """Dólar libre de Argentina: blue (2011-2012) y CCL (2013 en adelante),
+    promedio del mes."""
+    blue = traspaso.mensual_promedio(_tc_cache(config.SERIES_DIR / "usd_blue.csv"))
+    ccl = traspaso.mensual_promedio(_tc_cache(config.SERIES_DIR / "usd_ccl.csv"))
+    return ccl.combine_first(blue)
+
+
+def commodities(offline: bool) -> pd.Series:
+    """Inflación de las materias primas en dólares (índice de precios del FMI), %."""
+    s, _ = comun.actualizar(SERIES_DIR, "commodities", lambda d, h: _imf_mensual(COMMODITIES_URL), "1990-01-01",
+                            solapamiento_dias=100000, offline=offline)
+    return traspaso.variacion(s) if not s.empty else s
+
+
+def _traspaso_pairs(r: pd.DataFrame) -> list:
+    out = []
+    for d, x in r.iterrows():
+        if x.sin_dato or pd.isna(x.suma):
+            out.append([d.strftime("%Y-%m-%d"), None, None, None])
+        else:
+            out.append([d.strftime("%Y-%m-%d"), round(x.suma * 100, 1), round((x.suma - 1.96 * x.se) * 100, 1),
+                        round((x.suma + 1.96 * x.se) * 100, 1)])
+    return out
+
+
+def traspaso_pais(pais: str, offline: bool, ext: pd.Series | None) -> tuple[dict | None, pd.Series | None]:
+    """Regresiones móviles por país. Devuelve el bloque para el JSON y la serie
+    principal (en %) para el tablero y la comparación."""
+    pi = ipc_mensual(pais, offline)
+    tc = tc_mensual(pais, offline)
+    if pi.empty or tc.empty:
+        return None, None
+    pi = traspaso.desestacionalizar(pi)
+    variantes = [("oficial", "Tipo de cambio oficial", tc)]
+    if pais == "ar":
+        par = tc_paralelo_ar()
+        # Antes del blue, el paralelo es el oficial.
+        par = par.combine_first(tc[tc.index < par.index.min()]) if not par.empty else tc
+        variantes = [("paralelo", "Con el dólar paralelo (blue / CCL)", par), ("oficial", "Con el tipo de cambio oficial", tc)]
+    bloques = []
+    principal = None
+    for clave, label, e in variantes:
+        dep = traspaso.variacion(e)
+        r = traspaso.movil(pi, dep, ext)
+        if r.empty:
+            continue
+        jorda = traspaso.lp_movil(pi, dep)
+        bloques.append({"clave": clave, "label": label, "data": _traspaso_pairs(r),
+                        "largo_plazo": [[d.strftime("%Y-%m-%d"), round(x.lp * 100, 1)] for d, x in r.iterrows() if pd.notna(x.lp)],
+                        "jorda": [[d.strftime("%Y-%m-%d"), round(v * 100, 1)] for d, v in jorda.items()]})
+        if principal is None:
+            principal = (r.suma * 100).where(~r.sin_dato.astype(bool))
+    if not bloques:
+        return None, None
+    quiebres = [[f, t, (pd.Timestamp(f) + pd.DateOffset(months=traspaso.VENTANA) + pd.offsets.MonthEnd(0)).strftime("%Y-%m-%d")]
+                for f, t in QUIEBRES.get(pais, [])]
+    return {
+        "ventana": traspaso.VENTANA, "rezagos": traspaso.REZAGOS, "principal": bloques[0]["clave"],
+        "variantes": bloques, "quiebres": quiebres, "nota": NOTAS_TRASPASO.get(pais),
+        "control_externo": "inflación de materias primas (FMI)" if ext is not None and not ext.empty else None,
+    }, principal
+
 
 def _mensual(ind: dict, claves: list[str]) -> dict:
     """Serie mensual del primer indicador disponible (y cuál se usó)."""
@@ -469,6 +640,11 @@ def run(offline: bool = False) -> dict:
     builders = {"ar": argentina, "pe": peru, "uy": uruguay, "bo": bolivia}
     resumen = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "paises": {}}
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        ext = commodities(offline)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("materias primas: %s", exc)
+        ext = None
     for k, nombre in NOMBRES.items():
         try:
             out = builders[k](offline) if k in builders else {"frecuencia": "trimestral", "indicadores": {}, "descomposicion": {}}
@@ -493,6 +669,18 @@ def run(offline: bool = False) -> dict:
                     "trimestral", "BIS, estadísticas bancarias territoriales", 1)
         except Exception as exc:  # noqa: BLE001
             log.warning("%s BIS: %s", nombre, exc)
+        principal = None
+        try:
+            tr, principal = traspaso_pais(k, offline, ext)
+            if tr:
+                out["traspaso"] = tr
+                ultimo = principal.dropna()
+                if not ultimo.empty:
+                    out["indicadores"]["traspaso"] = indicador(
+                        principal, "Traspaso del tipo de cambio a precios (7 meses)", "% de la depreciación", "mensual",
+                        f"Cálculo propio: IPC ({FUENTE_IPC[k]}) y tipo de cambio " + ("paralelo" if k == "ar" else "(BIS)"), 1)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("%s traspaso: %s", nombre, exc)
         out.update({"codigo": k, "nombre": nombre, "nota": NOTAS.get(k),
                     "generated_at": resumen["generated_at"]})
         (DATA_DIR / f"{k}.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
@@ -504,6 +692,8 @@ def run(offline: bool = False) -> dict:
             "depositos_mensual": _mensual(out["indicadores"], ["depositos", "pasivos_fmi"]),
             "credito_mensual": _mensual(out["indicadores"], ["credito", "credito_fmi"]),
             "exterior": out["indicadores"].get("exterior", {}).get("data", []),
+            "traspaso_mensual": [] if principal is None else [[d.strftime("%Y-%m-%d"), None if pd.isna(v) else round(float(v), 1)]
+                                                              for d, v in principal.items()],
         }
         ultimos = {i: v["last"] for i, v in out["indicadores"].items()}
         log.info("%s: %s", nombre, ultimos)

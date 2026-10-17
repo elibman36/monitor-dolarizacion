@@ -139,6 +139,12 @@ a { color: inherit; }
         <div class="chart" id="c-fae-bancos" role="img" aria-label="Parte de las compras de dólares que quedó en depósitos"></div>
       </div>
     </section>
+    <section class="card section" id="sec-traspaso" hidden>
+      <h2>¿Cuánto se piensa en dólares? Traspaso del tipo de cambio a precios</h2>
+      <p class="note" id="traspaso-note">Qué parte de una depreciación aparece en el IPC en los siete meses siguientes (el mes de la suba y seis más), estimado en ventanas móviles de 36 meses. Cuanto más alto, más precios se fijan mirando el dólar. Banda: intervalo de confianza del 95%. Las franjas grises marcan los 36 meses que siguen a un cambio de régimen cambiario, cuando la ventana mezcla dos regímenes.</p>
+      <div class="chart tall" id="c-traspaso" role="img" aria-label="Traspaso del tipo de cambio a precios, regresión móvil"></div>
+      <p class="note" id="traspaso-pie"></p>
+    </section>
     <section class="card section" id="sec-m3" hidden>
       <h2>Dolarización de M3, serie larga</h2>
       <p class="note">Moneda extranjera en M3 (circulante y depósitos de los sectores privado y público), fin de cada mes. La caída de 2002 es la pesificación de los depósitos. BCRA, agregados monetarios.</p>
@@ -162,10 +168,15 @@ a { color: inherit; }
       <p class="note">Depósitos de residentes no bancarios en bancos del exterior, miles de millones de USD, trimestral (BIS).</p>
       <div class="chart tall" id="c-comp-ext" role="img" aria-label="Depósitos en bancos del exterior por país"></div>
     </section>
+    <section class="card section">
+      <h2>Traspaso del tipo de cambio a precios</h2>
+      <p class="note">Parte de una depreciación que aparece en el IPC en siete meses, regresión móvil de 36 meses. Un proxy de la dolarización de la unidad de cuenta: cuánto se fijan los precios mirando el dólar. Sin línea donde el tipo de cambio casi no se movió (Bolivia hasta 2026). Argentina, con el dólar paralelo en los años de cepo.</p>
+      <div class="chart tall" id="c-comp-traspaso" role="img" aria-label="Traspaso del tipo de cambio a precios por país"></div>
+    </section>
     <section class="card section table-wrap">
       <h2>Último dato</h2>
       <p class="note">* Indicador del FMI (pasivos o crédito en moneda extranjera de los bancos), donde no hay serie local.</p>
-      <table id="comp-tbl"><thead><tr><th>País</th><th class="num">Depósitos</th><th class="num">Crédito</th><th class="num">Liquidez</th><th class="num">Exterior (miles de M USD)</th><th>Frecuencia local</th></tr></thead><tbody></tbody></table>
+      <table id="comp-tbl"><thead><tr><th>País</th><th class="num">Depósitos</th><th class="num">Crédito</th><th class="num">Liquidez</th><th class="num">Exterior (miles de M USD)</th><th class="num">Traspaso a precios</th><th>Frecuencia local</th></tr></thead><tbody></tbody></table>
     </section>
   </div>
 
@@ -176,7 +187,9 @@ a { color: inherit; }
     <p>La dolarización que sale del sistema local no se ve en estos cocientes: los dólares en efectivo fuera de los bancos y los depósitos en el exterior. Para lo segundo se usan las estadísticas bancarias territoriales del Banco de Pagos Internacionales (BIS): depósitos de personas y empresas de cada país en bancos de otros países, trimestrales y con unos cuatro meses de rezago. Es la única medida comparable para Brasil y Colombia, donde los residentes no pueden tener depósitos en dólares en el sistema local (salvo excepciones), y para Chile mientras no esté disponible la serie del Banco Central.</p>
     <p><b>Frecuencia.</b> Argentina: diaria (API del BCRA), con M3 mensual desde 1940. Bolivia: diaria en las últimas semanas y mensual hacia atrás (información estadística semanal del BCB). Perú: mensual (BCRP). Uruguay: mensual (BCU, Superintendencia de Servicios Financieros). Costa Rica, Brasil, Chile y Colombia: indicadores de solidez financiera del FMI (crédito y pasivos en moneda extranjera de los bancos), mensuales o trimestrales y con varios meses de rezago. Exterior: trimestral (BIS). Todo se descarga automáticamente todos los días.</p>
     <p><b>Compras de dólares de las personas (Argentina).</b> La formación de activos externos de personas humanas (FAE) mide los dólares que la gente compra para atesorar. Comparada con la variación de los depósitos en dólares, aproxima qué parte queda en los bancos y qué parte va al colchón, al exterior o a otros activos.</p>
-    <p><b>Fuentes.</b> BCRA: depósitos y préstamos del sector privado por moneda, billetes y monedas en poder del público, agregados monetarios; tipo de cambio A3500. BCRP: liquidez y crédito de las sociedades creadoras de depósito. BCU: depósitos y créditos del sector no financiero, sistema bancario; tipo de cambio interbancario. BCB: información estadística semanal. FMI: Financial Soundness Indicators. BIS: Locational Banking Statistics.</p>
+    <p><b>Traspaso del tipo de cambio a precios: la dolarización de la unidad de cuenta.</b> Los cocientes anteriores miden el dólar como reserva de valor. Para ver cuánto se usa como unidad de cuenta (cuántos precios se fijan mirando el dólar) se estima cuánto de una depreciación pasa a la inflación. Para cada país y cada mes se corre una regresión con los últimos 36 meses: la inflación mensual del IPC (sin estacionalidad) sobre la depreciación del tipo de cambio de ese mes y de los seis anteriores (promedios mensuales), la inflación del mes anterior y la inflación de las materias primas en dólares (índice del FMI) como control externo. El indicador es la suma de los siete coeficientes: qué porcentaje de una depreciación aparece en los precios en siete meses. La banda es el intervalo del 95% con errores de Newey-West, robustos a autocorrelación. Como chequeo se muestran proyecciones locales (Jordà): la suba acumulada de los precios a seis meses dividida por la del tipo de cambio, después de una depreciación.</p>
+    <p>Cuidados. Con tipo de cambio fijo (Bolivia hasta junio de 2026) el traspaso no está identificado: si en la ventana el tipo de cambio se movió menos de 0,5% en al menos ocho meses, no se reporta. En Argentina, en los años de cepo el precio relevante del dólar para quien fija precios fue el paralelo (blue hasta 2012, contado con liquidación desde 2013), así que la serie principal usa ese tipo de cambio y se muestra también la del oficial. Un cambio de régimen (fin de la convertibilidad, cepo, flotación) hace que la ventana mezcle dos comportamientos: los 36 meses posteriores van sombreados. Y el traspaso no es sólo dolarización: también sube con la inflación alta, con la credibilidad baja del banco central y con depreciaciones grandes, así que conviene leerlo como un indicador de cuán atados al dólar están los precios, no como una medida pura. Algunos precios directamente se fijan en dólares (inmuebles y autos usados en Argentina y Uruguay, alquileres turísticos): ahí el traspaso es completo e inmediato, pero no hay series públicas mensuales comparables entre países.</p>
+    <p><b>Fuentes.</b> BCRA: depósitos y préstamos del sector privado por moneda, billetes y monedas en poder del público, agregados monetarios; tipo de cambio A3500. BCRP: liquidez y crédito de las sociedades creadoras de depósito. BCU: depósitos y créditos del sector no financiero, sistema bancario; tipo de cambio interbancario. BCB: información estadística semanal. FMI: Financial Soundness Indicators e índice de precios de materias primas (vía FRED). BIS: Locational Banking Statistics, precios al consumidor y tipos de cambio promedio mensuales. Inflación de Argentina: API del BCRA (INDEC).</p>
   </section>
   <footer id="foot"></footer>
 </div>
@@ -215,7 +228,7 @@ a { color: inherit; }
 
   function tiles(d) {
     const box = document.getElementById("tiles");
-    const orden = ["depositos", "pasivos_fmi", "credito", "credito_fmi", "liquidez", "exterior", "depositos_usd", "fae_12m", "fae_en_bancos", "fae_acum"];
+    const orden = ["depositos", "pasivos_fmi", "credito", "credito_fmi", "liquidez", "exterior", "depositos_usd", "traspaso", "fae_12m", "fae_en_bancos", "fae_acum"];
     box.innerHTML = orden.filter((k) => d.indicadores[k]).map((k) => {
       const x = d.indicadores[k];
       const pct = x.unidad === "%" || x.unidad.startsWith("% en");
@@ -275,6 +288,38 @@ a { color: inherit; }
     c.setOption(o);
   }
 
+  // Traspaso: línea central, banda del 95% (área apilada entre el límite inferior y el superior) y cambios de régimen.
+  function traspaso(d) {
+    const t = d.traspaso;
+    const ok = t && t.variantes && t.variantes.some((v) => v.data.some((p) => p[1] != null));
+    document.getElementById("sec-traspaso").hidden = !t;
+    if (!t) return;
+    document.getElementById("traspaso-pie").textContent = t.nota || "";
+    if (!ok) return empty("c-traspaso", "Sin dato: el tipo de cambio casi no se movió en la ventana, así que el traspaso no está identificado.");
+    const c = mount("c-traspaso"); const o = base();
+    o.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 0) + "%";
+    const cols = ["--s1", "--s2"];
+    o.series = [];
+    t.variantes.forEach((v, i) => {
+      const rows = cut(v.data, 3650);
+      const col = css(cols[i]);
+      if (i === 0) {
+        o.series.push({ name: "lo", type: "line", data: rows.map((p) => [p[0], p[2]]), stack: "banda", lineStyle: { opacity: 0 }, showSymbol: false, silent: true, tooltip: { show: false } });
+        o.series.push({ name: "Banda del 95%", type: "line", data: rows.map((p) => [p[0], p[2] == null ? null : p[3] - p[2]]), stack: "banda", lineStyle: { opacity: 0 }, areaStyle: { color: col, opacity: 0.15 }, showSymbol: false, silent: true, tooltip: { show: false }, itemStyle: { color: col } });
+      }
+      o.series.push(line(v.label, rows.map((p) => [p[0], p[1]]), col, { connectNulls: false }));
+      if (i === 0 && v.jorda && v.jorda.length) o.series.push(line("Chequeo: proyecciones locales", cut(v.jorda, 3650), css("--muted"), { lineStyle: { width: 1.5, type: "dotted", color: css("--muted") } }));
+    });
+    const r0 = cut(t.variantes[0].data, 3650); const desde = r0.length ? r0[0][0] : "";
+    o.series[o.series.length - 1].markArea = {
+      silent: true, itemStyle: { color: css("--wash") },
+      data: (t.quiebres || []).filter((q) => q[2] >= desde).map((q) => [{ xAxis: q[0] < desde ? desde : q[0], name: q[1], label: { color: css("--muted"), fontSize: 11, position: "insideTopLeft" } }, { xAxis: q[2] }]),
+    };
+    o.legend.data = o.series.map((x) => x.name).filter((n) => n !== "lo");
+    o.yAxis.axisLabel.formatter = (v) => nf(v, 0) + "%";
+    c.setOption(o);
+  }
+
   function renderPais(d) {
     const av = document.getElementById("aviso");
     av.hidden = !d.nota; av.textContent = d.nota || "";
@@ -307,6 +352,7 @@ a { color: inherit; }
       o2.series = [line("Quedó en depósitos", tramos, css("--s3"), { showSymbol: true, symbolSize: 5 })];
       c2.setOption(o2);
     }
+    traspaso(d);
     const m3 = d.indicadores.m3;
     document.getElementById("sec-m3").hidden = !m3;
     if (m3) { const c = mount("c-m3"); const o = base(); o.legend = undefined; o.grid.top = 16; o.tooltip.valueFormatter = (v) => nf(v, 1) + "%"; o.series = [line("M3 en moneda extranjera", m3.data, css("--s1"))]; c.setOption(o); }
@@ -332,13 +378,18 @@ a { color: inherit; }
     o2.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 1) + " mil M USD";
     o2.series = ps.filter((k) => r.paises[k].exterior.length).map((k) => line(r.paises[k].nombre, cut(r.paises[k].exterior, 3650), css(COLOR_PAIS[k]), { showSymbol: true, symbolSize: 5 }));
     c2.setOption(o2);
+    const c4 = mount("c-comp-traspaso"); const o4 = base();
+    o4.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 0) + "%";
+    o4.yAxis.axisLabel.formatter = (v) => nf(v, 0) + "%";
+    o4.series = ps.filter((k) => r.paises[k].traspaso_mensual && r.paises[k].traspaso_mensual.length).map((k) => line(r.paises[k].nombre, cut(r.paises[k].traspaso_mensual, 3650), css(COLOR_PAIS[k]), { connectNulls: false }));
+    c4.setOption(o4);
     const v = (p, k, dec = 1, suf = "%", alt = null) => {
       let x = p.ultimos[k], fmi = false;
       if ((!x || x.last == null) && alt && p.ultimos[alt]) { x = p.ultimos[alt]; fmi = true; }
       return x && x.last != null ? `${nf(x.last, dec)}${suf}${fmi ? "*" : ""} <span class="note">(${x.last_date.slice(0, 7)})</span>` : "–";
     };
     document.querySelector("#comp-tbl tbody").innerHTML = ps.map((k) => { const p = r.paises[k];
-      return `<tr><td><span style="display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px;background:var(${COLOR_PAIS[k]})"></span><a href="?pais=${k}" data-ir="${k}">${p.nombre}</a></td><td class="num">${v(p, "depositos", 1, "%", "pasivos_fmi")}</td><td class="num">${v(p, "credito", 1, "%", "credito_fmi")}</td><td class="num">${v(p, "liquidez")}</td><td class="num">${v(p, "exterior", 1, "")}</td><td>${p.frecuencia || "–"}</td></tr>`; }).join("");
+      return `<tr><td><span style="display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px;background:var(${COLOR_PAIS[k]})"></span><a href="?pais=${k}" data-ir="${k}">${p.nombre}</a></td><td class="num">${v(p, "depositos", 1, "%", "pasivos_fmi")}</td><td class="num">${v(p, "credito", 1, "%", "credito_fmi")}</td><td class="num">${v(p, "liquidez")}</td><td class="num">${v(p, "exterior", 1, "")}</td><td class="num">${v(p, "traspaso", 0)}</td><td>${p.frecuencia || "–"}</td></tr>`; }).join("");
     document.querySelectorAll("#comp-tbl [data-ir]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); document.querySelector(`#pais button[data-p="${a.dataset.ir}"]`).click(); }));
     document.getElementById("foot").textContent = `Actualizado: ${new Date(r.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina).`;
   }

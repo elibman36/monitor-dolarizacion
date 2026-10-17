@@ -550,3 +550,59 @@ def test_financiera_parse_bcb():
     r = d.iloc[-1]
     assert round(r["dep_me_usd"] / (r["dep_me_usd"] + r["dep_mn_usd"]) * 100, 1) == 11.5
     assert round(r["dep_mn_bs"] / r["dep_mn_usd"], 2) == 11.85
+
+
+def _simular_traspaso(betas, n=240, rho=0.3, semilla=0):
+    rng = np.random.default_rng(semilla)
+    idx = pd.date_range("2005-01-31", periods=n, freq="ME")
+    d = pd.Series(rng.normal(1, 3, n), idx)
+    pi = np.zeros(n)
+    for i in range(n):
+        pi[i] = 0.5 + (rho * pi[i - 1] if i else 0) + sum(b * d.iloc[i - k] for k, b in enumerate(betas) if i >= k) + rng.normal(0, 0.3)
+    return pd.Series(pi, idx), d
+
+
+def test_traspaso_recupera_la_suma_de_coeficientes():
+    from monitor import traspaso as t
+    pi, d = _simular_traspaso([0.2, 0.1, 0.05, 0.05])
+    # Muestra completa: Σβ = 0,4 y largo plazo 0,4 / 0,7.
+    r = t.estimar(t.armar(pi, d))
+    assert abs(r["suma"] - 0.4) < 0.05 and abs(r["lp"] - 0.4 / 0.7) < 0.08 and r["se"] > 0
+    m = t.movil(pi, d)
+    assert len(m) > 150 and not m.sin_dato.any()
+    # En ventanas de 36 meses la estimación es ruidosa pero centrada.
+    assert abs(m.suma.median() - 0.4) < 0.08
+    assert abs(t.proyeccion_local(pi, d) - 0.4 / 0.7) < 0.15
+
+
+def test_traspaso_sin_dato_con_tipo_de_cambio_fijo():
+    from monitor import traspaso as t
+    pi, d = _simular_traspaso([0.2])
+    fijo = pd.Series(0.0, d.index)
+    fijo.iloc[-3] = 40.0   # una devaluación aislada no alcanza para identificar
+    m = t.movil(pi, fijo)
+    assert m.sin_dato.all() and m.suma.isna().all()
+    assert t.lp_movil(pi, fijo).empty
+
+
+def test_traspaso_desestacionaliza():
+    from monitor import traspaso as t
+    idx = pd.date_range("2010-01-31", periods=144, freq="ME")
+    pi = pd.Series(2.0 + np.where(idx.month == 1, 1.2, -0.1), idx)
+    sa = t.desestacionalizar(pi)
+    assert sa.std() < 1e-9 and abs(sa.mean() - pi.mean()) < 1e-9
+
+
+def test_traspaso_json(monkeypatch):
+    from monitor import financiera as f
+    pi, d = _simular_traspaso([0.3, 0.1])
+    e = np.exp(d.cumsum() / 100) * 10
+    monkeypatch.setattr(f, "ipc_mensual", lambda pais, offline: pi)
+    monkeypatch.setattr(f, "tc_mensual", lambda pais, offline: e)
+    monkeypatch.setattr(f, "tc_paralelo_ar", lambda: e[e.index >= "2011-01-31"] * 1.5)
+    tr, principal = f.traspaso_pais("ar", True, None)
+    assert [v["clave"] for v in tr["variantes"]] == ["paralelo", "oficial"]
+    fecha, suma, lo, hi = tr["variantes"][0]["data"][-1]
+    assert lo < suma < hi and 20 < suma < 60
+    assert tr["quiebres"][0][:2] == ["2002-01-31", "Fin de la convertibilidad"] and tr["quiebres"][0][2] == "2005-01-31"
+    assert principal.dropna().iloc[-1] == pytest.approx(suma, abs=0.06)
