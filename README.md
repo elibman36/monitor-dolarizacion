@@ -1,12 +1,13 @@
-# Monitor de Dolarización (Argentina y América Latina)
+# Monitor de Dolarización (Argentina)
 
 Tablero diario para seguir la presión cambiaria y la dolarización de
 portafolios en Argentina, pensado para hacer incidencia en el ciclo electoral
 2027. Su eje es el **Índice de Dolarización (ID)**, una adaptación
 del *Exchange Market Pressure Index* a la economía bimonetaria argentina.
-El mismo motor se aplica a Perú, Uruguay, Brasil, Chile y Colombia, con
-componentes propios, y un núcleo comparable mide la presión de los países en
-las mismas unidades.
+El tablero y el reporte cubren sólo Argentina. Los módulos de Perú,
+Uruguay, Brasil, Chile, Colombia y el núcleo comparable siguen en el código
+(`monitor/peru.py`, etc.; el monitor financiero usa algunas de sus piezas),
+pero ya no se corren en el workflow diario ni se muestran.
 
 ```
 .
@@ -16,21 +17,16 @@ las mismas unidades.
 │   ├── sources.py          ← descarga (BCRA, ArgentinaDatos, A3 Mercados)
 │   ├── indicators.py       ← series derivadas e ID
 │   ├── build.py            ← orquestador de Argentina: python -m monitor.build
-│   ├── peru.py             ← Perú (BCRP): python -m monitor.peru
-│   ├── uruguay.py          ← Uruguay (BCU): python -m monitor.uruguay
-│   ├── brasil.py           ← Brasil (BCB): python -m monitor.brasil
-│   ├── chile.py            ← Chile (BCCh vía mindicador.cl): python -m monitor.chile
-│   ├── colombia.py         ← Colombia (BanRep, SFC): python -m monitor.colombia
+│   ├── peru.py … colombia.py, comparado.py ← otros países (sin uso en el tablero)
 │   ├── comun.py            ← piezas comunes a los países
-│   ├── comparado.py        ← núcleo comparable: python -m monitor.comparado
-│   └── report.py           ← reporte semanal: python -m monitor.report --pais ar|pe|uy|br|cl|co
+│   └── report.py           ← reporte semanal: python -m monitor.report
 ├── data/
 │   ├── monitor.json        ← lo que consume el tablero (generado)
 │   ├── panel_diario.csv    ← panel diario completo, para Excel/R/Stata (generado)
 │   ├── bcra_catalogo.csv   ← catálogo de variables del BCRA (generado)
 │   ├── series/*.csv        ← historia cruda de cada serie (generado)
-│   ├── pe/ uy/ br/ cl/ co/ ← lo mismo para cada país (generado)
-│   └── comparado.json      ← núcleo comparable entre países (generado)
+│   ├── pe/ uy/ br/ cl/ co/ ← datos históricos de otros países (ya no se actualizan)
+│   └── comparado.json      ← núcleo comparable (ya no se actualiza)
 └── tests/
 ```
 
@@ -187,55 +183,6 @@ componentes, suavizado y tramos del índice, y eventos.
 - El índice mide presión relativa a la historia reciente, no niveles de
   equilibrio.
 
-## Otros países
-
-El tablero tiene un selector de país (`?pais=ar|pe|uy|br|cl|co|comparado`) y cada país
-tiene su reporte semanal (`reportes/<país>/`). El índice 0–100 de
-cada país usa el mismo método, con componentes propios; mide presión
-**respecto de la historia de ese país**, así que un 80 en Perú no es la misma
-presión que un 80 en Argentina.
-
-| País | Subíndice | Componentes | Fuente |
-|---|---|---|---|
-| Perú | Presión cambiaria | depreciación del sol, volatilidad, ventas de dólares del BCRP (mesa y swaps cambiarios, en % de reservas), posición de cambio del BCRP, tasa interbancaria | BCRP (API) |
-| | Dolarización y riesgo | cambio en 3 meses de la dolarización de la liquidez, EMBIG Perú, bono soberano en soles a 10 años | BCRP |
-| Uruguay | Presión cambiaria | depreciación del peso, volatilidad, posición en moneda extranjera del BCU, activos de reserva | BCU (servicio de cotizaciones y planilla de reservas) |
-| | Dolarización | cambio en 3 meses de la dolarización de los depósitos privados, depósitos privados en dólares | BCU (SSF) |
-| Brasil | Presión cambiaria | depreciación del real, volatilidad, reservas, ventas spot del BCB (% de reservas), cambio en el stock de swaps cambiarios y en las líneas con recompra | BCB (SGS y planilla de intervenciones) |
-| | Riesgo y tasas | EMBIG Brasil, cambio en la Selic | BCRP, BCB |
-| Chile | Presión cambiaria | depreciación del peso, volatilidad, precio del cobre (signo inverso) | BCCh vía mindicador.cl |
-| | Riesgo y tasas | EMBIG Chile, cambio en la TPM | BCRP, BCCh |
-| Colombia | Presión cambiaria | depreciación del peso (TRM), volatilidad, reservas, ventas netas de dólares del Banco de la República (% de reservas) | SFC (datos.gov.co), BanRep (suameca) |
-| | Riesgo y tasas | EMBIG Colombia, cambio en la tasa de política | BCRP, BanRep |
-
-En Uruguay todavía no hay fuentes automáticas para la tasa de política
-monetaria reciente ni para el riesgo país (UBI). El sitio del BCU tiene la
-cadena de certificados incompleta: el workflow usa `BCU_SSL_VERIFY=0` sólo
-para el BCU (y `SUAMECA_SSL_VERIFY=0` para el portal del Banco de la
-República, por el mismo problema). En Chile, las reservas y la intervención
-están en la API del Banco Central (BDE), que exige registro: con las
-credenciales como secretos se pueden sumar, y Chile entraría al núcleo
-comparable.
-
-La vista **Comparar países** muestra juntos los índices 0–100 de los seis países
-y una tabla con el último dato de cada uno. Como cada índice se mide contra la
-historia de su país, el gráfico dice cuándo cada país está más presionado que lo
-habitual, no cuál tiene más presión. Debajo, plegada, está la medida
-complementaria que sí es comparable en nivel.
-
-**Núcleo comparable** (`monitor/comparado.py`, medida complementaria). Presión mensual en % de
-depreciación equivalente (Girton y Roper, 1977; Weymark, 1995; Patnaik, Felman
-y Shah, 2017): *depreciación + ρ × intervención vendedora neta del banco
-central (% de las reservas del mes anterior)*, con un ρ común a todos los países
-fijado con la dispersión del panel (MAD de la depreciación / MAD de la
-intervención, sólo en los meses con intervención). Intervención: Argentina, compras del BCRA y cambio en su
-posición vendida de futuros; Perú, mesa y swaps cambiarios del BCRP; Uruguay,
-caída de la posición en moneda extranjera del BCU (aproximación); Brasil, ventas
-spot y cambios en swaps y líneas del BCB; Colombia, operaciones del Banco de la
-República (los NDF, como cambio del stock vigente). No incluye
-las ventas del Tesoro argentino ni las tasas de interés, y con cepo subestima
-la presión argentina, que se va a la brecha.
-
 ## Monitor de Dolarización Financiera
 
 Proyecto aparte, en `financiera/` (tablero) y `monitor/financiera.py`
@@ -314,8 +261,6 @@ bloque `funciones`.
 
 ## Próximos pasos posibles
 
-- Uruguay: tasa de política monetaria y riesgo país (UBI) cuando haya una fuente automática.
-- Chile: reservas e intervención con la API del BCCh (requiere credenciales).
 - Agregar el breakeven de devaluación implícito entre LECAPs y bonos dollar
   linked a partir de precios de mercado.
 - Agregar flujos diarios de FCI de dólares y de money market (CAFCI).
