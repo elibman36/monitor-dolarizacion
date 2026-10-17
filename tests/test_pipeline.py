@@ -618,3 +618,27 @@ def test_parse_imf_mensual_y_encadenar():
     bcb = pd.Series([6.86, 6.86, 6.86, 9.76, 12.15], idx)
     e = f.encadenar(base, bcb)
     assert len(e) == 5 and e.iloc[-1] == pytest.approx(6.91 * 12.15 / 6.86)
+
+
+def test_funciones_del_dinero():
+    from monitor import funciones as fn
+    idx = pd.date_range("2005-01-31", periods=48, freq="ME")
+    rng = np.random.default_rng(1)
+    base = np.linspace(10, 40, 48)
+    vista = pd.Series(base + rng.normal(0, 1, 48), idx)                  # %
+    dep = pd.Series(base + 5 + rng.normal(0, 1, 48), idx)
+    cred = pd.Series(base - 5 + rng.normal(0, 1, 48), idx)
+    tr = pd.Series(np.linspace(-0.1, 1.3, 48), idx)                      # fracción, se acota a [0, 1]
+    p = fn.patas(vista, tr, dep, cred)
+    assert p["unidad_cuenta"].min() == 0 and p["unidad_cuenta"].max() == 1
+    assert p["reserva_valor"].iloc[0] == pytest.approx((dep.iloc[0] + cred.iloc[0]) / 200)
+    b = fn.bloque(vista, tr, dep, cred)
+    u = b["ultimo"]
+    assert u["indice"] == pytest.approx((u["medio_pago"] + u["unidad_cuenta"] + u["reserva_valor"]) / 3, abs=2e-3)
+    assert set(b["pca"]["pesos"]) == set(fn.PATAS) and sum(b["pca"]["pesos"].values()) == pytest.approx(1, abs=3e-3)
+    assert min(b["pca"]["pesos"].values()) >= 0.0999
+    etiquetas = [t["etiqueta"] for t in b["triangulo"]]
+    assert etiquetas[0] == "2007" and etiquetas[-1].startswith("Últimos 12 meses")
+    # Sin traspaso (por ejemplo, tipo de cambio fijo) no hay índice.
+    s, _, _ = fn.indice(fn.patas(vista, pd.Series(np.nan, idx), dep, cred))
+    assert s.empty

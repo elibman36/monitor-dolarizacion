@@ -72,6 +72,14 @@ th { text-align: left; font-weight: 600; color: var(--ink-2); border-bottom: 1px
 td { border-bottom: 1px solid var(--grid); padding: 6px 8px; }
 .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+@media (max-width: 860px) { .hero { grid-template-columns: 1fr; } }
+.hero .big { font-size: 44px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; margin: 6px 0 2px; }
+.patas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.patas div { border-top: 3px solid var(--c); padding-top: 6px; }
+.patas b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+.patas span { font-size: 12px; color: var(--ink-2); }
+.chart.tri { height: 400px; }
 footer { color: var(--muted); font-size: 12px; margin-top: 20px; }
 a { color: inherit; }
 </style>
@@ -97,6 +105,25 @@ a { color: inherit; }
 
   <div id="vista-pais">
     <div class="card aviso" id="aviso" hidden></div>
+    <section class="card section" id="sec-funciones" hidden>
+      <h2>Índice de las tres funciones del dinero</h2>
+      <p class="note">Cuánto cumple el dólar cada función del dinero en Argentina, de 0 (nada) a 1 (todo). <b>Medio de pago</b>: parte de los depósitos a la vista (cuentas corrientes y cajas de ahorro) en dólares. <b>Unidad de cuenta</b>: traspaso del dólar a los precios en siete meses. <b>Reserva de valor</b>: promedio de la dolarización de los depósitos y del crédito. El índice es el promedio simple de las tres.</p>
+      <div class="hero">
+        <div>
+          <div class="note" id="fn-fecha"></div>
+          <div class="big" id="fn-valor">–</div>
+          <div class="note" id="fn-pca"></div>
+          <div class="patas" id="fn-patas"></div>
+        </div>
+        <div>
+          <div class="chart tri" id="c-triangulo" role="img" aria-label="Triángulo de las tres funciones del dinero, promedios anuales"></div>
+          <div class="table-wrap"><table id="fn-tbl"><thead><tr><th>Período</th><th class="num">Medio de pago</th><th class="num">Unidad de cuenta</th><th class="num">Reserva de valor</th><th class="num">Índice</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+      <h2 style="margin-top:20px">Las tres patas en el tiempo</h2>
+      <p class="note">Promedios mensuales. La unidad de cuenta es la más ruidosa: sale de una regresión con 36 meses de datos.</p>
+      <div class="chart tall" id="c-funciones" role="img" aria-label="Medio de pago, unidad de cuenta, reserva de valor e índice, mensual"></div>
+    </section>
     <section class="tiles" id="tiles"></section>
     <section class="card section" id="sec-ratios">
       <h2>Dolarización por instrumento</h2>
@@ -189,6 +216,7 @@ a { color: inherit; }
     <p><b>Compras de dólares de las personas.</b> La formación de activos externos de personas humanas (FAE) mide los dólares que la gente compra para atesorar. Comparada con la variación de los depósitos en dólares, aproxima qué parte queda en los bancos y qué parte va al colchón, al exterior o a otros activos.</p>
     <p><b>Traspaso del tipo de cambio a precios: la dolarización de la unidad de cuenta.</b> Los cocientes anteriores miden el dólar como reserva de valor. Para ver cuánto se usa como unidad de cuenta (cuántos precios se fijan mirando el dólar) se estima cuánto de una depreciación pasa a la inflación. Para cada mes se corre una regresión con los últimos 36 meses: la inflación mensual del IPC (sin estacionalidad) sobre la depreciación del tipo de cambio de ese mes y de los seis anteriores (promedios mensuales), la inflación del mes anterior y la inflación de las materias primas en dólares (índice del FMI) como control externo. El indicador es la suma de los siete coeficientes: qué porcentaje de una depreciación aparece en los precios en siete meses. La banda es el intervalo del 95% con errores de Newey-West, robustos a autocorrelación. Como chequeo se muestran proyecciones locales (Jordà): la suba acumulada de los precios a seis meses dividida por la del tipo de cambio, después de una depreciación.</p>
     <p>Cuidados. Si el tipo de cambio casi no se mueve, el traspaso no está identificado: cuando en la ventana se movió menos de 0,5% en menos de ocho meses (la convertibilidad, por ejemplo), no se reporta. En los años de cepo el precio relevante del dólar para quien fija precios fue el paralelo (blue hasta 2012, contado con liquidación desde 2013), así que la serie principal usa ese tipo de cambio y se muestra también la del oficial. Un cambio de régimen (fin de la convertibilidad, cepo, unificación, fin del cepo) hace que la ventana mezcle dos comportamientos: los 36 meses posteriores van sombreados. Y el traspaso no es sólo dolarización: también sube con la inflación alta, con la credibilidad baja del banco central y con depreciaciones grandes, así que conviene leerlo como un indicador de cuán atados al dólar están los precios, no como una medida pura. Algunos precios directamente se fijan en dólares (inmuebles, autos usados, alquileres turísticos): ahí el traspaso es completo e inmediato, pero casi no pesan en el IPC y no hay series públicas mensuales confiables. Entre 2007 y 2015 el IPC oficial subestimó la inflación, así que el traspaso de esos años no es confiable.</p>
+    <p><b>Índice de las tres funciones del dinero.</b> El dinero sirve como medio de pago, unidad de cuenta y reserva de valor, y el dólar puede ocupar cualquiera de esas funciones por separado. El índice mide cada una entre 0 y 1, en su escala natural para que se lea directo. <b>Medio de pago</b>: participación de los dólares en los depósitos a la vista del sector privado (cuentas corrientes, otras cuentas a la vista y cajas de ahorro, con los dólares al tipo de cambio del día; BCRA, depósitos por tipo de cuenta, desde 1999). Como variante se muestra el mismo cociente con el circulante en pesos en el denominador. Es una cota alta: buena parte de las cajas de ahorro en dólares son ahorro y no se usan para pagar, y hasta hace poco casi no se podía pagar con ellas. <b>Unidad de cuenta</b>: el traspaso acumulado a siete meses, acotado entre 0 y 1, con el dólar paralelo, porque en los años de cepo fue el precio del dólar que siguieron los precios (con el oficial, el traspaso de 2024-2026 sale casi nulo aunque los precios ya habían seguido al CCL). <b>Reserva de valor</b>: promedio de la dolarización de los depósitos y del crédito al sector privado; una alternativa es la dolarización de los plazos fijos, que también se muestra. El índice es el promedio simple de las tres patas, sólo en los meses con las tres. Como chequeo se pondera por el primer componente principal de las tres series (cargas negativas en cero y un piso de 10% por pata, igual que en el Índice de Dolarización). El triángulo, en la línea del índice del trilema de Aizenman, Chinn e Ito, muestra los promedios anuales de algunos años: hacia qué punta crece el polígono dice en qué función avanzó el dólar.</p>
     <p><b>Fuentes.</b> BCRA: depósitos y préstamos del sector privado por moneda, billetes y monedas en poder del público, agregados monetarios, tipo de cambio A3500, anexo del balance cambiario e inflación mensual (INDEC). Dólar blue y contado con liquidación: ArgentinaDatos. BIS: Locational Banking Statistics y tipo de cambio promedio mensual. FMI: índice de precios de materias primas.</p>
   </section>
   <footer id="foot"></footer>
@@ -228,7 +256,7 @@ a { color: inherit; }
 
   function tiles(d) {
     const box = document.getElementById("tiles");
-    const orden = ["depositos", "pasivos_fmi", "credito", "credito_fmi", "liquidez", "exterior", "depositos_usd", "traspaso", "fae_12m", "fae_en_bancos", "fae_acum"];
+    const orden = ["depositos", "pasivos_fmi", "credito", "credito_fmi", "liquidez", "exterior", "depositos_usd", "vista", "plazo_fijo", "traspaso", "fae_12m", "fae_en_bancos", "fae_acum"];
     box.innerHTML = orden.filter((k) => d.indicadores[k]).map((k) => {
       const x = d.indicadores[k];
       const pct = x.unidad === "%" || x.unidad.startsWith("% en");
@@ -325,10 +353,62 @@ a { color: inherit; }
     c.setOption(o);
   }
 
+  const PATAS = [["medio_pago", "Medio de pago", "--s1"], ["unidad_cuenta", "Unidad de cuenta", "--s2"], ["reserva_valor", "Reserva de valor", "--s3"]];
+  // Índice de las tres funciones: número grande, triángulo por año (estilo Aizenman–Chinn–Ito) y serie mensual.
+  function funciones(d) {
+    const f = d.funciones;
+    document.getElementById("sec-funciones").hidden = !f;
+    if (!f) return;
+    const u = f.ultimo;
+    document.getElementById("fn-fecha").textContent = `Dato a ${u.fecha ? u.fecha.slice(5, 7) + "/" + u.fecha.slice(0, 4) : "–"}`;
+    document.getElementById("fn-valor").textContent = nf(u.indice, 2);
+    document.getElementById("fn-pca").textContent = f.pca ? `Ponderado por componentes principales: ${nf(f.indice_pca.length ? f.indice_pca[f.indice_pca.length - 1][1] : null, 2)} (pesos ${PATAS.map(([k, n]) => n.toLowerCase() + " " + nf(f.pca.pesos[k] * 100, 0) + "%").join(", ")}).` : "";
+    document.getElementById("fn-patas").innerHTML = PATAS.map(([k, n, c]) => `<div style="--c:var(${c})"><span>${n}</span><b>${nf(u[k], 2)}</b></div>`).join("");
+    const tri = f.triangulo || [];
+    const cols = ["--s4", "--s5", "--s6", "--s7", "--ink"];
+    const colTri = (i) => css(i === tri.length - 1 ? "--ink" : cols[i % 4]);
+    const c = mount("c-triangulo");
+    const angosto = document.getElementById("c-triangulo").clientWidth < 420;
+    c.setOption({
+      animation: false,
+      textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
+      legend: { bottom: 0, left: "center", icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } },
+      tooltip: { trigger: "item", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 },
+        formatter: (p) => `<b>${p.name}</b><br>` + PATAS.map(([, n], i) => `${n}: ${nf(p.value[i], 2)}`).join("<br>") },
+      radar: {
+        shape: "polygon", center: ["50%", "48%"], radius: angosto ? "58%" : "66%", splitNumber: 4,
+        indicator: PATAS.map(([, n]) => ({ name: n, max: 1, min: 0 })),
+        axisName: { color: css("--ink"), fontSize: 13, fontWeight: 600 },
+        axisLine: { lineStyle: { color: css("--axis") } },
+        splitLine: { lineStyle: { color: css("--grid") } },
+        splitArea: { show: false },
+        axisLabel: { show: true, color: css("--muted"), fontSize: 10, formatter: (v) => nf(v, 2) },
+      },
+      series: [{
+        type: "radar", symbolSize: 8,
+        data: tri.map((t, i) => {
+          const col = colTri(i), ult = i === tri.length - 1;
+          return { name: t.etiqueta, value: PATAS.map(([k]) => t[k]), symbol: "circle",
+            lineStyle: { width: ult ? 3 : 2, color: col }, itemStyle: { color: col, borderColor: css("--surface"), borderWidth: 2 },
+            areaStyle: { color: col, opacity: ult ? 0.12 : 0.04 } };
+        }),
+      }],
+    });
+    document.querySelector("#fn-tbl tbody").innerHTML = tri.map((t, i) => `<tr><td><span style="display:inline-block;width:12px;height:3px;border-radius:2px;vertical-align:middle;margin-right:8px;background:${colTri(i)}"></span>${t.etiqueta}</td>` +
+      PATAS.map(([k]) => `<td class="num">${nf(t[k], 2)}</td>`).join("") + `<td class="num">${nf((t.medio_pago + t.unidad_cuenta + t.reserva_valor) / 3, 2)}</td></tr>`).join("");
+    const c2 = mount("c-funciones"); const o = base();
+    o.tooltip.valueFormatter = (v) => v == null ? "–" : nf(v, 2);
+    o.yAxis.min = 0; o.yAxis.max = 1; o.yAxis.scale = false;
+    if (document.getElementById("c-funciones").clientWidth < 600) o.grid.top = 56;
+    o.series = PATAS.map(([k, n, col]) => line(n, cut(f.patas[k].data), css(col), { connectNulls: false }))
+      .concat([line("Índice (promedio simple)", cut(f.indice), css("--ink"), { lineStyle: { width: 3, color: css("--ink") }, connectNulls: false })]);
+    c2.setOption(o);
+  }
+
   function renderPais(d) {
     const av = document.getElementById("aviso");
     av.hidden = !d.nota; av.textContent = d.nota || "";
-    tiles(d); ratios(d);
+    funciones(d); tiles(d); ratios(d);
     const hayDesc = d.descomposicion && d.descomposicion.depositos && d.descomposicion.depositos.length;
     document.getElementById("sec-desc").hidden = !hayDesc;
     if (hayDesc) { desc("c-desc-dep", d.descomposicion.depositos); desc("c-desc-cred", d.descomposicion.credito, "card-desc-cred"); }

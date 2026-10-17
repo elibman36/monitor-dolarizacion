@@ -33,7 +33,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 
-from . import comun, config, sources, traspaso
+from . import comun, config, funciones, sources, traspaso
 
 log = logging.getLogger("monitor.financiera")
 
@@ -49,6 +49,10 @@ BCRA_IDS = {
     "circulante": 17,    # billetes y monedas en poder del público (millones de $)
     "m3_total": 1623,    # M3 en moneda local y extranjera (mensual, miles de $)
     "m3_local": 1624,    # M3 en moneda local (mensual, miles de $)
+    # Depósitos del sector privado por tipo de cuenta (diarios, desde 1999).
+    "cc_pesos": 1528, "vista_pesos": 1530, "ca_pesos": 1532,   # millones de $
+    "cc_usd": 1565, "vista_usd": 1567, "ca_usd": 1569,         # millones de USD
+    "pf_pesos": 1534, "pf_usd": 1571,                          # plazos fijos
 }
 # Perú (BCRP, mensual).
 BCRP_CODES = {
@@ -176,6 +180,22 @@ def argentina(offline: bool) -> dict:
     m3 = m3[m3.index >= m3[m3 > 0.5].index.min()] if (m3 > 0.5).any() else m3
     fuente = "BCRA (API de series estadísticas)"
     fae = fae_indicadores(raw["dep_usd"])
+    # Depósitos a la vista (cuentas corrientes, otras cuentas a la vista y cajas de ahorro).
+    idv = raw["ca_pesos"].index.union(raw["ca_usd"].index)
+    alv = lambda s: s.reindex(idv.union(s.index)).sort_index().ffill().reindex(idv)  # noqa: E731
+    vista_pesos = sum(alv(raw[k]).fillna(0) for k in ("cc_pesos", "vista_pesos", "ca_pesos"))
+    vista_usd = sum(alv(raw[k]).fillna(0) for k in ("cc_usd", "vista_usd", "ca_usd"))
+    ev = alv(tc)
+    vista = ratio(vista_usd * ev, vista_pesos)
+    vista_circ = ratio(vista_usd * ev, vista_pesos + alv(raw["circulante"]))
+    pf = ratio(alv(raw["pf_usd"]) * ev, alv(raw["pf_pesos"]))
+    extra = {}
+    if not vista.dropna().empty:
+        extra = {
+            "vista": indicador(vista, "Dolarización de los depósitos a la vista", "% en dólares", "diaria", fuente),
+            "vista_circulante": indicador(vista_circ, "Dolarización de los medios de pago (depósitos a la vista + circulante)", "% en dólares", "diaria", fuente),
+            "plazo_fijo": indicador(pf, "Dolarización de los plazos fijos", "% en dólares", "diaria", fuente),
+        }
     return {
         "frecuencia": "diaria",
         "indicadores": {
@@ -185,6 +205,7 @@ def argentina(offline: bool) -> dict:
             "m3": indicador(m3, "Dolarización de M3 (serie larga)", "% en moneda extranjera", "mensual", "BCRA, agregados monetarios"),
             "depositos_usd": indicador(raw["dep_usd"], "Depósitos privados en dólares", "millones de USD", "diaria", fuente, 0),
             **fae,
+            **extra,
         },
         "descomposicion": {
             "depositos": _desc_pairs(descomponer(raw["dep_pesos"], raw["dep_usd"], tc)),
@@ -627,6 +648,12 @@ def traspaso_pais(pais: str, offline: bool, ext: pd.Series | None) -> tuple[dict
     }, principal
 
 
+def _serie(ind: dict | None) -> pd.Series:
+    if not ind or not ind["data"]:
+        return pd.Series(dtype=float)
+    return pd.Series({pd.Timestamp(d): v for d, v in ind["data"]})
+
+
 def _mensual(ind: dict, claves: list[str]) -> dict:
     """Serie mensual del primer indicador disponible (y cuál se usó)."""
     for k in claves:
@@ -681,6 +708,14 @@ def run(offline: bool = False) -> dict:
                         f"Cálculo propio con el IPC (" + FUENTE_IPC[k] + ") y el tipo de cambio " + ("paralelo" if k == "ar" else "del BIS"), 1)
         except Exception as exc:  # noqa: BLE001
             log.warning("%s traspaso: %s", nombre, exc)
+        if k == "ar" and principal is not None:
+            try:
+                serie = lambda i: _serie(out["indicadores"].get(i))  # noqa: E731
+                f = funciones.bloque(serie("vista"), principal / 100, serie("depositos"), serie("credito"))
+                if f:
+                    out["funciones"] = f
+            except Exception as exc:  # noqa: BLE001
+                log.warning("%s funciones del dinero: %s", nombre, exc)
         out.update({"codigo": k, "nombre": nombre, "nota": NOTAS.get(k),
                     "generated_at": resumen["generated_at"]})
         (DATA_DIR / f"{k}.json").write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

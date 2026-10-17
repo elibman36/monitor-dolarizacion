@@ -292,6 +292,26 @@ cociente de proyecciones locales a 6 meses.
 En el JSON de cada país, `traspaso.variantes[].data` = `[fecha, Σβ, límite
 inferior, superior]` en %; `indicadores.traspaso` es la serie principal.
 
+### Índice de las tres funciones del dinero (Argentina)
+
+`monitor/funciones.py`. Cuánto cumple el dólar cada función del dinero, de 0
+a 1 en la escala natural de cada pata:
+
+- **Medio de pago**: dólares en los depósitos a la vista del sector privado
+  (cuentas corrientes, otras a la vista y cajas de ahorro; BCRA, variables
+  1528/1530/1532 en pesos y 1565/1567/1569 en dólares, diarias desde 1999).
+  Variante con el circulante en pesos en el denominador (`vista_circulante`).
+- **Unidad de cuenta**: traspaso acumulado a 7 meses con el dólar paralelo,
+  acotado a [0, 1].
+- **Reserva de valor**: promedio de la dolarización de depósitos y crédito.
+  Alternativa: plazos fijos (`plazo_fijo`, variables 1534/1571).
+
+Índice = promedio simple (meses con las tres patas). Chequeo: ponderación por
+el primer componente principal (`indicators.pca_weights`, como el Índice de
+Dolarización). El tablero muestra un triángulo estilo Aizenman–Chinn–Ito con
+los promedios de 2007, 2015, 2019, 2023 y los últimos 12 meses. En `ar.json`,
+bloque `funciones`.
+
 ## Próximos pasos posibles
 
 - Uruguay: tasa de política monetaria y riesgo país (UBI) cuando haya una fuente automática.
