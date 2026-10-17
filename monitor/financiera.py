@@ -461,7 +461,7 @@ def bis(pais: str, offline: bool) -> pd.Series:
 BIS_CPI_URL = "https://stats.bis.org/api/v1/data/WS_LONG_CPI/M.{pais}.628?format=csv&startPeriod=1990-01"
 BIS_XRU_URL = "https://stats.bis.org/api/v1/data/WS_XRU/M.{pais}..A?format=csv&startPeriod=1990-01"
 IMF_CPI_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.STA,CPI/{iso3}.CPI._T.IX.M?startPeriod=1990"
-COMMODITIES_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.RES,PCPS/W00.PALLFNF.IX.M?startPeriod=1990"
+COMMODITIES_URL = "https://api.imf.org/external/sdmx/2.1/data/IMF.RES,PCPS/G001.PALLFNF.INDEX.M?startPeriod=1990"
 SGS_IPCA_URL = "https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados?formato=json&dataInicial=01/01/1990"
 # De dónde sale el IPC de cada país (el BIS no publica Uruguay, Bolivia ni Costa Rica).
 FUENTE_IPC = {"ar": "BCRA (INDEC)", "br": "IPCA, BCB-SGS", "pe": "BIS", "cl": "BIS", "co": "BIS",
@@ -470,7 +470,7 @@ FUENTE_IPC = {"ar": "BCRA (INDEC)", "br": "IPCA, BCB-SGS", "pe": "BIS", "cl": "B
 QUIEBRES = {
     "ar": [("2002-01-31", "Fin de la convertibilidad"), ("2011-10-31", "Cepo"), ("2015-12-31", "Unificación"),
            ("2019-09-30", "Vuelve el cepo"), ("2025-04-30", "Bandas, fin del cepo para personas")],
-    "br": [("1999-01-31", "Flotación")],
+    "br": [("1994-07-31", "Plan Real"), ("1999-01-31", "Flotación")],
     "cl": [("1999-09-30", "Flotación")],
     "co": [("1999-09-30", "Flotación")],
     "uy": [("2002-06-30", "Flotación")],
@@ -641,10 +641,10 @@ def run(offline: bool = False) -> dict:
     resumen = {"generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "paises": {}}
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     try:
-        ext = commodities(offline)
+        materias = commodities(offline)
     except Exception as exc:  # noqa: BLE001
         log.warning("materias primas: %s", exc)
-        ext = None
+        materias = None
     for k, nombre in NOMBRES.items():
         try:
             out = builders[k](offline) if k in builders else {"frecuencia": "trimestral", "indicadores": {}, "descomposicion": {}}
@@ -671,7 +671,7 @@ def run(offline: bool = False) -> dict:
             log.warning("%s BIS: %s", nombre, exc)
         principal = None
         try:
-            tr, principal = traspaso_pais(k, offline, ext)
+            tr, principal = traspaso_pais(k, offline, materias)
             if tr:
                 out["traspaso"] = tr
                 ultimo = principal.dropna()

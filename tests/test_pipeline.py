@@ -606,3 +606,15 @@ def test_traspaso_json(monkeypatch):
     assert lo < suma < hi and 20 < suma < 60
     assert tr["quiebres"][0][:2] == ["2002-01-31", "Fin de la convertibilidad"] and tr["quiebres"][0][2] == "2005-01-31"
     assert principal.dropna().iloc[-1] == pytest.approx(suma, abs=0.06)
+
+
+def test_parse_imf_mensual_y_encadenar():
+    from monitor import financiera as f
+    txt = "COUNTRY,TIME_PERIOD,OBS_VALUE\nG001,2026-M07,193.9\nG001,2026-M08,205.6\n"
+    s = f.parse_imf_mensual(txt)
+    assert list(s.index.strftime("%Y-%m-%d")) == ["2026-07-31", "2026-08-31"] and s.iloc[-1] == 205.6
+    idx = pd.date_range("2026-03-31", periods=5, freq="ME")
+    base = pd.Series([6.91, 6.91, 6.91], idx[:3])
+    bcb = pd.Series([6.86, 6.86, 6.86, 9.76, 12.15], idx)
+    e = f.encadenar(base, bcb)
+    assert len(e) == 5 and e.iloc[-1] == pytest.approx(6.91 * 12.15 / 6.86)
