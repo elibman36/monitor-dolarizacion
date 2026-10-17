@@ -190,11 +190,6 @@ Proyecto aparte, en `financiera/` (tablero) y `monitor/financiera.py`
 dolarización como la define la literatura (Ize y Levy Yeyati, 2003): qué parte
 de los depósitos, el crédito y la liquidez está en moneda extranjera.
 
-El tablero (`financiera/index.html`) muestra **sólo Argentina**: el selector
-de país y la vista comparada están ocultos. El pipeline sigue calculando y
-guardando los demás países en `data/financiera/`, por si se quieren volver a
-mostrar (quitar el `hidden` del selector `#pais` y la lectura de `?pais=`).
-
 | País | Depósitos | Crédito | Liquidez | Frecuencia | Fuente |
 |---|---|---|---|---|---|
 | Argentina | sí | sí | sí (con circulante); M3 desde 1940 | diaria | BCRA |

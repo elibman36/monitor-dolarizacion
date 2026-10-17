@@ -639,6 +639,11 @@ def test_funciones_del_dinero():
     assert min(b["pca"]["pesos"].values()) >= 0.0999
     etiquetas = [t["etiqueta"] for t in b["triangulo"]]
     assert etiquetas[0] == "2007" and etiquetas[-1].startswith("Últimos 12 meses")
-    # Sin traspaso (por ejemplo, tipo de cambio fijo) no hay índice.
-    s, _, _ = fn.indice(fn.patas(vista, pd.Series(np.nan, idx), dep, cred))
-    assert s.empty
+    # Sin traspaso (tipo de cambio fijo) el índice es parcial: promedio de las otras dos patas.
+    sin = fn.bloque(vista, pd.Series(np.nan, idx), dep, cred)
+    assert sin["faltan"] == ["unidad_cuenta"] and sin["triangulo"][-1]["unidad_cuenta"] is None
+    assert sin["ultimo"]["indice"] == pytest.approx((sin["ultimo"]["medio_pago"] + sin["ultimo"]["reserva_valor"]) / 2, abs=2e-3)
+    # Sin depósitos, la reserva de valor usa sólo el crédito; las series trimestrales se extienden dos meses.
+    q = cred.resample("QE").last()
+    p2 = fn.patas(None, tr, None, q)
+    assert p2["reserva_valor"].notna().sum() >= len(q) * 3 - 2
