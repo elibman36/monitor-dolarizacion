@@ -245,7 +245,7 @@ def test_reporte_semanal_html(fake_api):
     payload = json.loads((tmp / "monitor.json").read_text())
     html_txt = report.construir_html(semana, p, payload)
     assert "Reporte semanal" in html_txt and "/100" in html_txt
-    assert "Qué explica el índice" in html_txt and "Var. semana" in html_txt and "<svg" in html_txt
+    assert "Qué explica el índice" in html_txt and "En la semana" in html_txt and "En 4 semanas" in html_txt and "<svg" in html_txt
 
 
 def test_pca_weights():
