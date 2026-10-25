@@ -2,12 +2,14 @@ name: Reporte semanal (PDF)
 
 on:
   schedule:
-    # Lunes 07:47 hora Argentina (UTC-3): informa la semana hábil anterior.
-    - cron: "47 10 * * 1"
+    # Sábado 10:17 hora Argentina (UTC-3), con el cierre del viernes ya
+    # descargado: el reporte queda listo antes del lunes aunque GitHub demore
+    # la corrida.
+    - cron: "17 13 * * 6"
   workflow_dispatch:
     inputs:
       fecha:
-        description: "Fecha de referencia AAAA-MM-DD (se informa la semana anterior). Vacío = hoy."
+        description: "Fecha de referencia AAAA-MM-DD (se informa la semana anterior). Vacío = hoy; un sábado o domingo, la semana que acaba de cerrar."
         required: false
 
 permissions:
@@ -44,6 +46,12 @@ jobs:
       - name: Generar el PDF
         run: |
           FECHA="${{ github.event.inputs.fecha }}"
+          # Sábado o domingo: se informa la semana que acaba de cerrar (la
+          # fecha de referencia es el lunes siguiente).
+          DOW=$(TZ=America/Argentina/Buenos_Aires date +%u)
+          if [ -z "$FECHA" ] && [ "$DOW" -ge 6 ]; then
+            FECHA=$(TZ=America/Argentina/Buenos_Aires date -d "+$((8 - DOW)) days" +%F)
+          fi
           if [ -n "$FECHA" ]; then
             python -m monitor.report --fecha "$FECHA"
           else
