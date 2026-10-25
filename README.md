@@ -58,9 +58,10 @@ python -m http.server               # y abrir http://localhost:8000
 
 ## Reporte semanal en PDF
 
-Todos los lunes a las 07:47 (hora argentina) el workflow
-`.github/workflows/reporte-semanal.yml` actualiza los datos y genera un PDF de
-tres páginas con la semana hábil anterior (lunes a viernes):
+Todos los sábados a las 10:17 (hora argentina), con el cierre del viernes ya
+descargado, el workflow `.github/workflows/reporte-semanal.yml` actualiza los
+datos y genera un PDF con la semana hábil que terminó (lunes a viernes), así
+queda listo antes del lunes aunque GitHub demore la corrida:
 
 1. el índice al cierre de la semana, un resumen automático y los gráficos del
    índice (18 meses y desde 2003) y de sus componentes;
