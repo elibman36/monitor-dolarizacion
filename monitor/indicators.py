@@ -10,13 +10,22 @@ import pandas as pd
 from . import config
 
 
+# Series que no definen el calendario: el CER se publica todos los días
+# (feriados incluidos) y por adelantado, hasta un mes hacia adelante.
+NO_CALENDARIO = {"cer"}
+
+
 def business_days(series: dict[str, pd.Series]) -> pd.DatetimeIndex:
-    """Calendario de días hábiles: días de semana con dato en alguna serie diaria."""
+    """Calendario de días hábiles: días de semana con dato en alguna serie
+    diaria (salvo las de NO_CALENDARIO), hasta hoy."""
     dates = pd.DatetimeIndex([])
-    for s in series.values():
+    for key, s in series.items():
+        if key in NO_CALENDARIO:
+            continue
         if s is not None and not s.empty:
             dates = dates.union(s.index)
-    dates = dates[dates.dayofweek < 5]
+    hoy = pd.Timestamp.now(tz="America/Argentina/Buenos_Aires").tz_localize(None).normalize()
+    dates = dates[(dates.dayofweek < 5) & (dates <= hoy)]
     return dates.sort_values()
 
 
