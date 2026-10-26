@@ -183,7 +183,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <h2>Qué explica el índice</h2>
       <div class="seg" id="contrib-h" role="group" aria-label="Período del cambio"><button data-h="7" aria-pressed="true">Cambio en 7 días</button><button data-h="30">Cambio en 30 días</button></div>
     </div>
-    <p class="note"><b>Dato</b>: la variable que mide cada componente. <b>Peso</b>: participación en el índice. <b>Variación</b>: cuánto cambió esa variable en el período, en su unidad. <b>Puntos</b>: cuánto movió eso al índice, en puntos de 0 a 100; suman lo que se movió el índice.</p>
+    <p class="note"><b>Dato</b>: la variable que mide cada componente. <b>Peso</b>: participación en el índice. <b>Variación</b>: cuánto cambió esa variable en el período, en su unidad. Para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, el índice no mira el nivel sino cuánto se movieron en los últimos 5 días hábiles: la tabla muestra ese cambio hoy y, en gris, el de la fecha con que se compara. <b>Puntos</b>: cuánto movió eso al índice, en puntos de 0 a 100; suman lo que se movió el índice.</p>
     <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
@@ -576,9 +576,37 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     };
     // La variable que mide cada componente, con su cambio en el mismo período.
     const ALIAS = { tc_a3500: "tc_oficial_ref", futuros_oi: "futuros_interes_abierto", intervencion: "intervencion_usd", ventas_spot: "ventas_spot_usd" };
-    const varCelda = (k) => {
+    // Cambio de la variable en H días hábiles hasta la fecha `f`, sobre el
+    // calendario del índice y con el último dato disponible en cada fecha (como
+    // el panel del índice): es lo que mira en los componentes "dlog"/"diff".
+    const H = DATA.config.horizon || 5;
+    const dias = (DATA.ipd.indice || []).map((x) => x[0]);
+    const asof = (d, f) => { let i = d.length - 1; while (i >= 0 && d[i][0] > f) i--; return i >= 0 ? d[i][1] : null; };
+    const cambioH = (s, f) => {
+      let j = dias.length - 1; while (j >= 0 && dias[j] > f) j--;
+      if (j - H < 0) return null;
+      const v1 = asof(s.data, dias[j]), v0 = asof(s.data, dias[j - H]);
+      return v1 == null || v0 == null ? null : { abs: v1 - v0, pct: (v1 / v0 - 1) * 100 };
+    };
+    const txtCambio = (s, c) => {
+      if (!c) return "–";
+      const pp = s.unit.startsWith("%"), pb = s.unit === "pb", usd = /^(millones de USD|M USD)/.test(s.unit);
+      if (pp) return (c.abs > 0 ? "+" : "") + nf(c.abs, 1) + " pp";
+      if (pb) return (c.abs > 0 ? "+" : "") + nf(c.abs, 0) + " pb";
+      if (usd) return (c.abs > 0 ? "+" : "") + nf(c.abs, 0) + " M USD";
+      return (c.abs > 0 ? "+" : "") + nf(c.abs, 2) + " $ (" + (c.pct > 0 ? "+" : "") + nf(c.pct, 1) + "%)";
+    };
+    const varCelda = (k, transform) => {
       const s = DATA.series[k] || DATA.series[ALIAS[k]];
       if (!s || s.last == null) return ["<td></td>", "<td></td>"];
+      // Las series mensuales (futuros del BCRA) se miden en otro horizonte: van con su variación.
+      if ((transform === "dlog" || transform === "diff") && s.data && !/mes/.test(s.unit)) {
+        const f1 = DATA.headline.date;
+        const f0 = new Date(new Date(f1) - contribH * 864e5).toISOString().slice(0, 10);
+        const dg = digitsFor(s.unit, s.last);
+        return [`<td class="num">${nf(s.last, dg)} <span class="muted">${s.unit.split(",")[0]}</span></td>`,
+                `<td class="num">${txtCambio(s, cambioH(s, f1))} <span class="muted">en ${H} días · antes ${txtCambio(s, cambioH(s, f0))}</span></td>`];
+      }
       const prev = contribH === 7 ? s.prev_7d : s.prev_30d;
       const dg = digitsFor(s.unit, s.last);
       let ch = "–";
@@ -599,7 +627,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       const cs = comps.filter((x) => x.block === bk).sort((x, y) => (y.weight || 0) - (x.weight || 0));
       if (!cs.length) return;
       filas.push(`<tr class="sub"><td>${b.label}</td><td class="num">${b.indice_last != null ? nf(b.indice_last, 0) + "/100" : ""}</td><td class="num">${b.weight != null ? nf(b.weight * 100, 0) + "%" : ""}</td><td></td>${delta(b.puntos, b[prevKey])}</tr>`);
-      cs.forEach((x) => { const [dato, varia] = varCelda(x.key);
+      cs.forEach((x) => { const [dato, varia] = varCelda(x.key, x.transform);
         filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td>${dato}<td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td>${varia}${delta(x.puntos, x[prevKey])}</tr>`); });
     });
     filas.push(`<tr class="tot"><td>Índice</td><td class="num">${nf(h.indice, 0)}/100</td><td class="num">100%</td><td></td>${delta(h.indice, iPrev)}</tr>`);

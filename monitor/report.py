@@ -257,13 +257,18 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, pts1: dict, pts0: dict, pts4: di
                 dato = f"<td class='num'>{fmt(v['v'], v['dec'])} <span class='muted'>{_unidad_corta(v) if v['tipo'] != 'pct' else ''}</span>{nota}</td>"
                 # Una serie mensual repetida (FAE, futuros del BCRA) no trae dato nuevo.
                 sin_dato = not v["nueva"] or (v["tipo"] == "abs" and v["d"] == 0 and "mes" in v["unidad"])
-                if not sin_dato:
+                me = v.get("medida")
+                if me:
+                    var_sem = (f"<td class='num'>{_txt_medida(v, me['m1'])} <span class='muted'>en {me['h']} días · "
+                               f"antes {_txt_medida(v, me['m0'])}</span></td>")
+                elif not sin_dato:
                     var_sem = f"<td class='num'>{_txt_var_comp(v, v['d'], v.get('a'))}</td>"
                 else:
                     var_sem = "<td class='num muted'>sin dato nuevo</td>"
                     if np.isfinite(d_sem) and abs(d_sem) >= 0.05:
                         marca, hay_nota = "*", True
-                var_4 = f"<td class='num'>{_txt_var_comp(v, v['d4'], v.get('a4'))}</td>"
+                var_4 = (f"<td class='num'><span class='muted'>hace 4 sem.</span> {_txt_medida(v, me['m4'])}</td>" if me
+                         else f"<td class='num'>{_txt_var_comp(v, v['d4'], v.get('a4'))}</td>")
             else:
                 dato, var_sem, var_4 = "<td></td>", "<td></td>", "<td></td>"
             filas.append(f"<tr><td class='comp'>{html.escape(b['components'][c]['label'])}</td>{dato}"
@@ -402,11 +407,46 @@ def _pts1(x: float) -> str:
     return "0" if abs(x) < 0.05 else fmt(x, 1, signo=True)
 
 
+def medidas_indice(p: pd.DataFrame, semana: Semana, blocks_cfg: dict, datos: dict, perfil: dict) -> None:
+    """Para los componentes que el índice mide por su cambio en IPD_HORIZON días
+    hábiles (oficial, reservas, BADLAR, depósitos, riesgo país), agrega a `datos`
+    ese cambio al viernes informado, al anterior y al de hace 4 semanas: es lo
+    que compara el índice, así que va en el mismo sentido que los puntos."""
+    h = config.IPD_HORIZON
+    for b in blocks_cfg.values():
+        for c, spec in b["components"].items():
+            if spec.get("transform") not in ("dlog", "diff") or spec.get("horizonte", h) != h:
+                continue
+            vk = _var_comp(perfil, c)
+            if vk not in datos or vk not in p:
+                continue
+            x = p[vk].dropna()
+            def cambio(f):
+                x_ = x[x.index <= f]
+                if len(x_) <= h:
+                    return None
+                v1, v0 = x_.iloc[-1], x_.iloc[-1 - h]
+                return {"a": v1 - v0, "d": (v1 / v0 - 1) * 100 if datos[vk]["tipo"] == "pct" else v1 - v0}
+            datos[vk]["medida"] = {"h": h, "m1": cambio(semana.viernes), "m0": cambio(semana.viernes - pd.Timedelta(days=7)),
+                                   "m4": cambio(semana.viernes - pd.Timedelta(days=28))}
+
+
+def _txt_medida(v: dict, m: dict | None) -> str:
+    if not m:
+        return "–"
+    t = _txt_var_comp(v, m["d"], m["a"])
+    return t + (f" {_unidad_corta(v)}" if v["tipo"] == "abs" else "")
+
+
 def _movimiento(comp: str, label: str, dpts: float, datos: dict, perfil: dict) -> str:
     """"reservas internacionales (+476 M USD en la semana; −1,3 pts)": cómo se
     movió la variable y cuánto movió eso al índice."""
     v = datos.get(_var_comp(perfil, comp))
     var = ""
+    me = (v or {}).get("medida")
+    if me and me["m1"]:
+        return (f"{_corto(label)} ({_txt_medida(v, me['m1'])} en {me['h']} días, contra "
+                f"{_txt_medida(v, me['m0'])} una semana antes; {_pts1(dpts)} pts)")
     # Un dato mensual repetido (FAE, depósitos) da variación cero: no hubo dato nuevo.
     if v and v["nueva"] and v["d"] is not None and np.isfinite(v["d"]) and not (v["tipo"] == "abs" and v["d"] == 0):
         u = _unidad_corta(v)
@@ -579,6 +619,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     sub_svg = chart_subindices(indice, [(blocks_cfg[b]["label"], p[f"indice_bloque_{b}"], colores_sub[b]) for b in sub1], semana) if sub1 else ""
 
     tabla, datos = tabla_variables(p, semana, perfil["variables"])
+    medidas_indice(p, semana, blocks_cfg, datos, perfil)
     pts_4 = {c: _hasta(p[f"pts_{c}"], semana.viernes - pd.Timedelta(days=28))[1] for c in labels if f"pts_{c}" in p}
     pesos_b = {b: (payload["ipd"]["blocks"].get(b, {}).get("weight") or blocks_cfg[b]["weight"]) for b in blocks_cfg}
     tabla_html, hay_nota = tabla_aportes(blocks_cfg, meta, pts_cierre, pts_prev, pts_4, sub1, i1, i0, i4, datos, perfil, pesos_b)
@@ -639,7 +680,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note"><b>Dato</b>: la variable que mide cada componente, al viernes {fecha_larga(semana.viernes)} o último dato disponible. {perfil["nota_variables"]} <b>Peso</b>: participación en el índice. <b>Variación</b>: cuánto cambió esa variable, en su propia unidad (%, puntos porcentuales, pesos por dólar, millones de USD). <b>Puntos</b>: cuánto movió eso al índice, en puntos del índice de 0 a 100; los de cada columna suman lo que se movió el índice en ese período.</p>
+  <p class="note"><b>Dato</b>: la variable que mide cada componente, al viernes {fecha_larga(semana.viernes)} o último dato disponible. {perfil["nota_variables"]} <b>Peso</b>: participación en el índice. <b>Variación</b>: cuánto cambió esa variable, en su propia unidad (%, puntos porcentuales, pesos por dólar, millones de USD). Para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, el índice no mira el nivel sino cuánto se movieron en los últimos 5 días hábiles: la tabla muestra ese cambio al viernes y, en gris, el del viernes con que se compara. <b>Puntos</b>: cuánto movió eso al índice, en puntos del índice de 0 a 100; los de cada columna suman lo que se movió el índice en ese período.</p>
   {tabla_html}
   {nota_sin_dato}
 </section>
