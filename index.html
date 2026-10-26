@@ -182,7 +182,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card-head">
       <h2>Qué explica el índice</h2>
     </div>
-    <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con los dos años anteriores (un canje alto suma aunque no se haya movido).</p>
+    <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con los dos años anteriores (un canje alto suma aunque no se haya movido); al lado, cuánto se movió en la semana.</p>
     <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
@@ -584,10 +584,27 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     };
     const queMira = (k, transform) => {
       const s = DATA.series[k] || DATA.series[ALIAS[k]];
+      // Las compras de personas (FAE) son mensuales y vienen aparte.
+      const ph = DATA.monthly && DATA.monthly.compras_personas_humanas;
+      if (k === "compras_ph" && ph && ph.length > 1) {
+        const u = ph[ph.length - 1], a = ph[ph.length - 2], v = u.netas_usd_millones - a.netas_usd_millones;
+        return `<td class="num">${nf(u.netas_usd_millones, 0)} <span class="muted">M USD en ${u.fecha}</span> <span class="muted">·</span> ${sg(v, 0)} M USD contra el mes anterior</td>`;
+      }
       if (!s || s.last == null) return "<td></td>";
       if ((transform === "dlog" || transform === "diff") && s.data && !/mes/.test(s.unit))
         return `<td class="num">${txtCambio(s, cambioH(s, h.date))} <span class="muted">en ${H} días</span></td>`;
-      return `<td class="num">${nf(s.last, digitsFor(s.unit, s.last))} <span class="muted">${s.unit.split(",")[0]}</span></td>`;
+      // Nivel y, al lado, si subió o bajó en la semana (las series mensuales,
+      // contra el mes anterior).
+      const mensual = /mes/.test(s.unit);
+      const prev = mensual ? (s.data && s.data.length > 1 ? s.data[s.data.length - 2][1] : null) : s.prev_7d;
+      let ch = "";
+      if (prev != null) {
+        const usd = /^(millones de USD|M USD)/.test(s.unit), pp = s.unit.startsWith("%"), pb = s.unit === "pb";
+        const v = pp || pb || usd ? s.last - prev : (s.last / prev - 1) * 100;
+        const txt = Math.abs(v) < 0.05 ? "sin cambios" : pp ? sg(v) + " pp" : pb ? sg(v, 0) + " pb" : usd ? sg(v, 0) + " M USD" : sg(v) + "%";
+        ch = ` <span class="muted">·</span> ${txt} ${mensual ? "contra el mes anterior" : "en la semana"}`;
+      }
+      return `<td class="num">${nf(s.last, digitsFor(s.unit, s.last))} <span class="muted">${s.unit.split(",")[0]}</span>${ch}</td>`;
     };
     tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Peso</th><th class="num">Qué mira el índice</th><th class="num">Aporte al índice</th></tr>`;
     const filas = [];

@@ -245,7 +245,13 @@ def _que_mide(v: dict | None) -> str:
     if me and me["m1"]:
         return f"{_txt_medida(v, me['m1'])} <span class='muted'>en {me['h']} días</span>"
     nota = "" if v["nueva"] or v["fecha"] is None else f" <span class='muted'>(al {v['fecha'].day}/{v['fecha'].month})</span>"
-    return f"{fmt(v['v'], v['dec'])} <span class='muted'>{_unidad_corta(v)}</span>{nota}"
+    # Nivel y, al lado, si subió o bajó en la semana.
+    sin_dato = not v["nueva"] or (v["tipo"] == "abs" and v["d"] == 0 and "mes" in v["unidad"])
+    if sin_dato:
+        var = "sin dato nuevo"
+    else:
+        var = _txt_var_comp(v, v["d"], v.get("a")) + " en la semana"
+    return f"{fmt(v['v'], v['dec'])} <span class='muted'>{_unidad_corta(v)}</span>{nota} <span class='muted'>·</span> {var}"
 
 
 def tabla_aportes(blocks_cfg: dict, meta: dict, pts1: dict, sub1: dict, i1: float, datos: dict, perfil: dict,
@@ -650,7 +656,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles, o sea en la semana (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con los dos años anteriores (un canje alto suma aunque no se haya movido). {perfil["nota_variables"]}</p>
+  <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles, o sea en la semana (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con los dos años anteriores (un canje alto suma aunque no se haya movido); al lado, cuánto se movió en la semana. {perfil["nota_variables"]}</p>
   {tabla_html}
 </section>
 
