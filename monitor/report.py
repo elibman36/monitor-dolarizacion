@@ -582,10 +582,10 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     pts_4 = {c: _hasta(p[f"pts_{c}"], semana.viernes - pd.Timedelta(days=28))[1] for c in labels if f"pts_{c}" in p}
     pesos_b = {b: (payload["ipd"]["blocks"].get(b, {}).get("weight") or blocks_cfg[b]["weight"]) for b in blocks_cfg}
     tabla_html, hay_nota = tabla_aportes(blocks_cfg, meta, pts_cierre, pts_prev, pts_4, sub1, i1, i0, i4, datos, perfil, pesos_b)
-    nota_sin_dato = ("<p class='note'>* Sin dato nuevo en la semana (la serie es mensual), pero su aporte igual cambia: "
-                     "el índice promedia las últimas 20 ruedas, así que entra la semana nueva y sale la de hace un mes, "
-                     "y la comparación con los dos años anteriores también se corre. En «En 4 semanas» se ve la "
-                     "variación del último dato mensual.</p>") if hay_nota else ""
+    nota_sin_dato = ("<p class='note'>* Sin dato nuevo en la semana (la serie es mensual), pero sus puntos igual pueden "
+                     "cambiar: la distancia del índice a 50 se reparte entre todos los componentes en proporción a su "
+                     "presión, así que si se mueven los demás cambia su parte, y la comparación con los dos años "
+                     "anteriores también se corre. En «En 4 semanas» se ve la variación del último dato mensual.</p>") if hay_nota else ""
     puntos = resumen(indice, semana, pts_cierre, datos, perfil, pts_prev)
 
     gauge = "".join(f"<span style='flex:{min(hi, 100) - lo};background:{TRAMO_COLOR[k]}'></span>"
@@ -646,7 +646,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card">
   <h2>Índice en los últimos 18 meses</h2>
-  <p class="note">Dato diario (promedio de 20 días hábiles). La franja gris marca la semana informada. <a href="{DASHBOARD_URL}{perfil["query"]}">Ver la versión interactiva, con el período a elección</a>.</p>
+  <p class="note">Dato diario. La franja gris marca la semana informada. <a href="{DASHBOARD_URL}{perfil["query"]}">Ver la versión interactiva, con el período a elección</a>.</p>
   <div class="chart">{chart_indice_anual(indice, semana, payload.get("events", []))}</div>
   <div class="legend">{leyenda}</div>
 </section>
@@ -673,7 +673,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
   <h2>Metodología</h2>
   {perfil["metodo"](pca_txt, pesos_b) if perfil["codigo"] == "ar" else perfil["metodo"](pca_txt)}
   <table><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody>{comp_rows}</tbody></table>
-  <p>El promedio ponderado se promedia en 20 días hábiles (un mes, para que el índice no salte de una semana a otra) y se lleva a una escala de 0 a 100 con la normal acumulada. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Los aportes en puntos reparten la distancia del índice a 50 entre los componentes, así que suman exactamente esa distancia. Si falta un componente, su peso se reparte entre los demás de su subíndice. Cada subíndice también se lleva a su propia escala de 0 a 100 con el mismo método, para leerlo solo; en puntos del índice, los tres subíndices suman la distancia del índice a 50.{perfil["metodo_extra"]}</p>
+  <p>El promedio ponderado de cada día se lleva a una escala de 0 a 100 con la normal acumulada, sin promediar días: el índice reacciona enseguida a los giros, aunque puede moverse bastante de un día a otro. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Los aportes en puntos reparten la distancia del índice a 50 entre los componentes, así que suman exactamente esa distancia. Si falta un componente, su peso se reparte entre los demás de su subíndice. Cada subíndice también se lleva a su propia escala de 0 a 100 con el mismo método, para leerlo solo; en puntos del índice, los tres subíndices suman la distancia del índice a 50.{perfil["metodo_extra"]}</p>
   <p><b>Fuentes:</b> {perfil["fuentes"]}</p>
   <p class="muted">Generado el {generado.day}/{generado.month}/{generado.year} a las {generado:%H:%M} (hora argentina). Tablero diario y datos: <a href="{DASHBOARD_URL}">{DASHBOARD_URL}</a></p>
 </section>

@@ -171,7 +171,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
           <button data-f="d" aria-pressed="true">Diario</button><button data-f="w">Semanal</button><button data-f="m">Mensual</button>
         </div>
       </div>
-      <p class="note" id="idx-note">Promedio de 20 días hábiles llevado a escala 0–100. El color de la línea indica el tramo; las verticales marcan elecciones y episodios cambiarios.</p>
+      <p class="note" id="idx-note">Dato diario, sin promediar. El color de la línea indica el tramo; las verticales marcan elecciones y episodios cambiarios.</p>
       <div class="chart tall" id="c-idx" role="img" aria-label="Índice de presión cambiaria 0 a 100"></div>
     </div>
   </section>
@@ -183,7 +183,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <h2>Qué explica el índice</h2>
       <div class="seg" id="contrib-h" role="group" aria-label="Período del cambio"><button data-h="7" aria-pressed="true">Cambio en 7 días</button><button data-h="30">Cambio en 30 días</button></div>
     </div>
-    <p class="note"><b>Dato</b>: la variable que mide cada componente. <b>Peso</b>: participación en el índice. <b>Variación</b>: cuánto cambió esa variable en el período, en su unidad. <b>Puntos</b>: cuánto movió eso al índice, en puntos de 0 a 100; suman lo que se movió el índice. Ojo: el índice promedia las últimas cuatro semanas, así que su cambio compara los días nuevos con los que salieron del promedio, de hace un mes. Un componente que bajó en la semana pero sigue más alto que hace un mes todavía suma puntos; deja de sumar cuando queda por debajo de ese nivel.</p>
+    <p class="note"><b>Dato</b>: la variable que mide cada componente. <b>Peso</b>: participación en el índice. <b>Variación</b>: cuánto cambió esa variable en el período, en su unidad. <b>Puntos</b>: cuánto movió eso al índice, en puntos de 0 a 100; suman lo que se movió el índice.</p>
     <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
@@ -231,7 +231,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="table-wrap"><table id="pesos-tbl"><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody></tbody></table></div>
     <p class="note" id="pesos-nota"></p>
     <p>Si falta un componente, su peso se reparte entre los demás de su subíndice. El índice se publica cuando hay datos para al menos el 40% del peso.</p>
-    <p><b>Índice 0–100.</b> Para comunicarlo, la medida de base se promedia en 20 días hábiles (un mes, para que el índice no salte de una semana a otra) y se lleva a una escala de 0 a 100 con la distribución normal: Índice = 100 × Φ(ID / σ), donde σ es el desvío histórico del ID promediado. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 2003. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. <b>Aportes en puntos:</b> la distancia del índice a 50 se reparte entre los componentes según su aporte a la medida de base, así que los aportes suman exactamente esa distancia.</p>
+    <p><b>Índice 0–100.</b> Para comunicarlo, la medida de base de cada día se lleva a una escala de 0 a 100 con la distribución normal, sin promediar días: Índice = 100 × Φ(ID / σ), donde σ es el desvío histórico del ID. Así reacciona enseguida a los giros, aunque puede moverse bastante de un día a otro; las vistas semanal y mensual del gráfico lo promedian. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 2003. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. <b>Aportes en puntos:</b> la distancia del índice a 50 se reparte entre los componentes según su aporte a la medida de base, así que los aportes suman exactamente esa distancia.</p>
     <p class="note">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
   </section>
   </div>
@@ -472,7 +472,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   function renderIndex() {
     let data = idxFullHistory ? (DATA.ipd.indice || []) : cut(DATA.ipd.indice || []);
     if (!data.length) return emptyState("c-idx", "Todavía no hay historia suficiente para calcular el índice.");
-    // Diario: el dato publicado (promedio de 20 días hábiles). Semanal y mensual: promedios.
+    // Diario: el dato de cada día. Semanal y mensual: promedios.
     const keyOf = { w: (d) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return x.toISOString().slice(0, 10); },
                     m: (d) => d.slice(0, 7) + "-01" }[idxFreq];
     if (keyOf) {
@@ -481,7 +481,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       data = [...acc].map(([k, [s, n]]) => [k, s / n]);
     }
     const notas = {
-      d: "Dato diario: promedio de 20 días hábiles llevado a escala 0–100.",
+      d: "Dato diario, sin promediar: reacciona enseguida pero salta de un día a otro (las vistas semanal y mensual lo suavizan).",
       w: "Promedio semanal del índice (cada punto es la semana que empieza ese lunes).",
       m: "Promedio mensual del índice.",
     };
