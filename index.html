@@ -109,7 +109,7 @@ table.contrib tr td.up { color: var(--div-pos); } table.contrib tr td.down { col
 .card-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
 .chart { width: 100%; height: 300px; }
 .chart.tall { height: 360px; }
-.chart.small { height: 220px; }
+.chart.small { height: 250px; }
 .section-title { margin: 28px 0 10px; font-size: 18px; }
 .empty { color: var(--muted); font-size: 13px; padding: 24px 8px; text-align: center; border: 1px dashed var(--axis); border-radius: 8px; margin-top: 10px; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -183,7 +183,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <h2>Qué explica el índice</h2>
       <div class="seg" id="contrib-h" role="group" aria-label="Período del cambio"><button data-h="7" aria-pressed="true">Cambio en 7 días</button><button data-h="30">Cambio en 30 días</button></div>
     </div>
-    <p class="note"><b>Dato</b>: la variable que mide cada componente y su cambio en el período, en su unidad. <b>Aporte hoy</b>: cuánto suma (rojo) o resta (azul) cada parte, en puntos del índice; suman la distancia a 50. <b>Cambio de puntos</b>: cuánto cambió ese aporte en el período; suman lo que se movió el índice. Ojo: el índice promedia las últimas cuatro semanas, así que su cambio compara los días nuevos con los que salieron del promedio, de hace un mes. Un componente que bajó en la semana pero sigue más alto que hace un mes todavía suma puntos; deja de sumar cuando queda por debajo de ese nivel.</p>
+    <p class="note"><b>Dato</b>: la variable que mide cada componente. <b>Peso</b>: participación en el índice. <b>Variación</b>: cuánto cambió esa variable en el período, en su unidad. <b>Puntos</b>: cuánto movió eso al índice, en puntos de 0 a 100; suman lo que se movió el índice. Ojo: el índice promedia las últimas cuatro semanas, así que su cambio compara los días nuevos con los que salieron del promedio, de hace un mes. Un componente que bajó en la semana pero sigue más alto que hace un mes todavía suma puntos; deja de sumar cuando queda por debajo de ese nivel.</p>
     <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
@@ -192,11 +192,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="chart" id="c-blocks" role="img" aria-label="Índice y subíndices en escala 0 a 100"></div>
   </section>
 
-  <section class="card" style="margin-bottom:16px">
-    <h2>Medida de base del índice (desvíos)</h2>
-    <p class="note">Para analistas: el promedio ponderado de los componentes estandarizados, antes de llevarlo a 0–100. Mayor a 0 = más presión que lo habitual en los últimos 2 años. Línea fina: dato diario; línea gruesa: promedio de 20 días hábiles.</p>
-    <div class="chart" id="c-ipd" role="img" aria-label="Serie diaria del ID en desvíos"></div>
-  </section>
 
   <h2 class="section-title">Variables</h2>
   <section class="grid3" id="multiples"></section>
@@ -474,45 +469,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
 
   // ---- gráficos -----------------------------------------------------------
-  function renderIPD() {
-    const data = cut(DATA.ipd.data);
-    if (!data.length) return emptyState("c-ipd", "Todavía no hay historia suficiente para calcular el ID.");
-    const c = mount("c-ipd");
-    const o = base();
-    o.yAxis.scale = false;
-    const nComp = new Map(DATA.ipd.n_components || []);
-    const nTot = DATA.ipd.n_components_total;
-    o.tooltip.formatter = (ps) => {
-      const p = ps[0];
-      const n = nComp.get(p.value[0]);
-      return `${p.value[0]}<br><b>ID ${nf(p.value[1], 2)}</b>` +
-        (n != null ? `<br><span style="color:${css("--muted")}">${n} de ${nTot} componentes con datos</span>` : "");
-    };
-    o.grid.top = 32;
-    o.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 12 } };
-    const ma = movingAvg(DATA.ipd.data, 20);
-    const maMap = new Map(ma);
-    const baseTooltip = o.tooltip.formatter;
-    o.tooltip.formatter = (ps) => {
-      const p = ps.find((x) => x.seriesName === "Diario") || ps[0];
-      const m = maMap.get(p.value[0]);
-      return baseTooltip([p]) + (m != null ? `<br>Promedio 20 días: ${nf(m, 2)}` : "");
-    };
-    o.series = [
-      lineSeries("Diario", data, css("--s1"), {
-        lineStyle: { width: 1, color: css("--s1"), opacity: 0.35 },
-        itemStyle: { color: css("--s1"), opacity: 0.35 },
-        markLine: {
-          symbol: "none", silent: true,
-          lineStyle: { color: css("--axis"), type: "solid", width: 1 },
-          data: [{ yAxis: 0, label: { show: false } }, ...eventLines(data)],
-        },
-      }),
-      lineSeries("Promedio 20 días", cut(ma), css("--s1"), { z: 3 }),
-    ];
-    c.setOption(o);
-  }
-
   function renderIndex() {
     let data = idxFullHistory ? (DATA.ipd.indice || []) : cut(DATA.ipd.indice || []);
     if (!data.length) return emptyState("c-idx", "Todavía no hay historia suficiente para calcular el índice.");
@@ -611,13 +567,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const prevKey = contribH === 7 ? "puntos_7d" : "puntos_30d";
     const h = DATA.headline;
     const iPrev = contribH === 7 ? h.indice_7d : h.indice_30d;
-    const escala = Math.max(1, ...comps.map((x) => Math.abs(x.puntos)), ...Object.values(DATA.ipd.blocks).map((b) => Math.abs(b.puntos || 0)));
     const sg = (v, dg = 1) => (v > 0 ? "+" : "") + nf(v, dg);
-    const barra = (v) => {
-      if (v == null) return "<td class='bar'></td>";
-      const w = Math.min(50, Math.abs(v) / escala * 50);
-      return `<td class="bar"><div><i style="${v >= 0 ? "left" : "right"}:50%;width:${w.toFixed(1)}%;background:var(${v >= 0 ? "--div-pos" : "--div-neg"})"></i></div></td>`;
-    };
     const delta = (a, b) => {
       if (a == null || b == null) return "<td class='num muted'>–</td>";
       const v = a - b;
@@ -628,7 +578,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const ALIAS = { tc_a3500: "tc_oficial_ref", futuros_oi: "futuros_interes_abierto", intervencion: "intervencion_usd", ventas_spot: "ventas_spot_usd" };
     const varCelda = (k) => {
       const s = DATA.series[k] || DATA.series[ALIAS[k]];
-      if (!s || s.last == null) return "<td></td><td></td>";
+      if (!s || s.last == null) return ["<td></td>", "<td></td>"];
       const prev = contribH === 7 ? s.prev_7d : s.prev_30d;
       const dg = digitsFor(s.unit, s.last);
       let ch = "–";
@@ -641,17 +591,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         ch = Math.abs(v) < 0.5 * 10 ** -dec ? "0" : (v > 0 ? "+" : "") + nf(v, dec) + u;
       }
       const unit = s.unit.split(",")[0];
-      return `<td class="num">${nf(s.last, dg)} <span class="muted">${unit}</span></td><td class="num">${ch}</td>`;
+      return [`<td class="num">${nf(s.last, dg)} <span class="muted">${unit}</span></td>`, `<td class="num">${ch}</td>`];
     };
-    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Dato</th><th class="num">Cambio en ${contribH} días</th><th class="num">Peso</th><th>Aporte hoy</th><th class="num">Puntos</th><th class="num">Cambio de puntos en ${contribH} días</th></tr>`;
+    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Dato</th><th class="num">Peso</th><th class="num">Variación en ${contribH} días</th><th class="num">Puntos en ${contribH} días</th></tr>`;
     const filas = [];
     Object.entries(DATA.ipd.blocks).forEach(([bk, b]) => {
       const cs = comps.filter((x) => x.block === bk).sort((x, y) => (y.weight || 0) - (x.weight || 0));
       if (!cs.length) return;
-      filas.push(`<tr class="sub"><td>${b.label}</td><td class="num">${b.indice_last != null ? nf(b.indice_last, 0) + "/100" : ""}</td><td></td><td class="num">${b.weight != null ? nf(b.weight * 100, 0) + "%" : ""}</td>${barra(b.puntos)}<td class="num">${b.puntos == null ? "–" : sg(b.puntos)}</td>${delta(b.puntos, b[prevKey])}</tr>`);
-      cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td>${varCelda(x.key)}<td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td>${barra(x.puntos)}<td class="num">${sg(x.puntos)}</td>${delta(x.puntos, x[prevKey])}</tr>`));
+      filas.push(`<tr class="sub"><td>${b.label}</td><td class="num">${b.indice_last != null ? nf(b.indice_last, 0) + "/100" : ""}</td><td class="num">${b.weight != null ? nf(b.weight * 100, 0) + "%" : ""}</td><td></td>${delta(b.puntos, b[prevKey])}</tr>`);
+      cs.forEach((x) => { const [dato, varia] = varCelda(x.key);
+        filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td>${dato}<td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td>${varia}${delta(x.puntos, x[prevKey])}</tr>`); });
     });
-    filas.push(`<tr class="tot"><td>Índice (distancia a 50)</td><td class="num">${nf(h.indice, 0)}/100</td><td></td><td class="num">100%</td>${barra(h.indice - 50)}<td class="num">${sg(h.indice - 50)}</td>${delta(h.indice, iPrev)}</tr>`);
+    filas.push(`<tr class="tot"><td>Índice</td><td class="num">${nf(h.indice, 0)}/100</td><td class="num">100%</td><td></td>${delta(h.indice, iPrev)}</tr>`);
     tbl.querySelector("tbody").innerHTML = filas.join("");
   }
 
@@ -676,13 +627,25 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         o.legend = { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 3, textStyle: { color: css("--ink-2"), fontSize: 11 } };
         o.grid.top = 32;
       }
+      // Toda la historia, abierta en el período elegido; se navega con la
+      // barra inferior o con la rueda del mouse, como el gráfico del índice.
       o.series = avail.map((k) => {
         const name = m.names ? m.names[m.keys.indexOf(k)] : DATA.series[k].label;
         const col = cols[m.keys.indexOf(k)];
-        // Dato mensual: barras, con al menos 3 años a la vista.
-        if (m.bars) return { name, type: "bar", data: cut(DATA.series[k].data, 1095), itemStyle: { color: col }, barMaxWidth: 10 };
-        return lineSeries(name, cut(DATA.series[k].data), col);
+        if (m.bars) return { name, type: "bar", data: DATA.series[k].data, itemStyle: { color: col }, barMaxWidth: 10 };
+        return lineSeries(name, DATA.series[k].data, col);
       });
+      // Dato mensual: al menos 3 años a la vista.
+      const desde = avail.map((k) => (cut(DATA.series[k].data, m.bars ? 1095 : 0)[0] || [])[0]).filter(Boolean).sort()[0];
+      o.grid.bottom = 34;
+      o.dataZoom = [
+        // "filter": el eje vertical se ajusta a lo que queda a la vista.
+        { type: "inside", xAxisIndex: 0, filterMode: "filter", startValue: desde },
+        { type: "slider", xAxisIndex: 0, filterMode: "filter", startValue: desde, height: 14, bottom: 4, showDetail: false,
+          borderColor: css("--border"), fillerColor: css("--wash"), backgroundColor: "transparent",
+          dataBackground: { lineStyle: { color: css("--axis") }, areaStyle: { color: css("--wash") } },
+          handleStyle: { color: css("--surface"), borderColor: css("--axis") }, moveHandleStyle: { color: css("--axis") } },
+      ];
       c.setOption(o);
     });
   }
@@ -790,7 +753,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   function renderCharts() {
     charts.length = 0;
-    renderIndex(); renderIPD(); renderBlocks(); renderContrib(); renderMultiples(); renderMonthly();
+    renderIndex(); renderBlocks(); renderContrib(); renderMultiples(); renderMonthly();
   }
 
   function renderAll() {
