@@ -775,7 +775,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     renderPesos();
     const tb = document.querySelector("#tbl tbody");
     tb.innerHTML = "";
-    Object.entries(DATA.series).forEach(([k, s]) => {
+    // La medida de base del índice (en desvíos) es técnica: no va en la tabla.
+    Object.entries(DATA.series).filter(([k]) => k !== "ipd").forEach(([k, s]) => {
       const dg = digitsFor(s.unit, s.last);
       const tr = document.createElement("tr");
       tr.innerHTML = `<td>${s.label} <span style="color:var(--muted)">(${s.unit})</span></td><td class="num">${nf(s.last, dg)}</td><td>${s.last_date}</td><td class="num">${nf(s.prev_7d, dg)}</td><td class="num">${nf(s.prev_30d, dg)}</td><td>${s.source}</td>`;
