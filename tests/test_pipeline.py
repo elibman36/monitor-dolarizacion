@@ -691,3 +691,22 @@ def test_racconto_de_la_semana(tmp_path):
     assert "no va" not in h and "<b>compró</b>" in h and "<h3>Lo que viene</h3>" in h
     assert "<li>Licitación del Tesoro</li>" in h and "<i>inflación</i>" in h
     assert report.racconto(pd.Timestamp("2026-11-06"), tmp_path) == ""
+
+
+def test_mail_del_reporte(tmp_path):
+    import email
+    import pandas as pd
+    from monitor import enviar
+    pdf = tmp_path / "reporte-semanal-2026-10-30.pdf"
+    pdf.write_bytes(b"%PDF-1.4 prueba")
+    textos = tmp_path / "textos"; textos.mkdir()
+    (textos / "2026-10-30.md").write_text("Semana **tranquila**.", encoding="utf-8")
+    panel = tmp_path / "panel.csv"
+    pd.DataFrame({"indice_0_100": [48.0, 54.0]}, index=pd.to_datetime(["2026-10-23", "2026-10-30"])).rename_axis("fecha").to_csv(panel)
+    m = enviar.armar_mensaje(pdf, "yo@fund.ar", ["a@x.com", "b@y.com"], panel, textos)
+    assert "26 al 30 de oct. 2026" in m["Subject"] and m["Bcc"] == "a@x.com, b@y.com"
+    msg = email.message_from_bytes(bytes(m))
+    partes = {p.get_content_type(): p for p in msg.walk()}
+    assert "54/100" in partes["text/plain"].get_payload(decode=True).decode()
+    assert "<b>tranquila</b>" in partes["text/html"].get_payload(decode=True).decode()
+    assert partes["application/pdf"].get_filename() == pdf.name

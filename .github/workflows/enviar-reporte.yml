@@ -1,0 +1,42 @@
+name: Enviar reporte por email
+
+# Manda el último reporte publicado sin volver a generarlo: sirve para probar
+# el envío o para mandarlo a otra lista. El envío de los sábados lo hace el
+# workflow «Reporte semanal (PDF)».
+on:
+  workflow_dispatch:
+    inputs:
+      para:
+        description: "Destinatarios separados por coma. Vacío = la lista del secreto REPORTE_PARA."
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-reporte.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-reporte.txt
+
+      - name: Enviar
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          REPORTE_PARA: ${{ secrets.REPORTE_PARA }}
+          PARA: ${{ github.event.inputs.para }}
+        run: |
+          if [ -n "$PARA" ]; then
+            python -m monitor.enviar --para "$PARA"
+          else
+            python -m monitor.enviar
+          fi

@@ -2,3 +2,4 @@ __pycache__/
 .pytest_cache/
 reportes/ultimo.html
 reportes/*/ultimo.html
+reportes/ultimo.eml

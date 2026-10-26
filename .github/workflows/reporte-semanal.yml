@@ -76,3 +76,14 @@ jobs:
             git pull --rebase -X theirs origin "${GITHUB_REF_NAME}"
             git push
           fi
+
+      - name: Enviar por email
+        # Sólo si están cargados los secretos SMTP_USER, SMTP_PASSWORD y
+        # REPORTE_PARA (Settings → Secrets and variables → Actions).
+        if: ${{ env.SMTP_PASSWORD != '' }}
+        continue-on-error: true
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          REPORTE_PARA: ${{ secrets.REPORTE_PARA }}
+        run: python -m monitor.enviar

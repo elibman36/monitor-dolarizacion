@@ -92,6 +92,19 @@ archivo para esa semana, la sección no aparece. Como el reporte se arma el
 sábado a las 10:17, conviene escribirlo antes; si se escribe o corrige
 después, hay que volver a generar el reporte (*Run workflow*).
 
+### Envío por email
+
+Después de generar el PDF, el workflow del sábado lo manda por mail
+(`monitor/enviar.py`): adjunto, con el índice al cierre y el racconto en el
+cuerpo, y los destinatarios en copia oculta. Necesita tres secretos del
+repositorio (*Settings → Secrets and variables → Actions*): `SMTP_USER` (la
+cuenta que envía), `SMTP_PASSWORD` (una contraseña de aplicación de Google de
+esa cuenta) y `REPORTE_PARA` (destinatarios separados por coma). Sin esos
+secretos el paso se saltea. Para probar o reenviar sin regenerar el reporte:
+*Actions → Enviar reporte por email → Run workflow* (se puede poner otra lista
+de destinatarios). Localmente, `python -m monitor.enviar --dry-run` arma el
+mail sin enviarlo.
+
 ## Variables y fuentes
 
 | Variable | Desde | Frecuencia | Fuente | Carga |
