@@ -202,11 +202,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       <p class="note">Compras netas de billetes y divisas sin fines específicos, mensual, millones de USD. BCRA, balance cambiario.</p>
       <div class="chart" id="c-ph" role="img" aria-label="Compras de dólares de personas humanas"></div>
     </div>
-    <div class="card">
-      <h2>Flujos financieros del exterior por el mercado oficial</h2>
-      <p class="note">Neto mensual de todos los sectores, millones de USD: positivo, entran dólares; negativo, salen. Inversión de portafolio de no residentes (compra y venta de activos financieros argentinos), inversión directa de no residentes y préstamos financieros y títulos de deuda (incluye obligaciones negociables). Sólo lo que pasa por el mercado oficial; lo que entra o sale por el CCL no figura. BCRA, balance cambiario.</p>
-      <div class="chart" id="c-flujos" role="img" aria-label="Flujos financieros del exterior por el mercado oficial"></div>
-    </div>
   </section>
 
   <h2 class="section-title">Tabla de datos</h2>
@@ -674,43 +669,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     });
   }
 
-  function renderFlujos() {
-    const all = DATA.monthly.flujos_financieros || [];
-    if (!all.length) return emptyState("c-flujos", "Sin datos todavía. Se descargan solos del anexo del balance cambiario del BCRA.");
-    const lastM = all[all.length - 1].fecha;
-    const days = rangeDays ? Math.max(rangeDays, 730) : 0;
-    const fromM = days ? new Date(new Date(lastM + "-01") - days * 864e5).toISOString().slice(0, 7) : "";
-    const rows = all.filter((r) => r.fecha >= fromM);
-    const byM = new Map(rows.map((r) => [r.fecha, r]));
-    const c = mount("c-flujos");
-    const ser = [
-      ["Portafolio de no residentes", "portafolio_neto", "--s1"],
-      ["Inversión directa", "directa_neto", "--s2"],
-      ["Préstamos y títulos de deuda", "deuda_neto", "--s3"],
-    ];
-    c.setOption({
-      animation: false, textStyle: { fontFamily: css("--font"), color: css("--ink-2") },
-      grid: { left: 8, right: 16, top: 36, bottom: 8, containLabel: true },
-      tooltip: {
-        trigger: "axis", confine: true, backgroundColor: css("--surface"), borderColor: css("--border"), textStyle: { color: css("--ink"), fontSize: 12 },
-        formatter: (ps) => {
-          const r = byM.get(ps[0].name);
-          return `${ps[0].name}` + ps.map((p) => `<br>${p.marker}${p.seriesName}: <b>${nf(p.value, 0)} M USD</b>`).join("") +
-            `<br><span style="color:${css("--muted")}">Portafolio: entradas ${nf(r.portafolio_ingresos, 0)} · salidas ${nf(r.portafolio_egresos, 0)}</span>`;
-        },
-      },
-      xAxis: { type: "category", data: rows.map((r) => r.fecha), axisTick: { show: false }, axisLine: { lineStyle: { color: css("--axis") } }, axisLabel: { color: css("--muted"), fontSize: 11, hideOverlap: true } },
-      yAxis: { type: "value", axisLabel: { color: css("--muted"), fontSize: 11, formatter: (v) => nf(v, 0) }, splitLine: { lineStyle: { color: css("--grid") } } },
-      legend: { top: 0, left: 0, icon: "roundRect", itemWidth: 12, itemHeight: 8, textStyle: { color: css("--ink-2"), fontSize: 12 } },
-      series: ser.map(([name, k, col]) => ({
-        name, type: "bar", barMaxWidth: 10, barGap: "15%", data: rows.map((r) => r[k]),
-        itemStyle: { color: css(col), borderColor: css("--surface"), borderWidth: 1 },
-      })),
-    });
-  }
-
   function renderMonthly() {
-    renderFlujos();
     const phAll = DATA.monthly.compras_personas_humanas || [];
     if (!phAll.length) {
       emptyState("c-ph", "Sin datos todavía. Se descargan solos del anexo del balance cambiario del BCRA.");
