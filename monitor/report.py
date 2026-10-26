@@ -38,6 +38,9 @@ from . import config, indicators  # noqa: E402
 log = logging.getLogger("monitor.report")
 
 REPORTS_DIR = config.ROOT / "reportes"
+# Racconto de la semana, escrito a mano: reportes/textos/AAAA-MM-DD.md, con la
+# fecha del viernes de la semana informada.
+TEXTOS_DIR = REPORTS_DIR / "textos"
 PANEL_CSV = config.DATA_DIR / "panel_diario.csv"
 DASHBOARD_URL = "https://elibman36.github.io/monitor-dolarizacion/"
 
@@ -422,6 +425,36 @@ def _pts1(x: float) -> str:
     return "0" if abs(x) < 0.05 else fmt(x, 1, signo=True)
 
 
+def _md_inline(t: str) -> str:
+    t = html.escape(t, quote=False)
+    t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+    t = re.sub(r"(?<![*\w])\*(?!\s)(.+?)(?<!\s)\*(?![*\w])", r"<i>\1</i>", t)
+    return t
+
+
+def racconto(viernes: pd.Timestamp, dir_: Path | None = None) -> str:
+    """El texto de la semana (Markdown simple: párrafos, **negrita**, *cursiva*
+    y listas con «- »), en HTML. Vacío si no hay archivo para ese viernes. Los
+    comentarios <!-- ... --> no se publican."""
+    f = (dir_ or TEXTOS_DIR) / f"{viernes:%Y-%m-%d}.md"
+    if not f.exists():
+        return ""
+    txt = re.sub(r"<!--.*?-->", "", f.read_text(encoding="utf-8"), flags=re.S).strip()
+    bloques = []
+    for b in re.split(r"\n\s*\n", txt):
+        lineas = [l.strip() for l in b.strip().splitlines() if l.strip()]
+        if lineas and lineas[0].startswith("#"):
+            bloques.append(f"<h3>{_md_inline(lineas[0].lstrip('#').strip())}</h3>")
+            lineas = lineas[1:]
+        if not lineas:
+            continue
+        if all(l.startswith(("- ", "* ")) for l in lineas):
+            bloques.append("<ul>" + "".join(f"<li>{_md_inline(l[2:])}</li>" for l in lineas) + "</ul>")
+        else:
+            bloques.append(f"<p>{_md_inline(' '.join(lineas))}</p>")
+    return "".join(bloques)
+
+
 def medidas_indice(p: pd.DataFrame, semana: Semana, blocks_cfg: dict, datos: dict, perfil: dict) -> None:
     """Para los componentes que el índice mide por su cambio en IPD_HORIZON días
     hábiles (oficial, reservas, BADLAR, depósitos, riesgo país), agrega a `datos`
@@ -538,6 +571,9 @@ ul.res { margin: 4pt 0 0; padding-left: 13pt; } ul.res li { margin-bottom: 3pt; 
 .nota-res { margin: 5pt 0 0; padding-top: 4pt; border-top: 1px solid #e1e0d9; color: #898781; font-size: 7.5pt; }
 .chart svg, .chart img { width: 100%; height: auto; display: block; }
 .note { color: #898781; font-size: 7.5pt; margin: 0 0 4pt; }
+.racconto p { margin: 4pt 0 0; font-size: 9.5pt; line-height: 1.5; }
+.racconto ul { margin: 4pt 0 0; padding-left: 14pt; } .racconto li { margin: 2pt 0; }
+.racconto h3 { font-size: 9.5pt; margin: 8pt 0 0; }
 table.vars { width: 100%; border-collapse: collapse; font-size: 8.3pt; }
 table.vars th { text-align: left; color: #52514e; font-weight: 600; border-bottom: 1px solid #c3c2b7; padding: 4pt 4pt; }
 table.vars td { border-bottom: 1px solid #eeede8; padding: 2.1pt 4pt; vertical-align: top; }
@@ -632,6 +668,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     pesos_b = {b: (payload["ipd"]["blocks"].get(b, {}).get("weight") or blocks_cfg[b]["weight"]) for b in blocks_cfg}
     tabla_html = tabla_aportes(blocks_cfg, meta, pts_cierre, sub1, i1, datos, perfil, pesos_b)
     puntos = resumen(indice, semana, pts_cierre, datos, perfil, pts_prev)
+    texto_semana = racconto(semana.viernes)
 
     gauge = "".join(f"<span style='flex:{min(hi, 100) - lo};background:{TRAMO_COLOR[k]}'></span>"
                     for lo, hi, k, _ in config.INDICE_TRAMOS)
@@ -681,6 +718,11 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     <p class="nota-res">Los puntos son lo que cada parte suma o resta al índice, que arranca en 50: suman la distancia del índice a 50. Entre paréntesis, lo que el índice mira de cada variable: su cambio en la semana (5 días hábiles) o su nivel.</p>
   </div>
 </section>
+
+{f'''<section class="section card racconto">
+  <h2>La semana</h2>
+  {texto_semana}
+</section>''' if texto_semana else ""}
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>

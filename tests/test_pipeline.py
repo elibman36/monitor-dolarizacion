@@ -679,3 +679,15 @@ def test_centro_cero_da_el_signo_del_movimiento():
     z_med = indicators.rolling_z(x, 252, 100, 4.0).iloc[-1]
     z_cero = indicators.rolling_z(x, 252, 100, 4.0, centro_cero=True).iloc[-1]
     assert z_med < 0 < z_cero
+
+
+def test_racconto_de_la_semana(tmp_path):
+    import pandas as pd
+    from monitor import report
+    (tmp_path / "2026-10-30.md").write_text(
+        "<!-- no va -->\nEl BCRA **compró** dólares.\n\n## Lo que viene\n- Licitación del Tesoro\n- Dato de *inflación*\n",
+        encoding="utf-8")
+    h = report.racconto(pd.Timestamp("2026-10-30"), tmp_path)
+    assert "no va" not in h and "<b>compró</b>" in h and "<h3>Lo que viene</h3>" in h
+    assert "<li>Licitación del Tesoro</li>" in h and "<i>inflación</i>" in h
+    assert report.racconto(pd.Timestamp("2026-11-06"), tmp_path) == ""

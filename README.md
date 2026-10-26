@@ -80,6 +80,18 @@ pip install -r requirements-reporte.txt && python -m playwright install chromium
 python -m monitor.report --fecha 2026-10-05   # semana del 28/9 al 2/10
 ```
 
+### Racconto de la semana
+
+El reporte tiene una sección «La semana» con un texto escrito a mano. Va en
+`reportes/textos/AAAA-MM-DD.md`, con la fecha del viernes de la semana
+informada (por ejemplo `2026-10-30.md` para la semana del 26 al 30 de
+octubre); `reportes/textos/PLANTILLA.md` explica el formato (párrafos,
+**negrita**, *cursiva*, listas con «- » y subtítulos con «## »). Desde la web
+de GitHub: *Add file → Create new file* en `reportes/textos/`. Si no hay
+archivo para esa semana, la sección no aparece. Como el reporte se arma el
+sábado a las 10:17, conviene escribirlo antes; si se escribe o corrige
+después, hay que volver a generar el reporte (*Run workflow*).
+
 ## Variables y fuentes
 
 | Variable | Desde | Frecuencia | Fuente | Carga |
