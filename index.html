@@ -212,7 +212,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   <h2 class="section-title">Tabla de datos</h2>
   <section class="card table-wrap">
     <table id="tbl"><thead><tr><th>Variable</th><th class="num">Último</th><th>Fecha</th><th class="num">Hace 7 días</th><th class="num">Hace 30 días</th><th>Fuente</th></tr></thead><tbody></tbody></table>
-    <div class="status-list" id="src-status"></div>
   </section>
 
   <h2 class="section-title">Metodología</h2>
@@ -770,9 +769,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       tr.innerHTML = `<td>${s.label} <span style="color:var(--muted)">(${s.unit})</span></td><td class="num">${nf(s.last, dg)}</td><td>${s.last_date}</td><td class="num">${nf(s.prev_7d, dg)}</td><td class="num">${nf(s.prev_30d, dg)}</td><td>${s.source}</td>`;
       tb.appendChild(tr);
     });
-    const st = document.getElementById("src-status");
-    st.innerHTML = Object.entries(DATA.sources_status || {}).map(([k, v]) =>
-      { const bad = v.startsWith("error") || v.startsWith("fallo"); return `<span class="${bad ? "err" : ""}" title="${v}">${v === "ok" ? "✓" : bad ? "✕" : "•"} ${k}</span>`; }).join("");
     document.getElementById("foot").textContent = `Actualizado: ${new Date(DATA.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: ${PAISES.ar.fuentes}.`;
   }
 
