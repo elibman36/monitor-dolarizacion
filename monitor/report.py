@@ -263,7 +263,10 @@ def _var_semana(v: dict | None) -> tuple[str, str]:
     elif v["tipo"] == "pct":
         u = " $" if v["unidad"].startswith("$") else " " + v["unidad"].split()[0]
     dec = 2 if v["tipo"] == "pct" and v["unidad"].startswith("$") else (1 if v["tipo"] == "pp" else 0)
-    return fmt(a, dec, signo=True) + u, (fmt(pct, 1, signo=True) + "%") if np.isfinite(pct) else "–"
+    pct_txt = (fmt(pct, 1, signo=True) + "%") if np.isfinite(pct) else "–"
+    if v.get("infl") is not None:
+        pct_txt += f" <span class='muted'>(inflación {fmt(v['infl'], 1)}%)</span>"
+    return fmt(a, dec, signo=True) + u, pct_txt
 
 
 def tabla_aportes(blocks_cfg: dict, meta: dict, pts1: dict, sub1: dict, sub0: dict, i1: float, i0: float,
@@ -455,8 +458,11 @@ def racconto(viernes: pd.Timestamp, dir_: Path | None = None) -> str:
 def _movimiento(comp: str, label: str, pts: float, datos: dict, perfil: dict) -> str:
     """"canje (+0,3 pp en la semana; +11,3 pts)": cómo se movió la variable en
     la semana y cuánto aporta al índice."""
-    va, _ = _var_semana(datos.get(_var_comp(perfil, comp)))
+    v = datos.get(_var_comp(perfil, comp))
+    va, vp = _var_semana(v)
     que = va if va in ("", "sin dato nuevo", "–") else va + " en la semana"
+    if v and v.get("infl") is not None and va not in ("", "sin dato nuevo", "–"):
+        que = f"{re.sub(r'<[^>]+>', '', vp).split(' (')[0]} en la semana contra {fmt(v['infl'], 1)}% de inflación"
     return f"{_corto(label)} ({que + '; ' if que else ''}{_pts1(pts)} pts)"
 
 
@@ -622,6 +628,12 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     sub_svg = chart_subindices(indice, [(blocks_cfg[b]["label"], p[f"indice_bloque_{b}"], colores_sub[b]) for b in sub1], semana) if sub1 else ""
 
     tabla, datos = tabla_variables(p, semana, perfil["variables"])
+    # Inflación de la semana (CER), para comparar con la depreciación del oficial.
+    if "cer" in p and "tc_oficial_ref" in datos:
+        _, c1 = _hasta(p["cer"], semana.viernes)
+        _, c0 = _hasta(p["cer"], semana.viernes - pd.Timedelta(days=7))
+        if np.isfinite(c1) and np.isfinite(c0) and c0:
+            datos["tc_oficial_ref"]["infl"] = (c1 / c0 - 1) * 100
     pesos_b = {b: (payload["ipd"]["blocks"].get(b, {}).get("weight") or blocks_cfg[b]["weight"]) for b in blocks_cfg}
     tabla_html = tabla_aportes(blocks_cfg, meta, pts_cierre, sub1, sub0, i1, i0, datos, perfil, pesos_b)
     puntos = resumen(indice, semana, pts_cierre, datos, perfil, pts_prev,
@@ -684,7 +696,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note"><b>Nivel</b> y <b>variación</b>: el dato de cada variable al viernes {fecha_larga(semana.viernes)} (o el último publicado) y cuánto cambió en la semana. {perfil["nota_variables"]} <b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. El oficial, las reservas, la BADLAR, los depósitos y el riesgo país aportan según cuánto se movieron en la semana; el resto, según su nivel comparado con los dos años anteriores (por eso una volatilidad que sube puede restar, si sigue por debajo de lo habitual).</p>
+  <p class="note"><b>Nivel</b> y <b>variación</b>: el dato de cada variable al viernes {fecha_larga(semana.viernes)} (o el último publicado) y cuánto cambió en la semana. {perfil["nota_variables"]} <b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. El oficial (descontada la inflación de la semana, medida por el CER: si sube lo mismo o menos que los precios no suma), las reservas, la BADLAR, los depósitos y el riesgo país aportan según cuánto se movieron en la semana; el resto, según su nivel comparado con los dos años anteriores (por eso una volatilidad que sube puede restar, si sigue por debajo de lo habitual).</p>
   {tabla_html}
 </section>
 
@@ -731,7 +743,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 def _metodo_ar(pca_txt: str, pesos_b: dict | None = None) -> str:
     pesos_sub_txt = (": " + ", ".join(f"{_minus(config.IPD_BLOCKS[b]['label'])} {fmt(w * 100, 0)}%" for b, w in pesos_b.items())
                      if pesos_b else "")
-    return f"""<p>El Índice de Dolarización adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano, para que un episodio extremo no infle la escala). Para el oficial, las reservas, la BADLAR, los depósitos en dólares y el riesgo país, que se miden por su cambio en 5 días hábiles, el centro es cero y no la mediana: así una semana en que las reservas suben siempre resta presión, y una en que caen siempre suma (con la escala de sus dos años anteriores). Los componentes se agrupan en tres subíndices: <b>presión cambiaria</b> (tipo de cambio oficial, su volatilidad, reservas, tasa en pesos, brecha MEP / oficial y futuros de dólar vendidos por el BCRA, que son intervención como la venta de reservas), <b>dolarización de portafolios</b> (devaluación implícita y posición abierta en futuros de dólar, depósitos en dólares y compras de dólares de personas humanas: la demanda de cobertura) y <b>extranjerización de portafolios</b> (canje CCL / MEP, volatilidad del CCL y riesgo país). Dentro de cada subíndice, los pesos salen de componentes principales: cada componente pesa según cuánto se mueve junto con el resto (cargas del primer componente principal de los promedios mensuales desde 2003). Los tres subíndices se ponderan con el mismo método{pesos_sub_txt}. Las cargas negativas valen cero y ningún componente pesa menos del 10% de su subíndice. Varianza explicada por el primer componente: {pca_txt}.</p>"""
+    return f"""<p>El Índice de Dolarización adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano, para que un episodio extremo no infle la escala). Para el oficial, las reservas, la BADLAR, los depósitos en dólares y el riesgo país, que se miden por su cambio en 5 días hábiles, el centro es cero y no la mediana: así una semana en que las reservas suben siempre resta presión, y una en que caen siempre suma (con la escala de sus dos años anteriores). Los componentes se agrupan en tres subíndices: <b>presión cambiaria</b> (tipo de cambio oficial descontada la inflación, su volatilidad, reservas, tasa en pesos, brecha MEP / oficial y futuros de dólar vendidos por el BCRA, que son intervención como la venta de reservas), <b>dolarización de portafolios</b> (devaluación implícita y posición abierta en futuros de dólar, depósitos en dólares y compras de dólares de personas humanas: la demanda de cobertura) y <b>extranjerización de portafolios</b> (canje CCL / MEP, volatilidad del CCL y riesgo país). Dentro de cada subíndice, los pesos salen de componentes principales: cada componente pesa según cuánto se mueve junto con el resto (cargas del primer componente principal de los promedios mensuales desde 2003). Los tres subíndices se ponderan con el mismo método{pesos_sub_txt}. Las cargas negativas valen cero y ningún componente pesa menos del 10% de su subíndice. Varianza explicada por el primer componente: {pca_txt}.</p>"""
 
 
 PERFIL_AR = {

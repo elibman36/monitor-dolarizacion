@@ -112,6 +112,7 @@ mail sin enviarlo.
 | Reservas internacionales brutas | 1996 | diaria | BCRA, API de Estadísticas v4 | automática |
 | Tasa BADLAR privados (TAMAR como respaldo) | 1999 | diaria | BCRA | automática |
 | Tipo de cambio mayorista A3500 | 2002 | diaria | BCRA | automática |
+| CER (para descontar la inflación) | 2002 | diaria | BCRA | automática |
 | Depósitos en dólares del sector privado | 2002 | diaria | BCRA | automática |
 | Riesgo país (EMBI) | 1999 | diaria | [ArgentinaDatos](https://argentinadatos.com) | automática |
 | Dólar oficial, mayorista y blue | 2011 | diaria | ArgentinaDatos | automática |
@@ -145,7 +146,7 @@ ponderados por componentes principales (hoy 38%, 30% y 32%):
 
 | Subíndice | Componente | Transformación | Signo |
 |---|---|---|---|
-| Presión cambiaria | Tipo de cambio A3500 | Δlog 5 días | + |
+| Presión cambiaria | Tipo de cambio A3500 descontada la inflación (÷ CER) | Δlog 5 días | + |
 | | Volatilidad del oficial | desvío de variaciones diarias, 20 días, anualizado | + |
 | | Reservas brutas | Δlog 5 días | − |
 | | Tasa BADLAR | Δ 5 días | + |

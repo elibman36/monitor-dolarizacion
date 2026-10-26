@@ -276,6 +276,7 @@ def fetch_all(offline: bool) -> tuple[dict[str, pd.Series], dict[str, str]]:
 SERIES_META = {
     "ipd": ("Índice de Dolarización", "desvíos estándar", "ID"),
     "tc_oficial_ref": ("Tipo de cambio oficial mayorista (A3500)", "$ por USD", "BCRA"),
+    "cer": ("CER (sigue a la inflación)", "índice", "BCRA"),
     "usd_ccl": ("Dólar contado con liquidación", "$ por USD", "ArgentinaDatos"),
     "usd_mep": ("Dólar MEP", "$ por USD", "ArgentinaDatos"),
     "usd_blue": ("Dólar blue", "$ por USD", "ArgentinaDatos"),

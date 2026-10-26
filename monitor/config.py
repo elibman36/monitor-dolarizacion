@@ -57,6 +57,15 @@ BCRA_VARIABLES = {
         "unit": "millones de USD",
         "optional": True,
     },
+    # CER: sigue al IPC día a día; sirve para descontar la inflación de la
+    # depreciación del oficial.
+    "cer": {
+        "id": 30,
+        "regex": r"coeficiente de estabilizaci[oó]n de referencia",
+        "label": "Coeficiente de estabilización de referencia (CER)",
+        "unit": "índice",
+        "optional": True,
+    },
     "depositos_usd": {
         "id": 108,
         "regex": r"dep[oó]sitos.*(?:d[oó]lares|moneda extranjera)",
@@ -173,10 +182,12 @@ IPD_BLOCKS = {
         "label": "Presión cambiaria",
         "weight": 1 / 3,
         "components": {
+            # Depreciación real: el oficial descontada la inflación (CER). Si el
+            # dólar sube lo mismo o menos que los precios, no hay presión.
             "tc_a3500":  {"transform": "dlog",  "sign": +1, "centro_cero": True, "weight": 1.0,
-                          "label": "Depreciación del oficial",
-                          "frases": ("el oficial se depreció más que lo habitual",
-                                     "el oficial se depreció menos que lo habitual")},
+                          "label": "Depreciación real del oficial",
+                          "frases": ("el oficial subió más que la inflación",
+                                     "el oficial subió menos que la inflación")},
             "vol_oficial": {"transform": "level", "sign": +1, "weight": 1.0,
                             "label": "Volatilidad del oficial",
                             "frases": ("la volatilidad del oficial está por encima de lo habitual",

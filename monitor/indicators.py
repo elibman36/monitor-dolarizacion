@@ -123,6 +123,14 @@ def derived_series(df: pd.DataFrame, futuros: pd.DataFrame, compras: pd.DataFram
     out = df.copy()
     oficial = official_rate(df)
     out["tc_oficial_ref"] = oficial
+    # El componente de depreciación usa el oficial deflactado por el CER: su
+    # variación es la depreciación menos la inflación. Antes del CER (feb-2002,
+    # convertibilidad) se usa el oficial nominal.
+    if "cer" in df and df["cer"].notna().any():
+        cer = df["cer"].ffill().bfill()
+        out["tc_a3500"] = oficial / cer * cer.iloc[-1]
+    else:
+        out["tc_a3500"] = oficial
     if "usd_ccl" in df:
         out["brecha_ccl"] = (df["usd_ccl"] / oficial - 1) * 100
         # Antes de que haya CCL (2011-2012) se usa la brecha con el blue.

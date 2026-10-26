@@ -182,7 +182,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card-head">
       <h2>Qué explica el índice</h2>
     </div>
-    <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con lo habitual de los dos años anteriores (en negrita): si está por encima suma y si está por debajo resta, aunque en la semana se haya movido para el otro lado (en gris).</p>
+    <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial (descontada la inflación: si sube lo mismo o menos que los precios no suma), las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con lo habitual de los dos años anteriores (en negrita): si está por encima suma y si está por debajo resta, aunque en la semana se haya movido para el otro lado (en gris).</p>
     <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
@@ -214,7 +214,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div>
     <p>El Índice de Dolarización (ID) adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes). Para el oficial, las reservas, la BADLAR, los depósitos en dólares y el riesgo país, que se miden por su cambio en 5 días hábiles, el centro es cero y no la mediana: así una semana en que las reservas suben siempre resta presión, y una en que caen siempre suma (con la escala de sus dos años anteriores). Los componentes se promedian dentro de tres subíndices:</p>
     <ul>
-      <li><b>Presión cambiaria:</b> depreciación del oficial A3500 en 5 días, volatilidad del oficial (20 días), evolución de las reservas brutas en 5 días, suba de la tasa BADLAR en 5 días (defensa del peso), brecha MEP / oficial, que mide cuánto pesan las restricciones para comprar al oficial, y futuros de dólar vendidos por el BCRA (intervención en el mercado de futuros, como la venta de reservas en el de contado: cobertura que absorbe el BCRA para contener la devaluación implícita; cuenta la variación mensual de la posición vendida neta, así que ampliarla suma presión y desarmarla resta; dato de fin de mes de la planilla de reservas, que entra 35 días después).</li>
+      <li><b>Presión cambiaria:</b> depreciación del oficial A3500 en 5 días descontada la inflación (con el CER: si el dólar sube lo mismo o menos que los precios, no suma presión), volatilidad del oficial (20 días), evolución de las reservas brutas en 5 días, suba de la tasa BADLAR en 5 días (defensa del peso), brecha MEP / oficial, que mide cuánto pesan las restricciones para comprar al oficial, y futuros de dólar vendidos por el BCRA (intervención en el mercado de futuros, como la venta de reservas en el de contado: cobertura que absorbe el BCRA para contener la devaluación implícita; cuenta la variación mensual de la posición vendida neta, así que ampliarla suma presión y desarmarla resta; dato de fin de mes de la planilla de reservas, que entra 35 días después).</li>
       <li><b>Dolarización de portafolios:</b> devaluación implícita en los futuros de A3 Mercados (TNA a 90 días), posición abierta en futuros de dólar (demanda de cobertura, promedio de 21 días para sacar el efecto de los vencimientos), depósitos en dólares del sector privado (cuando caen suma presión; cuando crecen, alivia) y compras netas de dólares de personas humanas (FAE, dato mensual que entra un mes después de su cierre, medido contra su promedio de 12 meses para no confundir la salida del cepo con presión).</li>
       <li><b>Extranjerización de portafolios:</b> canje (CCL / MEP), que mide la preferencia por tener dólares afuera del país; volatilidad del CCL, y suba del riesgo país en 5 días.</li>
     </ul>
@@ -587,8 +587,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         return `<td class="num">${nf(u.netas_usd_millones, 0)} <span class="muted">M USD en ${u.fecha} · ${sg(v, 0)} M USD contra el mes anterior</span><br><b>${nf(Math.abs(dif), 0)} M USD ${dif > 0 ? "por encima" : "por debajo"} del promedio de 12 meses</b></td>`;
       }
       if (!s || s.last == null) return "<td></td>";
-      if ((transform === "dlog" || transform === "diff") && s.data && !/mes/.test(s.unit))
-        return `<td class="num">${txtCambio(s, cambioH(s, h.date))} <span class="muted">en ${H} días</span></td>`;
+      if ((transform === "dlog" || transform === "diff") && s.data && !/mes/.test(s.unit)) {
+        // El oficial se compara con la inflación del mismo período (CER).
+        const cer = k === "tc_a3500" && DATA.series.cer ? cambioH(DATA.series.cer, h.date) : null;
+        return `<td class="num">${txtCambio(s, cambioH(s, h.date))} <span class="muted">en ${H} días${cer ? ` · inflación ${nf(cer.pct, 1)}%` : ""}</span></td>`;
+      }
       // Nivel, si subió o bajó en la semana (las series mensuales, contra el
       // mes anterior) y, en negrita, cuánto está por encima o por debajo de lo
       // habitual (mediana de los dos años anteriores, como el índice).
