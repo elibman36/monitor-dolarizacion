@@ -245,7 +245,7 @@ def test_reporte_semanal_html(fake_api):
     payload = json.loads((tmp / "monitor.json").read_text())
     html_txt = report.construir_html(semana, p, payload)
     assert "Reporte semanal" in html_txt and "/100" in html_txt
-    assert "Qué explica el índice" in html_txt and "En la semana" in html_txt and "En 4 semanas" in html_txt and "<svg" in html_txt
+    assert "Qué explica el índice" in html_txt and "Aporte al índice" in html_txt and "Qué mira el índice" in html_txt and "<svg" in html_txt
 
 
 def test_pca_weights():
@@ -667,3 +667,15 @@ def test_parse_vista_bcu():
     d = f.parse_vista_bcu(pd.DataFrame(filas))
     assert list(d.index.strftime("%Y-%m-%d")) == ["2026-07-31", "2026-08-31"]
     assert d.iloc[-1].tolist() == [110.0, 330.0]
+
+
+def test_centro_cero_da_el_signo_del_movimiento():
+    import numpy as np
+    import pandas as pd
+    from monitor import indicators
+    # Serie que casi siempre sube: contra la mediana, una suba chica da presión
+    # negativa grande; contra cero, sigue siendo positiva.
+    x = pd.Series(np.r_[np.full(300, 10.0) + np.sin(np.arange(300)), 2.0])
+    z_med = indicators.rolling_z(x, 252, 100, 4.0).iloc[-1]
+    z_cero = indicators.rolling_z(x, 252, 100, 4.0, centro_cero=True).iloc[-1]
+    assert z_med < 0 < z_cero

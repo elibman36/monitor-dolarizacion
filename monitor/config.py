@@ -123,8 +123,10 @@ FUTUROS_PLAZO_MINIMO_DIAS = 20
 #   diff  -> diferencia simple en `horizon` días hábiles
 #   level -> nivel de la serie
 # Opcionales: horizonte (días hábiles, en lugar de IPD_HORIZON), piso (valor
-# mínimo de la serie antes de transformarla) y clip (recorte del z-score, en
-# lugar de IPD_Z_CLIP).
+# mínimo de la serie antes de transformarla), clip (recorte del z-score, en
+# lugar de IPD_Z_CLIP) y centro_cero (se estandariza contra 0 y no contra la
+# mediana de la ventana: el signo del aporte es el del movimiento, p. ej.
+# reservas que suben en la semana siempre restan).
 # sign: +1 si un aumento implica más presión, -1 si implica menos.
 # Primer día que se publica el IPD. Antes de 2003 la serie no es confiable:
 # con la convertibilidad el tipo de cambio no se movía (faltan dos
@@ -171,7 +173,7 @@ IPD_BLOCKS = {
         "label": "Presión cambiaria",
         "weight": 1 / 3,
         "components": {
-            "tc_a3500":  {"transform": "dlog",  "sign": +1, "weight": 1.0,
+            "tc_a3500":  {"transform": "dlog",  "sign": +1, "centro_cero": True, "weight": 1.0,
                           "label": "Depreciación del oficial",
                           "frases": ("el oficial se depreció más que lo habitual",
                                      "el oficial se depreció menos que lo habitual")},
@@ -179,11 +181,11 @@ IPD_BLOCKS = {
                             "label": "Volatilidad del oficial",
                             "frases": ("la volatilidad del oficial está por encima de lo habitual",
                                        "la volatilidad del oficial está por debajo de lo habitual")},
-            "reservas":  {"transform": "dlog",  "sign": -1, "weight": 1.0,
+            "reservas":  {"transform": "dlog",  "sign": -1, "centro_cero": True, "weight": 1.0,
                           "label": "Reservas internacionales",
                           "frases": ("las reservas cayeron más que lo habitual",
                                      "las reservas evolucionaron mejor que lo habitual")},
-            "tasa":      {"transform": "diff",  "sign": +1, "weight": 1.0,
+            "tasa":      {"transform": "diff",  "sign": +1, "centro_cero": True, "weight": 1.0,
                           "label": "Tasa BADLAR (defensa del peso)",
                           "frases": ("subió la tasa en pesos", "bajó la tasa en pesos")},
             "brecha_mep":  {"transform": "level", "sign": +1, "weight": 1.0,
@@ -219,7 +221,7 @@ IPD_BLOCKS = {
                                       "hay menos posiciones abiertas en futuros de dólar")},
             # Los depósitos en USD caen cuando sube la presión (fuga de
             # depósitos) y suben con la confianza: su caída suma presión.
-            "depositos_usd": {"transform": "dlog", "sign": -1, "weight": 1.0,
+            "depositos_usd": {"transform": "dlog", "sign": -1, "centro_cero": True, "weight": 1.0,
                               "label": "Depósitos en USD",
                               "frases": ("cayeron los depósitos en dólares",
                                          "crecieron los depósitos en dólares")},
@@ -245,7 +247,7 @@ IPD_BLOCKS = {
                             "label": "Volatilidad del CCL",
                             "frases": ("la volatilidad del CCL está por encima de lo habitual",
                                        "la volatilidad del CCL está por debajo de lo habitual")},
-            "riesgo_pais": {"transform": "diff",  "sign": +1, "weight": 1.0,
+            "riesgo_pais": {"transform": "diff",  "sign": +1, "centro_cero": True, "weight": 1.0,
                             "label": "Riesgo país",
                             "frases": ("subió el riesgo país", "bajó el riesgo país")},
         },

@@ -181,13 +181,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   <section class="card" style="margin-bottom:16px">
     <div class="card-head">
       <h2>Qué explica el índice</h2>
-      <div class="seg" id="contrib-h" role="group" aria-label="Período del cambio"><button data-h="7" aria-pressed="true">Cambio en 7 días</button><button data-h="30">Cambio en 30 días</button></div>
     </div>
-    <p class="note"><b>Dato</b>: la variable que mide cada componente. <b>Peso</b>: participación en el índice. <b>Variación</b>: cuánto cambió esa variable en el período, en su unidad. Para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, el índice no mira el nivel sino cuánto se movieron en los últimos 5 días hábiles: la tabla muestra ese cambio hoy y, en gris, el de la fecha con que se compara. <b>Puntos</b>: cuánto movió eso al índice, en puntos de 0 a 100; suman lo que se movió el índice.</p>
+    <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con los dos años anteriores (un canje alto suma aunque no se haya movido).</p>
     <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
-    <h2>Índice y subíndices</h2>
+    <h2>Subíndices</h2>
     <p class="note" id="blocks-note">Cada subíndice en su propia escala de 0 a 100, con el mismo método que el índice.</p>
     <div class="chart" id="c-blocks" role="img" aria-label="Índice y subíndices en escala 0 a 100"></div>
   </section>
@@ -219,7 +218,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   <h2 class="section-title">Metodología</h2>
   <section class="card method">
     <div>
-    <p>El Índice de Dolarización (ID) adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes) y se promedia dentro de tres subíndices:</p>
+    <p>El Índice de Dolarización (ID) adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes). Para el oficial, las reservas, la BADLAR, los depósitos en dólares y el riesgo país, que se miden por su cambio en 5 días hábiles, el centro es cero y no la mediana: así una semana en que las reservas suben siempre resta presión, y una en que caen siempre suma (con la escala de sus dos años anteriores). Los componentes se promedian dentro de tres subíndices:</p>
     <ul>
       <li><b>Presión cambiaria:</b> depreciación del oficial A3500 en 5 días, volatilidad del oficial (20 días), evolución de las reservas brutas en 5 días, suba de la tasa BADLAR en 5 días (defensa del peso), brecha MEP / oficial, que mide cuánto pesan las restricciones para comprar al oficial, y futuros de dólar vendidos por el BCRA (intervención en el mercado de futuros, como la venta de reservas en el de contado: cobertura que absorbe el BCRA para contener la devaluación implícita; cuenta la variación mensual de la posición vendida neta, así que ampliarla suma presión y desarmarla resta; dato de fin de mes de la planilla de reservas, que entra 35 días después).</li>
       <li><b>Dolarización de portafolios:</b> devaluación implícita en los futuros de A3 Mercados (TNA a 90 días), posición abierta en futuros de dólar (demanda de cobertura, promedio de 21 días para sacar el efecto de los vencimientos), depósitos en dólares del sector privado (cuando caen suma presión; cuando crecen, alivia) y compras netas de dólares de personas humanas (FAE, dato mensual que entra un mes después de su cierre, medido contra su promedio de 12 meses para no confundir la salida del cepo con presión).</li>
@@ -540,22 +539,13 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const cols = [css("--s1"), css("--s2"), css("--s3")];
     const tramos = DATA.config.tramos || [];
     o.series = keys.map((k, i) => lineSeries(DATA.ipd.blocks[k].label, cut(DATA.ipd.blocks[k].indice), cols[i % cols.length],
-      { lineStyle: { width: 1.5, color: cols[i % cols.length] }, emphasis: { focus: "series" } }));
-    o.series.push(lineSeries("Índice", cut(DATA.ipd.indice || []), css("--ink"), {
-      lineStyle: { width: 2.5, color: css("--ink") }, emphasis: { focus: "series" }, z: 5,
-      markLine: { symbol: "none", silent: true, lineStyle: { color: css("--axis"), type: "solid", width: 1 }, data: [{ yAxis: 50, label: { show: false } }] },
-      markArea: { silent: true, data: tramos.filter((tr) => tr.key !== "neutral").map((tr) => [
-        { yAxis: tr.from, itemStyle: { color: css(`--dv-${tr.key}`), opacity: 0.07 } }, { yAxis: Math.min(tr.to, 100) }]) },
-    }));
+      Object.assign({ lineStyle: { width: 1.5, color: cols[i % cols.length] }, emphasis: { focus: "series" } }, i ? {} : {
+        markLine: { symbol: "none", silent: true, lineStyle: { color: css("--axis"), type: "solid", width: 1 }, data: [{ yAxis: 50, label: { show: false } }] },
+        markArea: { silent: true, data: tramos.filter((tr) => tr.key !== "neutral").map((tr) => [
+          { yAxis: tr.from, itemStyle: { color: css(`--dv-${tr.key}`), opacity: 0.07 } }, { yAxis: Math.min(tr.to, 100) }]) },
+      })));
     c.setOption(o);
   }
-
-  let contribH = 7;
-  document.querySelectorAll("#contrib-h button").forEach((b) => b.addEventListener("click", () => {
-    contribH = +b.dataset.h;
-    document.querySelectorAll("#contrib-h button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
-    if (DATA) renderContrib();
-  }));
 
   // Aporte de cada subíndice y componente hoy y su cambio en 7 o 30 días, en
   // puntos del índice: los aportes suman la distancia a 50 y los cambios, el
@@ -564,21 +554,17 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const comps = DATA.ipd.components.filter((x) => x.puntos != null);
     const tbl = document.getElementById("contrib-tbl");
     if (!comps.length) { tbl.querySelector("tbody").innerHTML = "<tr><td>Sin componentes disponibles.</td></tr>"; return; }
-    const prevKey = contribH === 7 ? "puntos_7d" : "puntos_30d";
     const h = DATA.headline;
-    const iPrev = contribH === 7 ? h.indice_7d : h.indice_30d;
     const sg = (v, dg = 1) => (v > 0 ? "+" : "") + nf(v, dg);
-    const delta = (a, b) => {
-      if (a == null || b == null) return "<td class='num muted'>–</td>";
-      const v = a - b;
+    const aporte = (v, bold) => {
+      if (v == null) return "<td class='num muted'>–</td>";
       if (Math.abs(v) < 0.05) return "<td class='num muted'>0</td>";
-      return `<td class="num ${v > 0 ? "up" : "down"}">${v > 0 ? "▲" : "▼"} ${sg(v)}</td>`;
+      return `<td class="num ${v > 0 ? "up" : "down"}"${bold ? ' style="font-weight:700"' : ""}>${v > 0 ? "▲" : "▼"} ${sg(v)}</td>`;
     };
-    // La variable que mide cada componente, con su cambio en el mismo período.
     const ALIAS = { tc_a3500: "tc_oficial_ref", futuros_oi: "futuros_interes_abierto", intervencion: "intervencion_usd", ventas_spot: "ventas_spot_usd" };
-    // Cambio de la variable en H días hábiles hasta la fecha `f`, sobre el
-    // calendario del índice y con el último dato disponible en cada fecha (como
-    // el panel del índice): es lo que mira en los componentes "dlog"/"diff".
+    // Lo que el índice mira de cada variable: en los componentes "dlog"/"diff"
+    // su cambio en H días hábiles hasta hoy (calendario del índice, último dato
+    // disponible en cada fecha); en el resto, su nivel.
     const H = DATA.config.horizon || 5;
     const dias = (DATA.ipd.indice || []).map((x) => x[0]);
     const asof = (d, f) => { let i = d.length - 1; while (i >= 0 && d[i][0] > f) i--; return i >= 0 ? d[i][1] : null; };
@@ -591,46 +577,27 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const txtCambio = (s, c) => {
       if (!c) return "–";
       const pp = s.unit.startsWith("%"), pb = s.unit === "pb", usd = /^(millones de USD|M USD)/.test(s.unit);
-      if (pp) return (c.abs > 0 ? "+" : "") + nf(c.abs, 1) + " pp";
-      if (pb) return (c.abs > 0 ? "+" : "") + nf(c.abs, 0) + " pb";
-      if (usd) return (c.abs > 0 ? "+" : "") + nf(c.abs, 0) + " M USD";
-      return (c.abs > 0 ? "+" : "") + nf(c.abs, 2) + " $ (" + (c.pct > 0 ? "+" : "") + nf(c.pct, 1) + "%)";
+      if (pp) return sg(c.abs) + " pp";
+      if (pb) return sg(c.abs, 0) + " pb";
+      if (usd) return sg(c.abs, 0) + " M USD";
+      return sg(c.abs, 2) + " $ (" + sg(c.pct) + "%)";
     };
-    const varCelda = (k, transform) => {
+    const queMira = (k, transform) => {
       const s = DATA.series[k] || DATA.series[ALIAS[k]];
-      if (!s || s.last == null) return ["<td></td>", "<td></td>"];
-      // Las series mensuales (futuros del BCRA) se miden en otro horizonte: van con su variación.
-      if ((transform === "dlog" || transform === "diff") && s.data && !/mes/.test(s.unit)) {
-        const f1 = DATA.headline.date;
-        const f0 = new Date(new Date(f1) - contribH * 864e5).toISOString().slice(0, 10);
-        const dg = digitsFor(s.unit, s.last);
-        return [`<td class="num">${nf(s.last, dg)} <span class="muted">${s.unit.split(",")[0]}</span></td>`,
-                `<td class="num">${txtCambio(s, cambioH(s, f1))} <span class="muted">en ${H} días · antes ${txtCambio(s, cambioH(s, f0))}</span></td>`];
-      }
-      const prev = contribH === 7 ? s.prev_7d : s.prev_30d;
-      const dg = digitsFor(s.unit, s.last);
-      let ch = "–";
-      if (prev != null) {
-        const abs = /^(millones de USD|M USD)/.test(s.unit);
-        const dif = s.unit.startsWith("%") || s.unit === "pb" || abs;
-        const v = dif ? s.last - prev : (s.last / prev - 1) * 100;
-        const u = s.unit === "pb" ? " pb" : s.unit.startsWith("%") ? " pp" : abs ? "" : "%";
-        const dec = dif && !s.unit.startsWith("%") ? 0 : 1;
-        ch = Math.abs(v) < 0.5 * 10 ** -dec ? "0" : (v > 0 ? "+" : "") + nf(v, dec) + u;
-      }
-      const unit = s.unit.split(",")[0];
-      return [`<td class="num">${nf(s.last, dg)} <span class="muted">${unit}</span></td>`, `<td class="num">${ch}</td>`];
+      if (!s || s.last == null) return "<td></td>";
+      if ((transform === "dlog" || transform === "diff") && s.data && !/mes/.test(s.unit))
+        return `<td class="num">${txtCambio(s, cambioH(s, h.date))} <span class="muted">en ${H} días</span></td>`;
+      return `<td class="num">${nf(s.last, digitsFor(s.unit, s.last))} <span class="muted">${s.unit.split(",")[0]}</span></td>`;
     };
-    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Dato</th><th class="num">Peso</th><th class="num">Variación en ${contribH} días</th><th class="num">Puntos en ${contribH} días</th></tr>`;
+    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Peso</th><th class="num">Qué mira el índice</th><th class="num">Aporte al índice</th></tr>`;
     const filas = [];
     Object.entries(DATA.ipd.blocks).forEach(([bk, b]) => {
       const cs = comps.filter((x) => x.block === bk).sort((x, y) => (y.weight || 0) - (x.weight || 0));
       if (!cs.length) return;
-      filas.push(`<tr class="sub"><td>${b.label}</td><td class="num">${b.indice_last != null ? nf(b.indice_last, 0) + "/100" : ""}</td><td class="num">${b.weight != null ? nf(b.weight * 100, 0) + "%" : ""}</td><td></td>${delta(b.puntos, b[prevKey])}</tr>`);
-      cs.forEach((x) => { const [dato, varia] = varCelda(x.key, x.transform);
-        filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td>${dato}<td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td>${varia}${delta(x.puntos, x[prevKey])}</tr>`); });
+      filas.push(`<tr class="sub"><td>${b.label}</td><td class="num">${b.weight != null ? nf(b.weight * 100, 0) + "%" : ""}</td><td class="num">${b.indice_last != null ? nf(b.indice_last, 0) + "/100" : ""}</td>${aporte(b.puntos, true)}</tr>`);
+      cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td><td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td>${queMira(x.key, x.transform)}${aporte(x.puntos)}</tr>`));
     });
-    filas.push(`<tr class="tot"><td>Índice</td><td class="num">${nf(h.indice, 0)}/100</td><td class="num">100%</td><td></td>${delta(h.indice, iPrev)}</tr>`);
+    filas.push(`<tr class="tot"><td>Índice</td><td class="num">100%</td><td class="num">${nf(h.indice, 0)}/100</td>${aporte(h.indice - 50, true)}</tr>`);
     tbl.querySelector("tbody").innerHTML = filas.join("");
   }
 

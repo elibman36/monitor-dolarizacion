@@ -187,17 +187,20 @@ def transform(s: pd.Series, kind: str, horizon: int) -> pd.Series:
     raise ValueError(f"transform desconocida: {kind}")
 
 
-def rolling_z(x: pd.Series, window: int, min_obs: int, clip: float) -> pd.Series:
+def rolling_z(x: pd.Series, window: int, min_obs: int, clip: float, centro_cero: bool = False) -> pd.Series:
+    """Estandariza contra la ventana: (x - centro) / escala. Con `centro_cero`
+    el centro es 0 en lugar de la mediana (o la media): el signo del componente
+    es el de su movimiento (reservas que suben restan; que caen, suman)."""
     if config.IPD_ZSCORE_METODO == "robusto":
         med = x.rolling(window, min_periods=min_obs).median()
         mad = (x - med).abs().rolling(window, min_periods=min_obs).median() * 1.4826
         # Si más de la mitad de la ventana es un mismo valor (p. ej. el BCRA sin
         # futuros en 2024), el MAD es 0: se usa el desvío estándar.
         std = x.rolling(window, min_periods=min_obs).std()
-        z = (x - med) / mad.where(mad > 0, std).replace(0, np.nan)
+        z = (x - (0 if centro_cero else med)) / mad.where(mad > 0, std).replace(0, np.nan)
     else:
         roll = x.rolling(window, min_periods=min_obs)
-        z = (x - roll.mean()) / roll.std()
+        z = (x - (0 if centro_cero else roll.mean())) / roll.std()
     return z.clip(-clip, clip)
 
 
@@ -254,7 +257,8 @@ def compute_ipd(df: pd.DataFrame, blocks_cfg: dict | None = None,
             # Un componente puede pedir un recorte más estricto (p. ej. una
             # intervención esporádica, que contra una ventana casi toda en cero
             # da desvíos extremos).
-            z = rolling_z(x, config.IPD_ZSCORE_WINDOW, config.IPD_ZSCORE_MIN_OBS, spec.get("clip", config.IPD_Z_CLIP))
+            z = rolling_z(x, config.IPD_ZSCORE_WINDOW, config.IPD_ZSCORE_MIN_OBS, spec.get("clip", config.IPD_Z_CLIP),
+                          centro_cero=spec.get("centro_cero", False))
             if z.dropna().empty:
                 continue
             zs[ckey] = z

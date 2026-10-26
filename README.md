@@ -142,6 +142,10 @@ El cálculo sigue estos pasos:
    dispersión, como en el EMP clásico, pero sin que un episodio extremo (la
    devaluación de dic-23) infle la escala durante dos años. La versión con
    media y desvío estándar sigue disponible (`IPD_ZSCORE_METODO = "clasico"`).
+   Los flujos (oficial, reservas, BADLAR, depósitos en USD y riesgo país, medidos
+   por su cambio en 5 días) se centran en cero y no en la mediana
+   (`centro_cero` en `config.py`): reservas que suben en la semana siempre
+   restan presión y que caen siempre suman.
 2. **Promedio ponderado.** Los subíndices se ponderan por componentes principales
    (primer componente principal de los subíndices mensuales, con el mismo piso
    de 10%; con dos subíndices el método da 50/50). Dentro de cada
