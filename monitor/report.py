@@ -164,21 +164,10 @@ def chart_indice_anual(indice: pd.Series, semana: Semana, eventos: list[dict]) -
     return _svg(fig)
 
 
-def chart_indice_historico(indice: pd.Series) -> str:
-    m = indice.dropna().resample("ME").mean()
-    m.index = m.index - pd.offsets.MonthBegin(1) + pd.Timedelta(days=14)
-    fig, ax = plt.subplots(figsize=(3.6, 2.1))
-    _bandas(ax)
-    _linea_tramos(ax, m, lw=1.1)
-    ax.xaxis.set_major_locator(mdates.YearLocator(5))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
-    return _svg(fig)
-
-
 def chart_subindices(indice: pd.Series, subs: list[tuple[str, pd.Series, str]], semana: Semana) -> str:
     """Índice y subíndices (cada uno en su escala 0-100), últimos 18 meses."""
     desde = semana.viernes - pd.DateOffset(months=18)
-    fig, ax = plt.subplots(figsize=(5.2, 2.9))
+    fig, ax = plt.subplots(figsize=(7.2, 2.4))
     _bandas(ax)
     for nombre, s, color in subs:
         s = s[(s.index >= desde) & (s.index <= semana.viernes)].dropna()
@@ -189,7 +178,7 @@ def chart_subindices(indice: pd.Series, subs: list[tuple[str, pd.Series, str]], 
     ax.axvspan(semana.lunes, semana.viernes, color=GRID, alpha=0.6, lw=0)
     ax.set_ylim(0, 100); ax.set_yticks([0, 25, 50, 75, 100])
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%y"))
-    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=2, fontsize=7.5, frameon=False, handlelength=1.6, borderaxespad=0.3)
+    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=4, fontsize=7.5, frameon=False, handlelength=1.6, borderaxespad=0.3)
     return _svg(fig)
 
 
@@ -239,17 +228,15 @@ def _txt_var_comp(v: dict, d: float, a: float | None = None) -> str:
 
 def tabla_aportes(blocks_cfg: dict, meta: dict, pts1: dict, pts0: dict, pts4: dict, sub1: dict, i1: float,
                   i0: float, i4: float, datos: dict, perfil: dict, pesos_b: dict | None = None) -> tuple[str, bool]:
-    """Una fila por subíndice y componente. Para la semana y para las últimas
-    cuatro, la variación de la variable en su unidad y, al lado, cuánto movió
-    eso al índice (puntos). Después, el peso y el aporte al cierre. Los aportes
-    suman la distancia a 50; los cambios, el cambio del índice. Devuelve también
-    si alguna fila usa la nota de "sin dato nuevo"."""
+    """Una fila por subíndice y componente: la variable que mide y su peso y,
+    para la semana y para las últimas cuatro, la variación de la variable en su
+    unidad y, al lado, cuánto movió eso al índice (puntos). Los puntos de cada
+    columna suman lo que se movió el índice. Devuelve también si alguna fila
+    usa la nota de "sin dato nuevo"."""
     def suma(d, cols):
         vals = [d[c] for c in cols if c in d and np.isfinite(d[c])]
         return sum(vals) if vals else np.nan
-    escala = max([abs(v) for v in pts1.values() if np.isfinite(v)] +
-                 [abs(suma(pts1, list(b["components"]))) for b in blocks_cfg.values() if np.isfinite(suma(pts1, list(b["components"])))] + [1.0])
-    filas, usadas, hay_nota = [], set(), False
+    filas, hay_nota = [], False
     for bkey, b in blocks_cfg.items():
         cols = [c for c in b["components"] if c in pts1]
         if not cols:
@@ -258,17 +245,14 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, pts1: dict, pts0: dict, pts4: di
         sub = sub1.get(bkey)
         sub_txt = f"{fmt(sub, 0)}/100" if sub is not None and np.isfinite(sub) else ""
         filas.append(f"<tr class='sub'><td>{html.escape(b['label'])}</td><td class='num'>{sub_txt}</td>"
-                     f"<td></td>{_celda_delta(v1 - v0)}<td></td>{_celda_delta(v1 - v4)}"
                      f"<td class='num'>{fmt((pesos_b or {}).get(bkey, b['weight']) * 100, 0)}%</td>"
-                     f"{_barra(v1, escala)}<td class='num'>{fmt(v1, 1, signo=True)}</td></tr>")
+                     f"<td></td>{_celda_delta(v1 - v0)}<td></td>{_celda_delta(v1 - v4)}</tr>")
         for c in sorted(cols, key=lambda c: -(meta.get(c, {}).get("weight") or 0)):
             w = meta.get(c, {}).get("weight_ipd")
-            vk = _var_comp(perfil, c)
-            v = datos.get(vk)
+            v = datos.get(_var_comp(perfil, c))
             d_sem, d_4 = pts1[c] - pts0.get(c, np.nan), pts1[c] - pts4.get(c, np.nan)
             marca = ""
             if v:
-                usadas.add(vk)
                 nota = "" if v["nueva"] or v["fecha"] is None else f" <span class='muted'>(al {v['fecha'].day}/{v['fecha'].month})</span>"
                 dato = f"<td class='num'>{fmt(v['v'], v['dec'])} <span class='muted'>{_unidad_corta(v) if v['tipo'] != 'pct' else ''}</span>{nota}</td>"
                 # Una serie mensual repetida (FAE, futuros del BCRA) no trae dato nuevo.
@@ -283,25 +267,14 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, pts1: dict, pts0: dict, pts4: di
             else:
                 dato, var_sem, var_4 = "<td></td>", "<td></td>", "<td></td>"
             filas.append(f"<tr><td class='comp'>{html.escape(b['components'][c]['label'])}</td>{dato}"
-                         f"{var_sem}{_celda_delta(d_sem, marca)}{var_4}{_celda_delta(d_4)}"
-                         f"<td class='num muted'>{fmt((w or 0) * 100, 0)}%</td>{_barra(pts1[c], escala)}"
-                         f"<td class='num'>{fmt(pts1[c], 1, signo=True)}</td></tr>")
-    filas.append(f"<tr class='tot'><td>Índice</td><td class='num'>{fmt(i1, 0)}/100</td>"
-                 f"<td></td>{_celda_delta(i1 - i0)}<td></td>{_celda_delta(i1 - i4)}<td class='num'>100%</td>"
-                 f"{_barra(i1 - 50, escala)}<td class='num'>{fmt(i1 - 50, 1, signo=True)}</td></tr>")
-    otras = [(k, v) for k, v in datos.items() if k not in usadas and k not in perfil.get("ocultar", ())]
-    if otras:
-        filas.append("<tr class='otras'><td colspan='9'>Otras variables de seguimiento (no entran en el índice)</td></tr>")
-        for k, v in otras:
-            filas.append(f"<tr><td class='comp'>{html.escape(v['label'])}</td>"
-                         f"<td class='num'>{fmt(v['v'], v['dec'])} <span class='muted'>{_unidad_corta(v) if v['tipo'] != 'pct' else ''}</span></td>"
-                         f"<td class='num'>{_txt_var_comp(v, v['d'], v.get('a'))}</td><td></td>"
-                         f"<td class='num'>{_txt_var_comp(v, v['d4'], v.get('a4'))}</td><td colspan='4'></td></tr>")
+                         f"<td class='num muted'>{fmt((w or 0) * 100, 0)}%</td>"
+                         f"{var_sem}{_celda_delta(d_sem, marca)}{var_4}{_celda_delta(d_4)}</tr>")
+    filas.append(f"<tr class='tot'><td>Índice</td><td class='num'>{fmt(i1, 0)}/100</td><td class='num'>100%</td>"
+                 f"<td></td>{_celda_delta(i1 - i0)}<td></td>{_celda_delta(i1 - i4)}</tr>")
     cab = ("<thead><tr class='grupo'><th rowspan='2'>Subíndice y componente</th><th rowspan='2' class='num'>Dato</th>"
-           "<th colspan='2' class='c'>En la semana</th><th colspan='2' class='c'>En 4 semanas</th>"
-           "<th rowspan='2' class='num'>Peso</th><th colspan='2' class='c'>Aporte al cierre</th></tr>"
-           "<tr><th class='num'>Variación</th><th class='num'>Puntos</th><th class='num'>Variación</th><th class='num'>Puntos</th>"
-           "<th class='bar'></th><th class='num'>Puntos</th></tr></thead>")
+           "<th rowspan='2' class='num'>Peso</th>"
+           "<th colspan='2' class='c'>En la semana</th><th colspan='2' class='c'>En 4 semanas</th></tr>"
+           "<tr><th class='num'>Variación</th><th class='num'>Puntos</th><th class='num'>Variación</th><th class='num'>Puntos</th></tr></thead>")
     return f"<table class='vars aportes'>{cab}<tbody>{''.join(filas)}</tbody></table>", hay_nota
 
 
@@ -318,32 +291,14 @@ def chart_mini(series: list[tuple[str, pd.Series, str]], titulo: str, unidad: st
     ax.axvspan(semana.lunes, semana.viernes + pd.Timedelta(days=1), color=INK, alpha=0.07, lw=0)
     ax.set_title(titulo, loc="left", fontsize=8, color=INK, fontweight="bold", pad=10)
     ax.text(0, 1.02, unidad, transform=ax.transAxes, fontsize=6.5, color=MUTED)
-    ax.xaxis.set_major_locator(mdates.MonthLocator(interval=3))
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%m/%y"))
+    # Un rótulo por mes, desde el primer mes del período (abr, may, jun...).
+    ax.set_xlim(desde.replace(day=1), semana.viernes + pd.Timedelta(days=3))
+    ax.xaxis.set_major_locator(mdates.MonthLocator())
+    ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: MESES[mdates.num2date(x).month - 1]))
     ax.tick_params(labelsize=6)
     if len(series) > 1:
         ax.legend(fontsize=5.8, frameon=False, loc="upper left", ncol=len(series), handlelength=1.0,
                   columnspacing=0.7, handletextpad=0.3, bbox_to_anchor=(-0.02, -0.2), borderaxespad=0)
-    return _svg(fig)
-
-
-def chart_flujos(flujos: list[dict]) -> str:
-    """Flujos financieros netos del exterior por el mercado oficial, últimos 24 meses."""
-    if not flujos:
-        return ""
-    df = pd.DataFrame(flujos).tail(24)
-    fig, ax = plt.subplots(figsize=(7.4, 2.3))
-    x = np.arange(len(df))
-    w = 0.27
-    for i, (k, nombre, color) in enumerate([("portafolio_neto", "Portafolio de no residentes", S1),
-                                             ("directa_neto", "Inversión directa", S2),
-                                             ("deuda_neto", "Préstamos y títulos de deuda", S3)]):
-        ax.bar(x + (i - 1) * w, df[k].astype(float), width=w, color=color, label=nombre, zorder=3)
-    ax.axhline(0, color=AXIS, lw=0.8)
-    etiquetas = [f"{MESES[int(f[5:7]) - 1]}\n{f[2:4]}" if j % 3 == 0 else "" for j, f in enumerate(df["fecha"])]
-    ax.set_xticks(x, etiquetas, fontsize=7)
-    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: fmt(v, 0)))
-    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=3, fontsize=7.5, frameon=False, borderaxespad=0.2)
     return _svg(fig)
 
 
@@ -475,7 +430,7 @@ def resumen(indice, semana, pts_cierre, datos, perfil: dict | None = None, pts_p
     tramo = indicators.status_for(i1)[1].lower()
     frases = {c: spec["frases"] for b in blocks_cfg.values() for c, spec in b["components"].items()}
     labels = {c: spec["label"] for b in blocks_cfg.values() for c, spec in b["components"].items()}
-    puntos, top, d = [], [], {}
+    puntos = []
     if np.isfinite(i1):
         txt = f"El índice cerró la semana en <b>{fmt(i1, 0)}/100</b> ({tramo})"
         if np.isfinite(i0):
@@ -497,41 +452,15 @@ def resumen(indice, semana, pts_cierre, datos, perfil: dict | None = None, pts_p
                 vals = [d[c] for c in b["components"] if c in d]
                 if vals:
                     por_bloque.append(f"{_minus(b['label'])} {_pts1(sum(vals))}")
-            top = [k for k in sorted(d, key=lambda k: -abs(d[k])) if abs(d[k]) >= 0.3][:4]
+            # Primero lo que lo subió y lo que lo bajó, de mayor a menor; después,
+            # cómo se reparte el cambio entre los subíndices.
+            for signo, titulo in ((1, "Lo subieron"), (-1, "Lo bajaron")):
+                comps = sorted((k for k in d if signo * d[k] >= 0.1), key=lambda k: -abs(d[k]))[:5]
+                if comps:
+                    puntos.append(f"<b>{titulo}</b>: " + "; ".join(_movimiento(k, labels[k], d[k], datos, perfil) for k in comps) + ".")
             puntos.append("<b>Composición del cambio por subíndice</b>, en puntos del índice: " + "; ".join(por_bloque) + ".")
-    # Un solo punto con lo que se movió: los componentes que más movieron el
-    # índice (variación en su unidad y puntos) y, después, los precios de
-    # referencia del mercado que no estén ya en esa lista.
-    vars_top = {_var_comp(perfil, k) for k in top}
-    partes = perfil["partes"](datos, vars_top)
-    movs = "; ".join(_movimiento(k, labels[k], d[k], datos, perfil) for k in top) if top else ""
-    if movs or partes:
-        txt = "<b>Lo que más lo movió</b>: " + (movs + "." if movs else "")
-        if partes:
-            txt += (" En el mercado, " if movs else "") + ", ".join(partes) + "."
-        puntos.append(txt)
     return puntos
 
-
-def _partes_ar(datos: dict, excluir: set | None = None) -> list[str]:
-    """Precios de referencia del mercado en la semana, salvo los que ya se
-    nombraron entre lo que más movió el índice."""
-    excluir = excluir or set()
-    partes = []
-    for k, nombre in (("tc_oficial_ref", "el oficial"), ("usd_mep", "el MEP"), ("usd_ccl", "el CCL")):
-        if k in datos and k not in excluir:
-            partes.append(f"{nombre} {_txt_var_comp(datos[k], datos[k]['d'], datos[k].get('a'))}")
-    if "riesgo_pais" in datos and "riesgo_pais" not in excluir:
-        partes.append(f"el riesgo país {_txt_var(datos['riesgo_pais']['d'], 'pb', 0)}")
-    if "reservas" in datos and "reservas" not in excluir and np.isfinite(datos["reservas"]["d"]):
-        d = datos["reservas"]["d"]
-        partes.append(f"las reservas {'subieron' if d >= 0 else 'cayeron'} USD {fmt(abs(d), 0)} M")
-    return partes
-
-
-# ---------------------------------------------------------------------------
-# HTML -> PDF
-# ---------------------------------------------------------------------------
 
 CSS = """
 @page { size: A4; margin: 14mm 14mm 16mm; }
@@ -583,7 +512,7 @@ table.aportes th.c { text-align: center; border-bottom: 1px solid #c3c2b7; paddi
 table.aportes tr.grupo th { border-bottom-width: 0; }
 table.aportes tr.grupo th.c { border-bottom: 1px solid #c3c2b7; }
 table.aportes th[rowspan] { vertical-align: bottom; border-bottom: 1px solid #c3c2b7; }
-table.aportes td:nth-child(4), table.aportes td:nth-child(6), table.aportes th:nth-child(2), table.aportes th:nth-child(4) { border-right: 1px solid #eeede8; }
+table.aportes td:nth-child(3), table.aportes td:nth-child(5), table.aportes tr.grupo th:nth-child(3), table.aportes tr.grupo th:nth-child(4) { border-right: 1px solid #eeede8; }
 table.aportes td:first-child, table.aportes th:first-child { width: 25%; }
 table.aportes td.bar div { position: relative; height: 8pt; }
 table.aportes td.bar div::after { content: ""; position: absolute; left: 50%; top: -2pt; bottom: -2pt; border-left: 1px solid #c3c2b7; }
@@ -669,9 +598,6 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     compras = payload.get("monthly", {}).get("compras_personas_humanas", []) if perfil.get("fae") else []
     ph_svg = chart_compras_ph(compras)
     ph_ult = compras[-1] if compras else None
-    flujos = payload.get("monthly", {}).get("flujos_financieros", []) if perfil.get("fae") else []
-    flujos_svg = chart_flujos(flujos)
-    fl_ult = flujos[-1] if flujos else None
 
     comp_rows = "".join(
         f"<tr><td>{html.escape(b['label'])}</td><td>{html.escape(spec['label'])}</td>"
@@ -713,30 +639,23 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note"><b>Dato</b>: la variable que mide cada componente, al viernes {fecha_larga(semana.viernes)} o último dato disponible. {perfil["nota_variables"]} <b>Variación</b>: cuánto cambió esa variable, en su propia unidad (%, puntos porcentuales, pesos por dólar, millones de USD). <b>Puntos</b>: cuánto movió eso al índice, en puntos del índice de 0 a 100; los de cada columna suman lo que se movió el índice en ese período. <b>Peso</b>: participación en el índice. <b>Aporte al cierre</b>: cuánto suma (rojo) o resta (azul) cada parte al nivel del índice; suman la distancia a 50.</p>
+  <p class="note"><b>Dato</b>: la variable que mide cada componente, al viernes {fecha_larga(semana.viernes)} o último dato disponible. {perfil["nota_variables"]} <b>Peso</b>: participación en el índice. <b>Variación</b>: cuánto cambió esa variable, en su propia unidad (%, puntos porcentuales, pesos por dólar, millones de USD). <b>Puntos</b>: cuánto movió eso al índice, en puntos del índice de 0 a 100; los de cada columna suman lo que se movió el índice en ese período.</p>
   {tabla_html}
   {nota_sin_dato}
 </section>
 
-<section class="card page">
+<section class="section card">
   <h2>Índice en los últimos 18 meses</h2>
   <p class="note">Dato diario (promedio de 20 días hábiles). La franja gris marca la semana informada. <a href="{DASHBOARD_URL}{perfil["query"]}">Ver la versión interactiva, con el período a elección</a>.</p>
   <div class="chart">{chart_indice_anual(indice, semana, payload.get("events", []))}</div>
   <div class="legend">{leyenda}</div>
 </section>
 
-<section class="section grid2 g-sub">
-  {f'''<div class="card">
+{f'''<section class="section card">
     <h2>Índice y subíndices</h2>
     <p class="note">Últimos 18 meses. Cada subíndice en su propia escala de 0 a 100, con el mismo método que el índice.</p>
     <div class="chart">{sub_svg}</div>
-  </div>''' if sub_svg else ""}
-  <div class="card">
-    <h2>Índice desde 2003</h2>
-    <p class="note">Promedio mensual.</p>
-    <div class="chart">{chart_indice_historico(indice)}</div>
-  </div>
-</section>
+</section>''' if sub_svg else ""}
 
 <section class="page">
   <div>
@@ -747,11 +666,6 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     <h2>Compras netas de USD de personas humanas (FAE)</h2>
     <p class="note">Formación de activos externos (billetes y divisas sin fines específicos), millones de USD por mes, con su promedio móvil de 12 meses. Último dato: {ph_ult["fecha"]} ({fmt(ph_ult.get("netas_usd_millones"), 0)} M USD netos; {fmt(ph_ult.get("compras_usd_millones"), 0)} M de compras brutas). BCRA, balance cambiario.</p>
     <div class="chart">{ph_svg}</div>
-  </div>'''}
-  {"" if not flujos_svg else f'''<div class="section card">
-    <h2>Flujos financieros del exterior por el mercado oficial</h2>
-    <p class="note">Neto mensual de todos los sectores, millones de USD (positivo: entran dólares). Inversión de portafolio y directa de no residentes, y préstamos financieros y títulos de deuda. Sólo lo que pasa por el mercado oficial; lo que entra o sale por el CCL no figura. Último dato: {fl_ult["fecha"]} (portafolio {fmt(fl_ult.get("portafolio_neto"), 0)}; directa {fmt(fl_ult.get("directa_neto"), 0)}; deuda {fmt(fl_ult.get("deuda_neto"), 0)} M USD). BCRA, balance cambiario.</p>
-    <div class="chart">{flujos_svg}</div>
   </div>'''}
 </section>
 
@@ -780,7 +694,7 @@ PERFIL_AR = {
     "codigo": "ar", "titulo": "", "query": "", "blocks": config.IPD_BLOCKS, "variables": VARIABLES,
     # Componente -> variable que lo mide, cuando no tienen el mismo nombre.
     "alias": {"tc_a3500": "tc_oficial_ref", "futuros_oi": "futuros_interes_abierto"},
-    "minis": _minis_ar, "partes": _partes_ar, "fae": True, "metodo": _metodo_ar,
+    "minis": _minis_ar, "fae": True, "metodo": _metodo_ar,
     "metodo_extra": " Las compras de dólares de personas humanas son mensuales, entran al índice un mes después del cierre de cada mes (cuando el BCRA las publica) y se miden contra su promedio de 12 meses, para no confundir la salida del cepo con presión.",
     "nota_variables": "Las reservas y los depósitos se publican con dos o tres días de rezago.",
     "fuentes": """BCRA (reservas, tipo de cambio A3500, BADLAR, depósitos en dólares, anexo del balance cambiario y planilla de reservas y liquidez en moneda extranjera), ArgentinaDatos (dólar MEP, CCL y blue; riesgo país) y A3 Mercados (futuros de dólar). Todas las series se descargan automáticamente.""",

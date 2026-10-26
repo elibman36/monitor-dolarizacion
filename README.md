@@ -63,10 +63,11 @@ descargado, el workflow `.github/workflows/reporte-semanal.yml` actualiza los
 datos y genera un PDF con la semana hábil que terminó (lunes a viernes), así
 queda listo antes del lunes aunque GitHub demore la corrida:
 
-1. el índice al cierre de la semana, un resumen automático y los gráficos del
-   índice (18 meses y desde 2003) y de sus componentes;
-2. la tabla de variables con variación semanal y de 4 semanas, gráficos de los
-   últimos seis meses y compras de USD de personas humanas;
+1. el índice al cierre de la semana y un resumen: qué lo subió y qué lo bajó,
+   en orden de importancia, y cómo se reparte el cambio entre los subíndices;
+2. la tabla de componentes (dato, peso, y variación y puntos del índice en la
+   semana y en 4 semanas), los gráficos del índice y los subíndices (18 meses),
+   los de los últimos seis meses y las compras de USD de personas humanas;
 3. la metodología.
 
 Queda en `reportes/reporte-semanal-AAAA-MM-DD.pdf` (fecha del viernes) y en
