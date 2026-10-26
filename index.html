@@ -182,7 +182,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card-head">
       <h2>Qué explica el índice</h2>
     </div>
-    <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con los dos años anteriores (un canje alto suma aunque no se haya movido); al lado, cuánto se movió en la semana.</p>
+    <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con lo habitual de los dos años anteriores (en negrita): si está por encima suma y si está por debajo resta, aunque en la semana se haya movido para el otro lado (en gris).</p>
     <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
@@ -588,13 +588,16 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       const ph = DATA.monthly && DATA.monthly.compras_personas_humanas;
       if (k === "compras_ph" && ph && ph.length > 1) {
         const u = ph[ph.length - 1], a = ph[ph.length - 2], v = u.netas_usd_millones - a.netas_usd_millones;
-        return `<td class="num">${nf(u.netas_usd_millones, 0)} <span class="muted">M USD en ${u.fecha}</span> <span class="muted">·</span> ${sg(v, 0)} M USD contra el mes anterior</td>`;
+        const prom = ph.slice(-12).reduce((t, x) => t + x.netas_usd_millones, 0) / Math.min(12, ph.length);
+        const dif = u.netas_usd_millones - prom;
+        return `<td class="num">${nf(u.netas_usd_millones, 0)} <span class="muted">M USD en ${u.fecha} · ${sg(v, 0)} M USD contra el mes anterior</span><br><b>${nf(Math.abs(dif), 0)} M USD ${dif > 0 ? "por encima" : "por debajo"} del promedio de 12 meses</b></td>`;
       }
       if (!s || s.last == null) return "<td></td>";
       if ((transform === "dlog" || transform === "diff") && s.data && !/mes/.test(s.unit))
         return `<td class="num">${txtCambio(s, cambioH(s, h.date))} <span class="muted">en ${H} días</span></td>`;
-      // Nivel y, al lado, si subió o bajó en la semana (las series mensuales,
-      // contra el mes anterior).
+      // Nivel, si subió o bajó en la semana (las series mensuales, contra el
+      // mes anterior) y, en negrita, cuánto está por encima o por debajo de lo
+      // habitual (mediana de los dos años anteriores, como el índice).
       const mensual = /mes/.test(s.unit);
       const prev = mensual ? (s.data && s.data.length > 1 ? s.data[s.data.length - 2][1] : null) : s.prev_7d;
       let ch = "";
@@ -602,9 +605,19 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         const usd = /^(millones de USD|M USD)/.test(s.unit), pp = s.unit.startsWith("%"), pb = s.unit === "pb";
         const v = pp || pb || usd ? s.last - prev : (s.last / prev - 1) * 100;
         const txt = Math.abs(v) < 0.05 ? "sin cambios" : pp ? sg(v) + " pp" : pb ? sg(v, 0) + " pb" : usd ? sg(v, 0) + " M USD" : sg(v) + "%";
-        ch = ` <span class="muted">·</span> ${txt} ${mensual ? "contra el mes anterior" : "en la semana"}`;
+        ch = ` · ${txt} ${mensual ? "contra el mes anterior" : "en la semana"}`;
       }
-      return `<td class="num">${nf(s.last, digitsFor(s.unit, s.last))} <span class="muted">${s.unit.split(",")[0]}</span>${ch}</td>`;
+      let hab = "";
+      if (transform === "level" && s.data && s.data.length > 20) {
+        const xs = s.data.slice(-(DATA.config.zscore_window || 504)).map((x) => x[1]).sort((a, b) => a - b);
+        const med = xs[Math.floor(xs.length / 2)];
+        const pp = s.unit.startsWith("%"), pb = s.unit === "pb";
+        const dif = s.last - med;
+        const txt = pp ? nf(Math.abs(dif), 1) + " pp" : pb ? nf(Math.abs(dif), 0) + " pb" : nf(Math.abs(dif) / Math.abs(med) * 100, 0) + "%";
+        hab = Math.abs(dif) < (pp ? 0.05 : pb ? 0.5 : Math.abs(med) * 0.005) ? "<br><b>en lo habitual (mediana de 2 años)</b>"
+          : `<br><b>${txt} ${dif > 0 ? "por encima" : "por debajo"} de lo habitual (mediana de 2 años)</b>`;
+      }
+      return `<td class="num">${nf(s.last, digitsFor(s.unit, s.last))} <span class="muted">${s.unit.split(",")[0]}${ch}</span>${hab}</td>`;
     };
     tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Peso</th><th class="num">Qué mira el índice</th><th class="num">Aporte al índice</th></tr>`;
     const filas = [];

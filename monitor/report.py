@@ -251,7 +251,21 @@ def _que_mide(v: dict | None) -> str:
         var = "sin dato nuevo"
     else:
         var = _txt_var_comp(v, v["d"], v.get("a")) + " en la semana"
-    return f"{fmt(v['v'], v['dec'])} <span class='muted'>{_unidad_corta(v)}</span>{nota} <span class='muted'>·</span> {var}"
+    hab = v.get("habitual")
+    contra = ""
+    if hab and np.isfinite(hab["ref"]) and hab["ref"] != 0:
+        dif = v["v"] - hab["ref"]
+        if v["tipo"] == "pct":
+            txt = f"{fmt(abs(dif) / abs(hab['ref']) * 100, 0)}%"
+        else:
+            txt = _txt_var(abs(dif), v["tipo"], v["dec"]).lstrip("+") + (f" {_unidad_corta(v).replace(' por mes', '')}" if v["tipo"] == "abs" else "")
+        if txt.strip("0,. %pbM USD") == "":
+            return (f"{fmt(v['v'], v['dec'])} <span class='muted'>{_unidad_corta(v)}</span>{nota} "
+                    f"<span class='muted'>· {var}</span><br><b>en lo habitual</b>")
+        lado = "por encima" if dif > 0 else "por debajo"
+        contra = f"<br><b>{txt} {lado} {('del ' + hab['txt'][3:]) if hab['txt'].startswith('el ') else ('de ' + hab['txt'])}</b>"
+    return (f"{fmt(v['v'], v['dec'])} <span class='muted'>{_unidad_corta(v)}</span>{nota} "
+            f"<span class='muted'>· {var}</span>{contra}")
 
 
 def tabla_aportes(blocks_cfg: dict, meta: dict, pts1: dict, sub1: dict, i1: float, datos: dict, perfil: dict,
@@ -416,6 +430,20 @@ def medidas_indice(p: pd.DataFrame, semana: Semana, blocks_cfg: dict, datos: dic
     h = config.IPD_HORIZON
     for b in blocks_cfg.values():
         for c, spec in b["components"].items():
+            # Los que se miden por su nivel se comparan con lo habitual de los dos
+            # años anteriores (la mediana, como el índice); las compras de
+            # personas, con su promedio de 12 meses.
+            if spec.get("transform") in ("level", "desvio_12m"):
+                vk = _var_comp(perfil, c)
+                if vk in datos and vk in p:
+                    x = p[vk][p.index <= semana.viernes].dropna()
+                    if spec["transform"] == "level":
+                        ref = x.tail(config.IPD_ZSCORE_WINDOW).median()
+                        datos[vk]["habitual"] = {"ref": ref, "txt": "lo habitual (mediana de 2 años)"}
+                    else:
+                        ref = x.tail(252).mean()
+                        datos[vk]["habitual"] = {"ref": ref, "txt": "el promedio de 12 meses"}
+                continue
             if spec.get("transform") not in ("dlog", "diff") or spec.get("horizonte", h) != h:
                 continue
             vk = _var_comp(perfil, c)
@@ -443,7 +471,7 @@ def _movimiento(comp: str, label: str, pts: float, datos: dict, perfil: dict) ->
     """"reservas internacionales (−16 M USD en 5 días; +0,1 pts)": lo que el
     índice mira de la variable y cuánto aporta."""
     v = datos.get(_var_comp(perfil, comp))
-    que = re.sub(r"<[^>]+>", "", _que_mide(v)) if v else ""
+    que = re.sub(r"<[^>]+>", "", _que_mide(v).replace("<br>", " · ")) if v else ""
     return f"{_corto(label)} ({que + '; ' if que else ''}{_pts1(pts)} pts)"
 
 
@@ -656,7 +684,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles, o sea en la semana (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con los dos años anteriores (un canje alto suma aunque no se haya movido); al lado, cuánto se movió en la semana. {perfil["nota_variables"]}</p>
+  <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial, las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles, o sea en la semana (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con lo habitual de los dos años anteriores (en negrita): si está por encima suma y si está por debajo resta, aunque en la semana se haya movido para el otro lado (en gris). {perfil["nota_variables"]}</p>
   {tabla_html}
 </section>
 
