@@ -278,9 +278,10 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, pts1: dict, sub1: dict, sub0: di
         vals = [pts1[c] for c in cols if c in pts1 and np.isfinite(pts1[c])]
         return sum(vals) if vals else np.nan
     def fila_100(label, peso, n1, n0, aporte, clase):
-        var = fmt(n1 - n0, 0, signo=True) if np.isfinite(n1) and np.isfinite(n0) else ""
+        # Subíndices e índice: sólo nivel y aporte (su variación en la escala
+        # 0-100 se confundía con el aporte).
         return (f"<tr class='{clase}'><td>{label}</td><td class='num'>{peso}</td>"
-                f"<td class='num'>{fmt(n1, 0)}/100</td><td class='num'>{var}</td><td></td>{_celda_aporte(aporte, True)}</tr>")
+                f"<td class='num'>{fmt(n1, 0)}/100</td><td></td><td></td>{_celda_aporte(aporte, True)}</tr>")
     filas = []
     for bkey, b in blocks_cfg.items():
         cols = [c for c in b["components"] if c in pts1]
