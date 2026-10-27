@@ -572,6 +572,9 @@ table.aportes td.bar i { position: absolute; top: 0; bottom: 0; border-radius: 1
 .method .num { text-align: right; font-variant-numeric: tabular-nums; }
 .apendice td { vertical-align: top; font-size: 7.4pt; line-height: 1.3; padding: 2.5pt 4pt; }
 .apendice tr.sub td { background: #f6f5f1; padding-top: 4pt; }
+.apendice tr.ojo td { color: #52514e; font-size: 7.2pt; padding-top: 0; }
+.apendice tr:has(+ tr.ojo) td { border-bottom: 0; }
+.apendice ul { margin: 0 0 6pt; padding-left: 13pt; color: #333; } .apendice li { margin-bottom: 3pt; }
 a { color: #2a78d6; text-decoration: none; }
 """
 
@@ -745,51 +748,65 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 def _metodo_ar(pca_txt: str, pesos_b: dict | None = None) -> str:
     pesos_sub_txt = (": " + ", ".join(f"{_minus(config.IPD_BLOCKS[b]['label'])} {fmt(w * 100, 0)}%" for b, w in pesos_b.items())
                      if pesos_b else "")
-    return f"""<p>El Índice de Dolarización adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano, para que un episodio extremo no infle la escala). Para el oficial, las reservas, la BADLAR, los depósitos en dólares y el riesgo país, que se miden por su cambio en 5 días hábiles, el centro es cero y no la mediana: así una semana en que las reservas suben siempre resta presión, y una en que caen siempre suma (con la escala de sus dos años anteriores). Los componentes se agrupan en tres subíndices: <b>presión cambiaria</b> (tipo de cambio oficial descontada la inflación, su volatilidad, reservas, tasa en pesos, brecha MEP / oficial y futuros de dólar vendidos por el BCRA, que son intervención como la venta de reservas), <b>dolarización de portafolios</b> (devaluación implícita y posición abierta en futuros de dólar, depósitos en dólares y compras de dólares de personas humanas: la demanda de cobertura) y <b>extranjerización de portafolios</b> (canje CCL / MEP, volatilidad del CCL y riesgo país). Dentro de cada subíndice, los pesos salen de componentes principales: cada componente pesa según cuánto se mueve junto con el resto (cargas del primer componente principal de los promedios mensuales desde 2003). Los tres subíndices se ponderan con el mismo método{pesos_sub_txt}. Las cargas negativas valen cero y ningún componente pesa menos del 10% de su subíndice. Varianza explicada por el primer componente: {pca_txt}.</p>"""
+    return f"""<p>El Índice de Dolarización adapta el <i>Exchange Market Pressure Index</i> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión y se compara con los últimos dos años (mediana y desvío absoluto mediano, para que un episodio extremo no infle la escala). Para el oficial, las reservas, la BADLAR, los depósitos en dólares y el riesgo país, que se miden por su cambio en 5 días hábiles, el centro es cero y no la mediana: así una semana en que las reservas suben siempre resta presión, y una en que caen siempre suma (con la escala de sus dos años anteriores). Los componentes se agrupan en tres subíndices: <b>presión cambiaria</b> (tipo de cambio oficial descontada la inflación, su volatilidad, reservas, tasa en pesos, brecha MEP / oficial y futuros de dólar vendidos por el BCRA, que son intervención como la venta de reservas), <b>dolarización de portafolios</b> (devaluación implícita y posición abierta en futuros de dólar, depósitos en dólares y compras de dólares de personas humanas: la demanda de cobertura) y <b>extranjerización de portafolios</b> (canje CCL / MEP, volatilidad del CCL y riesgo país). Dentro de cada subíndice, los pesos salen de componentes principales: cada componente pesa según cuánto se mueve junto con el resto (cargas del primer componente principal de los promedios mensuales desde 2003). Los tres subíndices se ponderan con el mismo método{pesos_sub_txt}. Las cargas negativas valen cero, ningún componente pesa menos del 10% de su subíndice y ninguno pesa más del 10% del índice (lo que excede se reparte entre los demás, para que un subíndice con pocas variables no concentre el índice en dos o tres). Varianza explicada por el primer componente: {pca_txt}.</p>"""
 
 
 # Apéndice metodológico: para cada componente, cómo se mide y qué significa que
-# empuje el índice hacia arriba (más presión) o hacia abajo (alivio).
+# empuje el índice hacia arriba (más presión) o hacia abajo (alivio), y el caso
+# que puede parecer contraintuitivo (p. ej. una variable que sube pero resta).
 APENDICE_AR = {
     "tc_a3500": ("Variación del dólar oficial mayorista (A3500) en 5 días hábiles, descontada la inflación (CER).",
                  "El oficial subió más que los precios: el peso se deprecia en términos reales.",
-                 "El oficial subió menos que los precios (o bajó): apreciación real; un dólar que acompaña a la inflación no es presión."),
+                 "El oficial subió menos que los precios (o bajó): apreciación real; un dólar que acompaña a la inflación no es presión.",
+                 "Si el dólar sube 1% en la semana pero los precios suben 2%, resta: se abarató en términos reales. El CER sigue la inflación con un mes de rezago."),
     "vol_oficial": ("Volatilidad del oficial en los últimos 20 días hábiles, comparada con la de los dos años anteriores.",
                     "El oficial se mueve más que lo habitual: incertidumbre sobre el precio del dólar.",
-                    "El oficial se mueve menos que lo habitual: calma en el mercado oficial."),
+                    "El oficial se mueve menos que lo habitual: calma en el mercado oficial.",
+                    "Cuenta su nivel, no si subió: si la volatilidad sube en la semana pero sigue por debajo de lo habitual, resta (y al revés)."),
     "reservas": ("Variación de las reservas brutas del BCRA en 5 días hábiles.",
                  "Las reservas cayeron: el BCRA pierde poder de fuego para defender el peso.",
-                 "Las reservas subieron: el BCRA acumula respaldo."),
+                 "Las reservas subieron: el BCRA acumula respaldo.",
+                 "Cuenta sólo hacia dónde se movieron en la semana, no su nivel: si suben, restan aunque sean bajas. También cuentan pagos de deuda o desembolsos de organismos."),
     "tasa": ("Variación de la tasa BADLAR de bancos privados en 5 días hábiles (puntos porcentuales).",
              "Subió la tasa en pesos: hace falta pagar más para que no se pasen al dólar (defensa del peso).",
-             "Bajó la tasa en pesos: no hace falta convalidar tasas altas para sostener el peso."),
+             "Bajó la tasa en pesos: no hace falta convalidar tasas altas para sostener el peso.",
+             "Una suba de tasa suma presión aunque busque contenerla: se lee como señal de que hizo falta defender el peso."),
     "brecha_mep": ("Brecha entre el dólar MEP y el oficial, comparada con los dos años anteriores.",
                    "La brecha está por encima de lo habitual: el mercado paga más por el dólar libre que por el oficial.",
-                   "La brecha está por debajo de lo habitual: el oficial y el MEP están alineados."),
+                   "La brecha está por debajo de lo habitual: el oficial y el MEP están alineados.",
+                   "Cuenta su nivel: si la brecha sube en la semana pero sigue por debajo de lo habitual, resta."),
     "posicion_bcra": ("Cambio en un mes de la posición vendida en futuros de dólar del BCRA (planilla de reservas). Una posición comprada cuenta como cero.",
                       "El BCRA vendió más futuros: interviene ofreciendo cobertura para contener la devaluación esperada, presión que no se ve en el precio.",
-                      "El BCRA redujo su posición vendida: necesita intervenir menos."),
+                      "El BCRA redujo su posición vendida: necesita intervenir menos.",
+                      "Dato mensual, que se repite hasta el siguiente. Cuenta el cambio en el mes, no el tamaño: una posición grande que se está desarmando resta."),
     "deval_implicita": ("Devaluación anual implícita en los futuros de dólar a 90 días (A3 Mercados), comparada con los dos años anteriores.",
                         "Los futuros anticipan más devaluación que lo habitual: el mercado espera un dólar más caro.",
-                        "Los futuros anticipan menos devaluación que lo habitual."),
+                        "Los futuros anticipan menos devaluación que lo habitual.",
+                        "Cuenta su nivel: si la devaluación esperada sube en la semana pero sigue por debajo de lo habitual, resta."),
     "futuros_oi": ("Contratos abiertos en futuros de dólar (promedio de 21 días hábiles), comparados con los dos años anteriores.",
                    "Hay más contratos abiertos que lo habitual: más gente busca cubrirse contra una devaluación.",
-                   "Hay menos contratos abiertos que lo habitual: menos demanda de cobertura."),
+                   "Hay menos contratos abiertos que lo habitual: menos demanda de cobertura.",
+                   "Cuenta su nivel: más contratos que la semana anterior pero menos que lo habitual, resta."),
     "depositos_usd": ("Variación de los depósitos en dólares del sector privado en 5 días hábiles.",
                       "Cayeron los depósitos en dólares: retiran dólares de los bancos, señal de desconfianza.",
-                      "Crecieron los depósitos en dólares: más confianza en el sistema."),
+                      "Crecieron los depósitos en dólares: más confianza en el sistema.",
+                      "Cuenta sólo el movimiento de la semana: si crecen, restan aunque haya otras señales de dolarización."),
     "compras_ph": ("Compras netas de dólares de personas humanas en el mes (FAE, balance cambiario del BCRA), comparadas con su promedio de 12 meses. Entra un mes después, cuando el BCRA la publica.",
                    "Las personas compran más dólares que su promedio del último año: dolarización del ahorro.",
-                   "Compran menos dólares que su promedio del último año."),
+                   "Compran menos dólares que su promedio del último año.",
+                   "Se compara con su promedio de 12 meses: si las compras suben en el mes pero siguen debajo de ese promedio, resta. Es dato mensual y llega con un mes de rezago."),
     "canje": ("Diferencia entre el dólar CCL y el MEP, comparada con los dos años anteriores.",
               "El canje está por encima de lo habitual: se paga más por tener los dólares afuera que adentro (preferencia por sacarlos del país).",
-              "El canje está por debajo de lo habitual: tener dólares afuera no tiene premio."),
+              "El canje está por debajo de lo habitual: tener dólares afuera no tiene premio.",
+              "Cuenta su nivel: si el canje sube en la semana pero sigue por debajo de lo habitual, resta."),
     "vol_ccl": ("Volatilidad del CCL en los últimos 20 días hábiles, comparada con la de los dos años anteriores.",
                 "El CCL se mueve más que lo habitual: incertidumbre en el dólar financiero.",
-                "El CCL se mueve menos que lo habitual."),
+                "El CCL se mueve menos que lo habitual.",
+                "Cuenta su nivel: si la volatilidad sube en la semana pero sigue por debajo de lo habitual, resta (y al revés)."),
     "riesgo_pais": ("Variación del riesgo país (EMBI Argentina) en 5 días hábiles, en puntos básicos.",
                     "Subió el riesgo país: los inversores ven más riesgo en la deuda argentina y aumenta el incentivo a salir de activos locales.",
-                    "Bajó el riesgo país: mejora la confianza en los activos argentinos."),
+                    "Bajó el riesgo país: mejora la confianza en los activos argentinos.",
+                    "Cuenta sólo el movimiento de la semana: si baja, resta aunque esté alto; si sube, suma aunque esté bajo."),
 }
 
 
@@ -803,16 +820,23 @@ def apendice(perfil: dict, meta: dict) -> str:
         for c, spec in b["components"].items():
             if c not in textos:
                 continue
-            como, sube, baja = textos[c]
+            como, sube, baja, ojo = textos[c]
             peso = meta.get(c, {}).get("weight_ipd")
             peso_txt = f"<br><span class='muted'>{fmt(peso * 100, 1)}% del índice</span>" if peso else ""
             filas.append(f"<tr><td><b>{html.escape(spec['label'])}</b>{peso_txt}</td><td>{html.escape(como)}</td>"
-                         f"<td>{html.escape(sube)}</td><td>{html.escape(baja)}</td></tr>")
+                         f"<td>{html.escape(sube)}</td><td>{html.escape(baja)}</td></tr>"
+                         f"<tr class='ojo'><td></td><td colspan='3'><b>Ojo:</b> {html.escape(ojo)}</td></tr>")
     if not filas:
         return ""
     return f"""<section class="page method apendice">
   <h2>Apéndice metodológico: qué mueve el índice</h2>
-  <p>Cada componente suma puntos al índice cuando indica más presión sobre el peso (lo hace <b>subir</b>, hacia la depreciación) y resta cuando indica alivio (lo hace <b>bajar</b>, hacia la apreciación). Los que se miden por su variación (oficial, reservas, BADLAR, depósitos en dólares y riesgo país) suman o restan según hacia dónde se movieron en la semana. Los que se miden por su nivel (volatilidades, brecha, canje, futuros) suman cuando están por encima de lo habitual de los dos años anteriores y restan cuando están por debajo, aunque en la semana se hayan movido para el otro lado. Cuánto pesa cada movimiento depende de qué tan grande es frente a los movimientos de esa variable en los dos años anteriores y del peso del componente.</p>
+  <p>Cada componente suma puntos cuando indica más presión sobre el peso (empuja el índice hacia <b>arriba</b>, hacia la depreciación) y resta cuando indica alivio (lo empuja hacia <b>abajo</b>). Que una variable <i>suba</i> no quiere decir que sume: depende de contra qué se la compara. Hay tres casos.</p>
+  <ul>
+    <li><b>Por su movimiento en la semana</b> (oficial, reservas, BADLAR, depósitos en dólares y riesgo país; los futuros vendidos por el BCRA, por su movimiento en el mes). Importa hacia dónde se movieron, no su nivel: unas reservas que suben siempre restan, aunque sean bajas, y un riesgo país que sube siempre suma, aunque esté bajo.</li>
+    <li><b>Por su nivel frente a lo habitual</b> (volatilidades del oficial y del CCL, brecha, canje, devaluación implícita y posición abierta en futuros). Se comparan con la mediana de los dos años anteriores. Suman si están por encima y restan si están por debajo, aunque en la semana se hayan movido para el otro lado: una volatilidad que sube pero sigue por debajo de lo habitual <i>resta</i>, porque todavía es más baja que lo normal.</li>
+    <li><b>Contra una referencia</b>. El oficial se mide contra la inflación (CER): si sube menos que los precios, resta aunque haya subido. Las compras de dólares de personas humanas se miden contra su promedio de 12 meses: si suben pero siguen debajo de ese promedio, restan.</li>
+  </ul>
+  <p>Cuánto suma o resta depende de qué tan grande es el movimiento (o la distancia a lo habitual) frente a lo que esa variable suele moverse en los dos años anteriores, y del peso del componente en el índice.</p>
   <table><thead><tr><th style="width:17%">Componente</th><th style="width:27%">Cómo se mide</th><th style="width:28%">Lo hace subir (más presión)</th><th style="width:28%">Lo hace bajar (alivio)</th></tr></thead><tbody>{"".join(filas)}</tbody></table>
 </section>"""
 

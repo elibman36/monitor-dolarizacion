@@ -296,6 +296,11 @@ def compute_ipd(df: pd.DataFrame, blocks_cfg: dict | None = None,
         if pca is not None:
             pesos_bloques, var_expl = pca
             pesos_info["_subindices"] = {"varianza_explicada": var_expl}
+    if config.IPD_PESO_MAXIMO:
+        pesos, pesos_bloques = apply_max_weight_ipd(pesos, pesos_bloques, config.IPD_PESO_MAXIMO)
+        for bkey in pesos:
+            zb = pd.DataFrame({k: components[k] for k in pesos[bkey]})
+            blocks[bkey] = _weighted_mean(zb, pesos[bkey], config.IPD_MIN_WEIGHT_SHARE_BLOQUE).reindex(df.index)
     ipd = _weighted_mean(blocks, pesos_bloques)
     ipd = ipd.reindex(df.index)
     # Antes de IPD_PUBLICAR_DESDE los datos sólo sirven de ventana de referencia.
@@ -408,6 +413,39 @@ def apply_min_weight(w: pd.Series, minimo: float) -> pd.Series:
             return pd.concat([pd.Series(minimo, index=w.index[fijos]), nuevo]).reindex(w.index)
         fijos[nuevo.index[bajo]] = True
     return pd.Series(1 / len(w), index=w.index)
+
+
+def apply_max_weight(w: pd.Series, maximo: float) -> pd.Series:
+    """Pone un tope a cada peso y reparte el exceso entre los demás en proporción.
+
+    Se repite hasta que ninguno quede por encima (puede pasar al reescalar).
+    """
+    if not maximo or maximo * len(w) <= 1:
+        return w
+    w = w / w.sum()
+    fijos = pd.Series(False, index=w.index)
+    for _ in range(len(w)):
+        resto = 1 - maximo * fijos.sum()
+        base = w[~fijos]
+        nuevo = base / base.sum() * resto
+        alto = nuevo > maximo
+        if not alto.any():
+            return pd.concat([pd.Series(maximo, index=w.index[fijos]), nuevo]).reindex(w.index)
+        fijos[nuevo.index[alto]] = True
+    return pd.Series(1 / len(w), index=w.index)
+
+
+def apply_max_weight_ipd(pesos: dict[str, dict[str, float]], pesos_bloques: dict[str, float],
+                         maximo: float) -> tuple[dict[str, dict[str, float]], dict[str, float]]:
+    """Tope al peso de cada componente en el índice (peso del bloque x peso en
+    el bloque). Devuelve los pesos dentro de cada bloque y los de los bloques
+    que resultan, para que el índice siga siendo el promedio de los subíndices."""
+    total = sum(pesos_bloques.get(b, 0) for b in pesos)
+    g = pd.Series({(b, c): pesos_bloques.get(b, 0) / total * w for b, ws in pesos.items() for c, w in ws.items()})
+    g = apply_max_weight(g, maximo)
+    nuevos_b = {b: float(g[b].sum()) for b in pesos}
+    nuevos = {b: {c: float(g[(b, c)] / nuevos_b[b]) for c in ws} for b, ws in pesos.items()}
+    return nuevos, nuevos_b
 
 
 def pressure_index(ipd: pd.Series) -> tuple[pd.Series, float]:

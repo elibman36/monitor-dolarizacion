@@ -711,3 +711,14 @@ def test_mail_del_reporte(tmp_path):
     assert "54/100" in partes["text/plain"].get_payload(decode=True).decode()
     assert "<b>tranquila</b>" in partes["text/html"].get_payload(decode=True).decode()
     assert partes["application/pdf"].get_filename() == pdf.name
+
+
+def test_tope_de_peso_por_componente():
+    from monitor import indicators
+    pesos = {"a": {"x": 0.5, "y": 0.5}, "b": {"z": 0.1, "w": 0.3, "v": 0.3, "u": 0.3}}
+    nuevos, bloques = indicators.apply_max_weight_ipd(pesos, {"a": 0.5, "b": 0.5}, 0.2)
+    g = {(b, c): bloques[b] * w for b, ws in nuevos.items() for c, w in ws.items()}
+    assert max(g.values()) <= 0.2 + 1e-9
+    assert abs(sum(g.values()) - 1) < 1e-9
+    assert all(abs(sum(ws.values()) - 1) < 1e-9 for ws in nuevos.values())
+    assert g[("b", "w")] > 0.15  # el exceso se reparte entre los que no tocan el tope

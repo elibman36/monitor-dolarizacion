@@ -174,6 +174,10 @@ IPD_PCA_MIN_OBS = 24        # meses mínimos en común entre dos componentes
 # Peso mínimo de cada componente dentro de su bloque: ninguno queda afuera
 # aunque la PCA le asigne carga nula o negativa (p. ej. riesgo país).
 IPD_PCA_PESO_MINIMO = 0.10
+# Peso máximo de cada componente en el índice: lo que excede se reparte entre
+# los demás en proporción a su peso. Sin tope, un subíndice con pocos
+# componentes (extranjerización) concentra mucho peso en dos o tres variables.
+IPD_PESO_MAXIMO = 0.10
 
 # Cada componente lleva dos frases para el resumen escrito del reporte: qué
 # está pasando cuando suma presión y cuándo resta ("habitual" = últimos 2 años).
