@@ -457,26 +457,9 @@ def racconto(viernes: pd.Timestamp, dir_: Path | None = None) -> str:
     return "".join(bloques)
 
 
-def _movimiento(comp: str, label: str, pts: float, datos: dict, perfil: dict) -> str:
-    """"canje (+0,3 pp en la semana; +11,3 pts)": cómo se movió la variable en
-    la semana y cuánto aporta al índice."""
-    v = datos.get(_var_comp(perfil, comp))
-    va, vp = _var_semana(v)
-    que = va if va in ("", "sin dato nuevo", "–") else va + " en la semana"
-    if v and v.get("infl") is not None and va not in ("", "sin dato nuevo", "–"):
-        que = f"{re.sub(r'<[^>]+>', '', vp).split(' (')[0]} en la semana"
-    # Los que se miden por su nivel: cuánto están por encima o por debajo de lo
-    # habitual, que es lo que define su aporte (aunque en la semana se hayan
-    # movido para el otro lado).
-    hab = (v or {}).get("habitual")
-    if hab is not None and np.isfinite(hab) and hab:
-        dif = v["v"] - hab
-        if v["tipo"] == "pct":
-            txt = f"{fmt(abs(dif) / abs(hab) * 100, 0)}%"
-        else:
-            txt = _txt_var(abs(dif), v["tipo"], v["dec"]).lstrip("+") + (f" {_unidad_corta(v).replace(' por mes', '')}" if v["tipo"] == "abs" else "")
-        que = f"{txt} {'por encima' if dif > 0 else 'por debajo'} de lo habitual"
-    return f"{_corto(label)} ({que + '; ' if que else ''}{_pts1(pts)} pts)"
+def _movimiento(label: str, pts: float) -> str:
+    """"canje (+11,3 pts)": cuánto aporta la variable al índice."""
+    return f"{_corto(label)} ({_pts1(pts)} pts)"
 
 
 def _corto(label: str) -> str:
@@ -511,14 +494,12 @@ def resumen(indice, semana, pts_cierre, datos, perfil: dict | None = None, pts_p
         for signo, titulo in ((1, "Lo empujan hacia arriba"), (-1, "Lo empujan hacia abajo")):
             comps = sorted((k for k in pc if signo * pc[k] >= 0.1), key=lambda k: -abs(pc[k]))[:5]
             if comps:
-                puntos.append(f"<b>{titulo}</b>: " + "; ".join(_movimiento(k, labels[k], pc[k], datos, perfil) for k in comps) + ".")
+                puntos.append(f"<b>{titulo}</b>: " + "; ".join(_movimiento(labels[k], pc[k]) for k in comps) + ".")
         por_bloque = []
         for k, b in blocks_cfg.items():
             if not any(c in pc for c in b["components"]):
                 continue
-            s1, s0 = (subs or {}).get(k, (np.nan, np.nan))
-            nivel = f"{fmt(s1, 0)}/100; " if np.isfinite(s1) else ""
-            por_bloque.append(f"{_minus(b['label'])} ({nivel}{_pts1(sum(pc[c] for c in b['components'] if c in pc))} pts)")
+            por_bloque.append(f"{_minus(b['label'])} ({_pts1(sum(pc[c] for c in b['components'] if c in pc))} pts)")
         puntos.append("<b>Subíndices</b>: " + "; ".join(por_bloque) + ".")
     return puntos
 
@@ -545,7 +526,6 @@ h2 { font-size: 11pt; margin: 0 0 2pt; }
 .kv { display: grid; grid-template-columns: auto auto; gap: 2pt 8pt; margin-top: 8pt; font-size: 8pt; color: #52514e; }
 .kv b { color: #0b0b0b; text-align: right; }
 ul.res { margin: 4pt 0 0; padding-left: 13pt; } ul.res li { margin-bottom: 3pt; }
-.nota-res { margin: 5pt 0 0; padding-top: 4pt; border-top: 1px solid #e1e0d9; color: #898781; font-size: 7.5pt; }
 .chart svg, .chart img { width: 100%; height: auto; display: block; }
 .note { color: #898781; font-size: 7.5pt; margin: 0 0 4pt; }
 .racconto p { margin: 4pt 0 0; font-size: 9.5pt; line-height: 1.5; }
@@ -705,7 +685,6 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
   <div class="card">
     <h2>Resumen de la semana</h2>
     <ul class="res">{"".join(f"<li>{x}</li>" for x in puntos)}</ul>
-    <p class="nota-res">Los puntos son lo que cada parte suma o resta al índice, que arranca en 50: suman la distancia del índice a 50. Entre paréntesis, cuánto se movió cada variable en la semana o, para las que el índice mira por su nivel (volatilidades, canje, brecha, futuros, compras de personas), cuánto se apartan de lo habitual de los últimos dos años.</p>
   </div>
 </section>
 
