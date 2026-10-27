@@ -295,7 +295,8 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, pts1: dict, sub1: dict, sub0: di
             filas.append(f"<tr><td class='comp'>{html.escape(b['components'][c]['label'])}</td>"
                          f"<td class='num muted'>{fmt((w or 0) * 100, 0)}%</td><td class='num'>{_nivel(v)}</td>"
                          f"<td class='num{' muted' if va == 'sin dato nuevo' else ''}'>{va}</td><td class='num'>{vp}</td>{_celda_aporte(pts1[c])}</tr>")
-    filas.append(fila_100("Índice", "100%", i1, i0, i1 - 50, "tot"))
+    filas.append(fila_100("Índice", "100%", i1, i0, i1 - 50, "tot").replace(
+        "</td></tr>", f"<br><span class='muted' style='font-weight:400'>({fmt(i1, 1)} − 50)</span></td></tr>"))
     cab = ("<thead><tr><th>Subíndice y componente</th><th class='num'>Peso</th><th class='num'>Nivel</th>"
            "<th class='num'>Variación en la semana</th><th class='num'>Variación %</th><th class='num'>Aporte al índice</th></tr></thead>")
     return f"<table class='vars aportes'>{cab}<tbody>{''.join(filas)}</tbody></table>"
@@ -462,7 +463,18 @@ def _movimiento(comp: str, label: str, pts: float, datos: dict, perfil: dict) ->
     va, vp = _var_semana(v)
     que = va if va in ("", "sin dato nuevo", "–") else va + " en la semana"
     if v and v.get("infl") is not None and va not in ("", "sin dato nuevo", "–"):
-        que = f"{re.sub(r'<[^>]+>', '', vp).split(' (')[0]} en la semana contra {fmt(v['infl'], 1)}% de inflación"
+        que = f"{re.sub(r'<[^>]+>', '', vp).split(' (')[0]} en la semana"
+    # Los que se miden por su nivel: cuánto están por encima o por debajo de lo
+    # habitual, que es lo que define su aporte (aunque en la semana se hayan
+    # movido para el otro lado).
+    hab = (v or {}).get("habitual")
+    if hab is not None and np.isfinite(hab) and hab:
+        dif = v["v"] - hab
+        if v["tipo"] == "pct":
+            txt = f"{fmt(abs(dif) / abs(hab) * 100, 0)}%"
+        else:
+            txt = _txt_var(abs(dif), v["tipo"], v["dec"]).lstrip("+") + (f" {_unidad_corta(v).replace(' por mes', '')}" if v["tipo"] == "abs" else "")
+        que = f"{txt} {'por encima' if dif > 0 else 'por debajo'} de lo habitual"
     return f"{_corto(label)} ({que + '; ' if que else ''}{_pts1(pts)} pts)"
 
 
@@ -504,7 +516,7 @@ def resumen(indice, semana, pts_cierre, datos, perfil: dict | None = None, pts_p
             if not any(c in pc for c in b["components"]):
                 continue
             s1, s0 = (subs or {}).get(k, (np.nan, np.nan))
-            nivel = f"{fmt(s1, 0)}/100, {fmt(s1 - s0, 0, signo=True)} en la semana; " if np.isfinite(s1) and np.isfinite(s0) else ""
+            nivel = f"{fmt(s1, 0)}/100; " if np.isfinite(s1) else ""
             por_bloque.append(f"{_minus(b['label'])} ({nivel}{_pts1(sum(pc[c] for c in b['components'] if c in pc))} pts)")
         puntos.append("<b>Subíndices</b>: " + "; ".join(por_bloque) + ".")
     return puntos
@@ -628,6 +640,13 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     sub_svg = chart_subindices(indice, [(blocks_cfg[b]["label"], p[f"indice_bloque_{b}"], colores_sub[b]) for b in sub1], semana) if sub1 else ""
 
     tabla, datos = tabla_variables(p, semana, perfil["variables"])
+    for b in blocks_cfg.values():
+        for c, spec in b["components"].items():
+            vk = _var_comp(perfil, c)
+            if spec.get("transform") in ("level", "desvio_12m") and vk in datos and vk in p:
+                x = p[vk][p.index <= semana.viernes].dropna()
+                datos[vk]["habitual"] = (x.tail(config.IPD_ZSCORE_WINDOW).median() if spec["transform"] == "level"
+                                         else x.tail(252).mean())
     # Inflación de la semana (CER), para comparar con la depreciación del oficial.
     if "cer" in p and "tc_oficial_ref" in datos:
         _, c1 = _hasta(p["cer"], semana.viernes)
@@ -685,7 +704,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
   <div class="card">
     <h2>Resumen de la semana</h2>
     <ul class="res">{"".join(f"<li>{x}</li>" for x in puntos)}</ul>
-    <p class="nota-res">Los puntos son lo que cada parte suma o resta al índice, que arranca en 50: suman la distancia del índice a 50. Entre paréntesis, cuánto se movió cada variable en la semana.</p>
+    <p class="nota-res">Los puntos son lo que cada parte suma o resta al índice, que arranca en 50: suman la distancia del índice a 50. Entre paréntesis, cuánto se movió cada variable en la semana o, para las que el índice mira por su nivel (volatilidades, canje, brecha, futuros, compras de personas), cuánto se apartan de lo habitual de los últimos dos años.</p>
   </div>
 </section>
 
