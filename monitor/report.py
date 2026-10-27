@@ -294,6 +294,10 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, i1: floa
             filas.append(f"<tr><td class='comp'>{html.escape(b['components'][c]['label'])}</td>"
                          f"<td class='num muted'>{fmt((w or 0) * 100, 0)}%</td><td class='num'>{_nivel(v)}</td>"
                          f"<td class='num{' muted' if va == 'sin dato nuevo' else ''}'>{va}</td><td class='num'>{vp}</td>{_celda_aporte(dpts[c])}</tr>")
+    if PREVIO in dpts and np.isfinite(dpts[PREVIO]):
+        filas.append(f"<tr class='sub'><td colspan='5'>{PREVIO_LABEL}"
+                     "<br><span class='muted' style='font-weight:400'>Lo que hicieron la semana anterior el oficial, las reservas, la BADLAR, los depósitos y el riesgo país</span></td>"
+                     f"{_celda_aporte(dpts[PREVIO], True)}</tr>")
     filas.append(fila_100("Índice", "100%", i1, i1 - i0, "tot").replace(
         "</td></tr>", f"<br><span class='muted' style='font-weight:400'>(de {fmt(i0, 1)} a {fmt(i1, 1)})</span></td></tr>"))
     cab = ("<thead><tr><th>Subíndice y componente</th><th class='num'>Peso</th><th class='num'>Nivel</th>"
@@ -473,6 +477,7 @@ def resumen(indice, semana, dpts: dict, perfil: dict | None = None) -> list[str]
     _, i0 = _hasta(indice, semana.viernes - pd.Timedelta(days=7))
     tramo = indicators.status_for(i1)[1].lower()
     labels = {c: spec["label"] for b in blocks_cfg.values() for c, spec in b["components"].items()}
+    labels[PREVIO] = PREVIO_LABEL
     puntos = []
     if np.isfinite(i1):
         txt = f"El índice cerró la semana en <b>{fmt(i1, 0)}/100</b> ({tramo})"
@@ -496,6 +501,8 @@ def resumen(indice, semana, dpts: dict, perfil: dict | None = None) -> list[str]
             if not any(c in pc for c in b["components"]):
                 continue
             por_bloque.append(f"{_minus(b['label'])} ({_pts1(sum(pc[c] for c in b['components'] if c in pc))} pts)")
+        if PREVIO in pc:
+            por_bloque.append(f"semana anterior ({_pts1(pc[PREVIO])} pts)")
         puntos.append("<b>Por subíndice</b>: " + "; ".join(por_bloque) + ".")
     return puntos
 
@@ -595,29 +602,47 @@ def _minis_ar(p: pd.DataFrame, semana: Semana) -> list[str]:
 
 
 
-def cambio_por_componente(p: pd.DataFrame, semana: Semana, meta: dict, comps: list[str]) -> dict[str, float]:
+# Clave de la línea con lo que deja de contar de la semana anterior.
+PREVIO = "_semana_anterior"
+PREVIO_LABEL = "Movimientos de la semana anterior que dejan de contar"
+
+
+def cambio_por_componente(p: pd.DataFrame, semana: Semana, meta: dict, comps: list[str],
+                          blocks_cfg: dict | None = None) -> dict[str, float]:
     """Cuántos puntos movió cada componente al índice en la semana.
 
     El cambio del índice se reparte en proporción a peso x cambio del z-score
     de cada componente: una variable que no se movió (p. ej. un dato mensual
-    sin publicación nueva) no mueve el índice. Los puntos suman el cambio del
-    índice. Si faltan los z-scores, se usa la diferencia de los aportes.
+    sin publicación nueva) no mueve el índice. Los que entran por su
+    movimiento de la semana, centrados en cero (reservas, riesgo país...),
+    muestran sólo lo de esta semana, con su signo: unas reservas que suben
+    siempre restan. Lo que esos hicieron la semana anterior, que el índice
+    deja de mirar, va junto en la clave PREVIO. Todo suma el cambio del índice.
     """
+    blocks_cfg = blocks_cfg or config.IPD_BLOCKS
+    flujo = {c for b in blocks_cfg.values() for c, spec in b["components"].items() if spec.get("centro_cero")}
     _, i1 = _hasta(p["indice_0_100"], semana.viernes)
     _, i0 = _hasta(p["indice_0_100"], semana.viernes - pd.Timedelta(days=7))
-    lineal = {}
+    z = {}
     for c in comps:
         if f"z_{c}" not in p:
             continue
         _, z1 = _hasta(p[f"z_{c}"], semana.viernes)
         _, z0 = _hasta(p[f"z_{c}"], semana.viernes - pd.Timedelta(days=7))
-        w = meta.get(c, {}).get("weight_ipd") or 0
-        lineal[c] = w * (z1 - z0) if np.isfinite(z1) and np.isfinite(z0) else 0.0
-    total = sum(lineal.values())
-    if len(lineal) == len(comps) and np.isfinite(i1 - i0) and total * (i1 - i0) > 0:
-        return {c: v / total * (i1 - i0) for c, v in lineal.items()}
-    previo = {c: _hasta(p[f"pts_{c}"], semana.viernes - pd.Timedelta(days=7))[1] for c in comps}
-    return {c: _hasta(p[f"pts_{c}"], semana.viernes)[1] - previo[c] for c in comps}
+        z[c] = (z1 if np.isfinite(z1) else 0.0, z0 if np.isfinite(z0) else 0.0, meta.get(c, {}).get("weight_ipd") or 0)
+    total = sum(w * (z1 - z0) for z1, z0, w in z.values())
+    if len(z) == len(comps) and np.isfinite(i1 - i0) and total * (i1 - i0) > 0:
+        k = (i1 - i0) / total
+        out = {c: k * w * (z1 if c in flujo else z1 - z0) for c, (z1, z0, w) in z.items()}
+        out[PREVIO] = -k * sum(w * z0 for c, (z1, z0, w) in z.items() if c in flujo)
+        return out
+    # Sin z-scores: diferencia de los aportes (los de flujo, su aporte de hoy).
+    def pts(c, f):
+        return _hasta(p[f"pts_{c}"], f)[1]
+    previo = semana.viernes - pd.Timedelta(days=7)
+    out = {c: pts(c, semana.viernes) - (0 if c in flujo else pts(c, previo)) for c in comps}
+    out[PREVIO] = -sum(pts(c, previo) for c in comps if c in flujo)
+    return out
 
 
 def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict | None = None) -> str:
@@ -636,7 +661,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     pts_cierre = {c: _hasta(p[f"pts_{c}"], semana.viernes)[1] for c in labels if f"pts_{c}" in p}
     sub1 = {b: _hasta(p[f"indice_bloque_{b}"], semana.viernes)[1] for b in blocks_cfg if f"indice_bloque_{b}" in p}
     colores_sub = dict(zip(blocks_cfg, [S1, S2, S3]))
-    dpts = cambio_por_componente(p, semana, meta, list(pts_cierre))
+    dpts = cambio_por_componente(p, semana, meta, list(pts_cierre), blocks_cfg)
     sub_dpts = {b: sum(dpts[c] for c in blocks_cfg[b]["components"] if c in dpts and np.isfinite(dpts[c]))
                 for b in blocks_cfg}
     subs_hero = "".join(
@@ -717,7 +742,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note"><b>Nivel</b> y <b>variación</b>: el dato de cada variable al viernes {fecha_larga(semana.viernes)} (o el último publicado) y cuánto cambió en la semana. {perfil["nota_variables"]} <b>Cambio del índice</b>: cuántos puntos subió (rojo) o bajó (azul) el índice en la semana por cada variable; suman el cambio del índice. El oficial (contra la inflación, medida por el CER), las reservas, la BADLAR, los depósitos y el riesgo país entran al índice por su movimiento de la semana: lo mueven si se movieron más o menos que la semana anterior (si el riesgo país sube lo mismo dos semanas seguidas, el índice no cambia por él). El resto entra por su nivel: si sube, sube el índice. Más detalle en el apéndice.</p>
+  <p class="note"><b>Nivel</b> y <b>variación</b>: el dato de cada variable al viernes {fecha_larga(semana.viernes)} (o el último publicado) y cuánto cambió en la semana. {perfil["nota_variables"]} <b>Cambio del índice</b>: cuántos puntos subió (rojo) o bajó (azul) el índice en la semana por cada variable; suman el cambio del índice. Las variables de nivel (volatilidades, brecha, canje, futuros) mueven el índice según cuánto cambiaron: si suben, lo suben. El oficial (contra la inflación, medida por el CER), las reservas, la BADLAR, los depósitos y el riesgo país entran por su movimiento de los últimos 5 días, centrado en cero: muestran lo que hicieron esta semana, con su signo (unas reservas que suben siempre restan). Lo que hicieron la semana anterior deja de contar y va en una línea aparte. Más detalle en el apéndice.</p>
   {tabla_html}
 </section>
 
@@ -772,21 +797,24 @@ def _metodo_ar(pca_txt: str, pesos_b: dict | None = None) -> str:
 # subir o bajar en la semana y el caso que puede parecer contraintuitivo.
 APENDICE_AR = {
     "tc_a3500": ("Variación del dólar oficial mayorista (A3500) en 5 días hábiles, descontada la inflación (CER).",
-                 "La depreciación real fue mayor que la de la semana anterior: el oficial le ganó más a la inflación, o le perdió menos.",
-                 "La depreciación real fue menor que la de la semana anterior: el oficial le ganó menos a la inflación, o le perdió más.",
-                 "Si el dólar sube 1% y los precios 2%, se abarató en términos reales: cuenta como alivio aunque el dólar haya subido. El CER sigue la inflación con un mes de rezago."),
+                 "El oficial subió más que la inflación: el peso se deprecia en términos reales.",
+                 "El oficial subió menos que la inflación, o bajó: apreciación real.",
+                 "Si el dólar sube 1% y los precios 2%, se abarató en términos reales: resta aunque el dólar haya subido. El CER sigue la inflación con un mes de rezago. Lo que hizo la semana anterior va en la línea aparte."),
+
     "vol_oficial": ("Volatilidad del oficial en los últimos 20 días hábiles, comparada con la de los dos años anteriores.",
                     "Subió la volatilidad del oficial: más incertidumbre sobre el precio del dólar.",
                     "Bajó la volatilidad del oficial: más calma en el mercado oficial.",
                     "Entra por su nivel: si sube en la semana, sube el índice, aunque siga por debajo de lo habitual (en ese caso, el índice la sigue leyendo como calma, pero menos que antes)."),
     "reservas": ("Variación de las reservas brutas del BCRA en 5 días hábiles.",
-                 "Las reservas cayeron, o subieron menos que la semana anterior.",
-                 "Las reservas subieron más que la semana anterior, o cayeron menos.",
-                 "Entra por su movimiento de la semana, así que lo que mueve el índice es la comparación con la semana anterior. Si la semana anterior subieron 500 M y esta 100 M, el índice sube: siguen dando alivio, pero menos. También cuentan pagos de deuda o desembolsos de organismos."),
+                 "Las reservas cayeron: el BCRA pierde poder de fuego para defender el peso.",
+                 "Las reservas subieron: el BCRA acumula respaldo.",
+                 "Entra por su movimiento de los últimos 5 días, centrado en cero: si suben, restan siempre, aunque sean bajas. También cuentan pagos de deuda o desembolsos de organismos."),
+
     "tasa": ("Variación de la tasa BADLAR de bancos privados en 5 días hábiles (puntos porcentuales).",
-             "La tasa en pesos subió más que la semana anterior (o bajó menos): hizo falta pagar más para que no se pasen al dólar.",
-             "La tasa en pesos subió menos que la semana anterior, o bajó.",
-             "Una suba de tasa cuenta como presión aunque busque contenerla: se lee como señal de que hizo falta defender el peso. Entra por su movimiento de la semana, así que lo que mueve el índice es la comparación con la semana anterior."),
+             "Subió la tasa en pesos: hace falta pagar más para que no se pasen al dólar (defensa del peso).",
+             "Bajó la tasa en pesos: no hace falta convalidar tasas altas para sostener el peso.",
+             "Una suba de tasa suma presión aunque busque contenerla: se lee como señal de que hizo falta defender el peso. Entra por su movimiento de los últimos 5 días, centrado en cero."),
+
     "brecha_mep": ("Brecha entre el dólar MEP y el oficial, comparada con los dos años anteriores.",
                    "Subió la brecha: el mercado paga más por el dólar libre que por el oficial.",
                    "Bajó la brecha: el oficial y el MEP se acercan.",
@@ -804,9 +832,10 @@ APENDICE_AR = {
                    "Bajó la posición abierta: menos demanda de cobertura.",
                    "Se usa el promedio de 21 días para filtrar los saltos por vencimientos: el dato del día puede subir mientras el promedio baja. Entra por su nivel: si sube en la semana, sube el índice, aunque siga por debajo de lo habitual (en ese caso, el índice la sigue leyendo como calma, pero menos que antes)."),
     "depositos_usd": ("Variación de los depósitos en dólares del sector privado en 5 días hábiles.",
-                      "Los depósitos cayeron, o crecieron menos que la semana anterior.",
-                      "Los depósitos crecieron más que la semana anterior, o cayeron menos.",
-                      "Entra por su movimiento de la semana, así que lo que mueve el índice es la comparación con la semana anterior. Si crecen 200 M una semana y 100 M la siguiente, el índice sube: siguen dando alivio, pero menos."),
+                      "Cayeron los depósitos en dólares: retiran dólares de los bancos, señal de desconfianza.",
+                      "Crecieron los depósitos en dólares: más confianza en el sistema.",
+                      "Entra por su movimiento de los últimos 5 días, centrado en cero: si crecen, restan siempre, aunque haya otras señales de dolarización."),
+
     "compras_ph": ("Compras netas de dólares de personas humanas en el mes (FAE, balance cambiario del BCRA), comparadas con su promedio de 12 meses. Entra un mes después, cuando el BCRA la publica.",
                    "Las personas compraron más dólares que el mes anterior.",
                    "Las personas compraron menos dólares que el mes anterior.",
@@ -820,9 +849,10 @@ APENDICE_AR = {
                 "Bajó la volatilidad del CCL.",
                 "Entra por su nivel: si sube en la semana, sube el índice, aunque siga por debajo de lo habitual (en ese caso, el índice la sigue leyendo como calma, pero menos que antes)."),
     "riesgo_pais": ("Variación del riesgo país (EMBI Argentina) en 5 días hábiles, en puntos básicos.",
-                    "El riesgo país subió más que la semana anterior (o bajó menos).",
-                    "El riesgo país subió menos que la semana anterior, o bajó.",
-                    "Entra por su movimiento de la semana, así que lo que mueve el índice es la comparación con la semana anterior. Si sube 60 pb dos semanas seguidas, sigue sumando presión, pero el índice no cambia por él: la presión es la misma que la semana anterior."),
+                    "Subió el riesgo país: más riesgo en la deuda argentina y más incentivo a salir de activos locales.",
+                    "Bajó el riesgo país: mejora la confianza en los activos argentinos.",
+                    "Entra por su movimiento de los últimos 5 días, centrado en cero: si sube, suma siempre, aunque esté bajo; si baja, resta aunque esté alto."),
+
 }
 
 
@@ -846,10 +876,10 @@ def apendice(perfil: dict, meta: dict) -> str:
         return ""
     return f"""<section class="page method apendice">
   <h2>Apéndice metodológico: qué mueve el índice</h2>
-  <p>El índice mide cuánta presión hay sobre el peso: arriba de 50, presión hacia la depreciación; abajo, alivio. El reporte muestra cuántos puntos movió cada variable el índice en la semana, y esos puntos suman el cambio del índice. Lo que mueve el índice depende de cómo entra cada variable:</p>
+  <p>El índice mide cuánta presión hay sobre el peso: arriba de 50, presión hacia la depreciación; abajo, alivio. El reporte muestra cuántos puntos movió cada variable el índice en la semana; junto con la línea de la semana anterior, suman el cambio del índice. Lo que mueve el índice depende de cómo entra cada variable:</p>
   <ul>
     <li><b>Por su nivel</b> (volatilidades del oficial y del CCL, brecha, canje, devaluación implícita y posición abierta en futuros). Si la variable sube en la semana, el índice sube; si baja, baja. Que esté por encima o por debajo de lo habitual de los dos años anteriores define si, en el nivel, cuenta como presión o como calma: una volatilidad baja que sube empuja el índice hacia arriba, aunque todavía cuente como calma.</li>
-    <li><b>Por su movimiento de la semana</b> (oficial contra la inflación, reservas, BADLAR, depósitos en dólares y riesgo país). Acá la presión es el movimiento: unas reservas que caen son presión y unas que suben, alivio. Por eso lo que mueve el índice es la comparación con la semana anterior. Si las reservas suben menos que la semana pasada, el índice sube: siguen dando alivio, pero menos. Si el riesgo país sube lo mismo dos semanas seguidas, el índice no cambia por él.</li>
+    <li><b>Por su movimiento de la semana</b> (oficial contra la inflación, reservas, BADLAR, depósitos en dólares y riesgo país). Se miden por cuánto se movieron en los últimos 5 días, centrado en cero: la presión es el movimiento. Cada una muestra lo que hizo esta semana, con su signo: unas reservas que suben siempre restan y un riesgo país que sube siempre suma. Como el índice mira sólo los últimos 5 días, lo que estas variables hicieron la semana anterior deja de contar: eso va en una línea aparte, “Movimientos de la semana anterior que dejan de contar”. Por ejemplo, si la semana anterior las reservas subieron mucho, ese alivio sale del índice y esa línea suma.</li>
     <li><b>Contra una referencia</b>. El oficial se mide contra la inflación (CER): si sube menos que los precios, cuenta como alivio aunque haya subido. Las compras de dólares de personas humanas se miden contra su promedio de 12 meses.</li>
   </ul>
   <p>Cuánto mueve el índice cada variable depende de qué tan grande es su cambio frente a lo que suele moverse en los dos años anteriores, y de su peso.</p>
