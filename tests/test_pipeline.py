@@ -246,6 +246,7 @@ def test_reporte_semanal_html(fake_api):
     html_txt = report.construir_html(semana, p, payload)
     assert "Reporte semanal" in html_txt and "/100" in html_txt
     assert "Qué explica el índice" in html_txt and "Aporte al índice" in html_txt and "Variación en la semana" in html_txt and "<svg" in html_txt
+    assert "Apéndice metodológico" in html_txt and "Lo hace subir" in html_txt
 
 
 def test_pca_weights():
