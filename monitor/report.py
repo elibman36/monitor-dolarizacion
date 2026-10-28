@@ -531,7 +531,7 @@ h2 { font-size: 11pt; margin: 0 0 2pt; }
 ul.res { margin: 4pt 0 0; padding-left: 13pt; } ul.res li { margin-bottom: 3pt; }
 .chart svg, .chart img { width: 100%; height: auto; display: block; }
 .note { color: #898781; font-size: 7.5pt; margin: 0 0 4pt; }
-.racconto p { margin: 4pt 0 0; font-size: 9.5pt; line-height: 1.5; }
+.racconto p { margin: 4pt 0 6pt; font-size: 9.5pt; line-height: 1.5; }
 .racconto ul { margin: 4pt 0 0; padding-left: 14pt; } .racconto li { margin: 2pt 0; }
 .racconto h3 { font-size: 9.5pt; margin: 8pt 0 0; }
 table.vars { width: 100%; border-collapse: collapse; font-size: 8.3pt; }
@@ -704,14 +704,10 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
   </div>
   <div class="card">
     <h2>Resumen de la semana</h2>
+    {f"<div class='racconto'>{texto_semana}</div>" if texto_semana else ""}
     <ul class="res">{"".join(f"<li>{x}</li>" for x in puntos)}</ul>
   </div>
 </section>
-
-{f'''<section class="section card racconto">
-  <h2>La semana</h2>
-  {texto_semana}
-</section>''' if texto_semana else ""}
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
@@ -827,7 +823,7 @@ def apendice(perfil: dict, meta: dict) -> str:
     if not filas:
         return ""
     return f"""<section class="page method apendice">
-  <h2>Apéndice metodológico: qué mueve el índice</h2>
+  <h2>Qué mueve el índice</h2>
   <p>El índice mide cuánta presión hay sobre el peso: arriba de 50, presión hacia la depreciación; abajo, alivio. El reporte muestra primero cuántos puntos empuja cada variable el índice por encima o por debajo de 50 (suman la distancia del índice a 50) y después cuánto lo movió frente a la semana anterior. Lo que mueve el índice depende de cómo entra cada variable:</p>
   <ul>
     <li><b>Por su nivel</b> (volatilidades del oficial y del CCL, brecha, canje, devaluación implícita y posición abierta en futuros). Si la variable sube en la semana, el índice sube; si baja, baja. Que esté por encima o por debajo de lo habitual de los dos años anteriores define si, en el nivel, cuenta como presión o como calma: una volatilidad baja que sube empuja el índice hacia arriba, aunque todavía cuente como calma.</li>
