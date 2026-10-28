@@ -260,7 +260,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     { title: "Brecha MEP / oficial y canje (CCL / MEP)", keys: ["brecha_mep", "canje"], names: ["Brecha MEP / oficial", "Canje CCL / MEP"], unit: "%" },
     { title: "Volatilidad cambiaria (20 días)", keys: ["vol_oficial", "vol_ccl"], names: ["Oficial", "CCL"], unit: "% anualizada" },
     { title: "Riesgo país", keys: ["riesgo_pais"], unit: "pb" },
-    { title: "Reservas internacionales brutas", keys: ["reservas"], unit: "millones de USD" },
+    { title: "Reservas internacionales", keys: ["reservas", "reservas_netas", "reservas_netas_sin_fmi"],
+      names: ["Brutas", "Netas", "Netas sin FMI"],
+      unit: "millones de USD", nota: "Netas según la planilla de reservas del BCRA (formato FMI): brutas menos encajes en dólares, depósitos del Tesoro, préstamos del BIS, swap con China y pases. Sin FMI: además, sin lo girado por el programa de abril de 2025. Dato de fin de mes." },
     { title: "Tasa BADLAR (bancos privados)", keys: ["tasa"], unit: "% n.a." },
     { title: "Devaluación implícita en futuros (90 días)", keys: ["deval_implicita"], unit: "% TNA" },
     { title: "Interés abierto en futuros de dólar", keys: ["futuros_interes_abierto"], unit: "contratos" },
@@ -636,7 +638,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       const avail = m.keys.filter((k) => DATA.series[k]);
       const card = document.createElement("div");
       card.className = "card";
-      card.innerHTML = `<h2>${m.title}</h2><p class="note">${m.unit}${avail.length ? " · " + [...new Set(avail.map((k) => DATA.series[k].source))].join(" / ") : ""}</p><div class="chart small" id="m-${idx}"></div>`;
+      card.innerHTML = `<h2>${m.title}</h2><p class="note">${m.unit}${avail.length ? " · " + [...new Set(avail.map((k) => DATA.series[k].source))].join(" / ") : ""}${m.nota && avail.length > 1 ? ". " + m.nota : ""}</p><div class="chart small" id="m-${idx}"></div>`;
       box.appendChild(card);
       if (!avail.length) {
         return emptyState(`m-${idx}`, "Serie no disponible en la fuente.");

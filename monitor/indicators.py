@@ -117,6 +117,32 @@ def posicion_bcra_mensual(posicion: pd.DataFrame | None) -> pd.Series:
     return s[~s.index.duplicated(keep="last")].sort_index()
 
 
+def reservas_netas_mensual(planilla: pd.DataFrame | None, fmi: pd.DataFrame | None) -> dict[str, pd.Series]:
+    """Reservas netas a fin de mes (planilla de reservas del BCRA, formato
+    FMI): brutas menos los pasivos del BCRA a menos de un año (encajes en
+    dólares, depósitos del Tesoro, BIS, swap con China, pases). Y las mismas
+    sin lo girado por el programa con el FMI de abril de 2025."""
+    vacio = pd.Series(dtype=float, index=pd.DatetimeIndex([], name="fecha"))
+    cols = {"reservas_brutas_usd_millones", "pasivos_cp_bcra_usd_millones"}
+    if planilla is None or planilla.empty or not cols <= set(planilla.columns):
+        return {"reservas_netas": vacio, "reservas_netas_sin_fmi": vacio}
+    fechas = pd.to_datetime(planilla["fecha"].astype(str).str[:7] + "-01") + pd.offsets.MonthEnd(0)
+    brutas = pd.to_numeric(planilla["reservas_brutas_usd_millones"], errors="coerce").to_numpy()
+    pasivos = pd.to_numeric(planilla["pasivos_cp_bcra_usd_millones"], errors="coerce").to_numpy()
+    netas = pd.Series(brutas + pasivos, index=fechas, name="reservas_netas").dropna()
+    netas = netas[~netas.index.duplicated(keep="last")].sort_index()
+    netas.index.name = "fecha"
+    girado = pd.Series(0.0, index=netas.index)
+    if fmi is not None and not fmi.empty:
+        g = pd.Series(pd.to_numeric(fmi["girado_usd_millones"], errors="coerce").to_numpy(),
+                      index=pd.to_datetime(fmi["fecha"].astype(str).str[:7] + "-01") + pd.offsets.MonthEnd(0))
+        girado = g.reindex(netas.index)
+        # Antes del programa no hay nada que descontar; después, un mes sin dato queda sin calcular.
+        girado[girado.index < pd.Timestamp("2025-04-01")] = 0.0
+    sin_fmi = (netas - girado).dropna().rename("reservas_netas_sin_fmi")
+    return {"reservas_netas": netas, "reservas_netas_sin_fmi": sin_fmi}
+
+
 def posicion_bcra_daily(posicion: pd.DataFrame | None, index: pd.DatetimeIndex) -> pd.Series:
     """La posición de cada fin de mes entra POSICION_BCRA_REZAGO_DIAS después,
     cuando el BCRA publica la planilla, y se mantiene hasta la siguiente."""

@@ -586,14 +586,24 @@ a { color: #2a78d6; text-decoration: none; }
 """
 
 
-def _minis_ar(p: pd.DataFrame, semana: Semana) -> list[str]:
+def _serie_payload(payload: dict | None, key: str) -> pd.Series | None:
+    datos = ((payload or {}).get("series", {}).get(key) or {}).get("data")
+    if not datos:
+        return None
+    return pd.Series([v for _, v in datos], index=pd.to_datetime([f for f, _ in datos]), dtype=float)
+
+
+def _minis_ar(p: pd.DataFrame, semana: Semana, payload: dict | None = None) -> list[str]:
     return [
         chart_mini([("Oficial", p["tc_oficial_ref"], S1), ("MEP", p.get("usd_mep"), S2), ("CCL", p.get("usd_ccl"), S3)],
                    "Tipo de cambio", "$ por USD", semana),
         chart_mini([("Brecha MEP", p.get("brecha_mep"), S1), ("Canje", p.get("canje"), S2)],
                    "Brecha MEP / oficial y canje", "%", semana),
         chart_mini([("Riesgo país", p["riesgo_pais"], S1)], "Riesgo país", "pb", semana),
-        chart_mini([("Reservas", p["reservas"], S1)], "Reservas brutas", "millones de USD", semana),
+        # Netas: dato de fin de mes de la planilla de reservas (formato FMI).
+        chart_mini([("Brutas", p["reservas"], S1), ("Netas", _serie_payload(payload, "reservas_netas"), S2),
+                    ("Netas sin FMI", _serie_payload(payload, "reservas_netas_sin_fmi"), S3)],
+                   "Reservas", "millones de USD", semana),
         chart_mini([("Futuros", p.get("deval_implicita"), S1)], "Devaluación implícita", "% TNA a 90 días", semana),
         # Cada contrato es de USD 1.000: miles de contratos = millones de USD.
         chart_mini([("Posición abierta", p.get("futuros_interes_abierto") / 1000 if "futuros_interes_abierto" in p else None, S1),
@@ -716,7 +726,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     leyenda = "".join(f"<span style='--c:{TRAMO_COLOR[k]}'>{html.escape(l)} ({lo}–{int(min(hi, 100))})</span>"
                       for lo, hi, k, l in config.INDICE_TRAMOS)
 
-    minis = perfil["minis"](p, semana)
+    minis = perfil["minis"](p, semana, payload)
     compras = payload.get("monthly", {}).get("compras_personas_humanas", []) if perfil.get("fae") else []
     ph_svg = chart_compras_ph(compras)
     ph_ult = compras[-1] if compras else None

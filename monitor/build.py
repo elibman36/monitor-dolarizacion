@@ -171,12 +171,44 @@ def load_flujos_financieros() -> pd.DataFrame:
 
 
 POSICION_BCRA_CACHE = "posicion_futuros_bcra"
+FMI_PROGRAMA_CACHE = "fmi_programa_2025"
 
 
 def _meses_planilla(hoy: pd.Timestamp) -> list[str]:
     """Meses cerrados desde BCRA_PLANILLA_DESDE hasta el anterior a `hoy`."""
     fin = (hoy.to_period("M") - 1)
     return [str(p) for p in pd.period_range(config.BCRA_PLANILLA_DESDE, fin, freq="M")]
+
+
+def load_fmi_programa(offline: bool) -> pd.DataFrame:
+    """Monto girado del programa con el FMI de abril de 2025 a cada fin de mes,
+    en millones de USD. Se baja sólo lo que falta (un mes cerrado no cambia)."""
+    path = config.SERIES_DIR / f"{FMI_PROGRAMA_CACHE}.csv"
+    cached = pd.read_csv(path, dtype={"fecha": str}) if path.exists() else pd.DataFrame()
+    if offline:
+        return cached
+    tengo = set(cached["fecha"]) if not cached.empty else set()
+    hoy = pd.Timestamp(datetime.now(timezone.utc).date())
+    nuevos = []
+    for mes in pd.period_range("2025-04", hoy.to_period("M") - 1, freq="M"):
+        if str(mes) in tengo:
+            continue
+        try:
+            fila = sources.fmi_programa_girado(mes.end_time.strftime("%Y-%m-%d"))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("FMI, programa %s: %s", mes, exc)
+            break
+        # Desde abril de 2025 siempre hay algo girado: un cero es que no se leyó.
+        if fila is None or not fila.get("girado_deg_millones"):
+            log.warning("FMI, programa %s: no se leyó el monto girado o el tipo de cambio del DEG", mes)
+            break
+        nuevos.append(fila)
+    if nuevos:
+        cached = pd.concat([cached, pd.DataFrame(nuevos)]).drop_duplicates("fecha", keep="last").sort_values("fecha")
+        config.SERIES_DIR.mkdir(parents=True, exist_ok=True)
+        cached.to_csv(path, index=False)
+        log.info("FMI, programa 2025: %d meses nuevos", len(nuevos))
+    return cached
 
 
 def load_posicion_bcra(offline: bool) -> pd.DataFrame:
@@ -192,7 +224,9 @@ def load_posicion_bcra(offline: bool) -> pd.DataFrame:
         return cached
     meta = _downloads_meta()
     no_disponibles = set(meta.get(f"{POSICION_BCRA_CACHE}_no_disponibles", []))
-    tengo = set(cached["fecha"]) if not cached.empty else set()
+    # Las reservas brutas y los pasivos de corto plazo se agregaron después: si
+    # el cache no los tiene, se vuelve a bajar toda la historia una vez.
+    tengo = set(cached["fecha"]) if not cached.empty and "pasivos_cp_bcra_usd_millones" in cached else set()
     hoy = pd.Timestamp(datetime.now(timezone.utc).date())
     meses = _meses_planilla(hoy)
     recientes = set(meses[-config.BCRA_PLANILLA_REINTENTAR_MESES:])
@@ -292,6 +326,10 @@ SERIES_META = {
     "deval_implicita": ("Devaluación implícita en futuros a 90 días", "% TNA", "A3 Mercados"),
     "deval_implicita_mensual": ("Devaluación mensual implícita en futuros (90 días)", "% mensual", "A3 Mercados"),
     "futuros_interes_abierto": ("Posición abierta en futuros de dólar", "contratos (USD 1.000 c/u)", "A3 Mercados"),
+    "reservas_netas": ("Reservas netas (brutas menos pasivos del BCRA a menos de un año)", "millones de USD (fin de mes)",
+                       "BCRA, planilla de reservas (formato FMI)"),
+    "reservas_netas_sin_fmi": ("Reservas netas sin los giros del programa con el FMI de 2025", "millones de USD (fin de mes)",
+                               "BCRA y FMI"),
     "posicion_bcra": ("Posición vendida neta del BCRA en futuros de dólar", "millones de USD (fin de mes)",
                       "BCRA, Planilla de Reservas Internacionales y Liquidez en Moneda Extranjera"),
 }
@@ -462,7 +500,8 @@ def run(offline: bool = False) -> dict:
 
     # La posición del BCRA se publica con su fecha real (fin de mes), no con
     # la de entrada al índice.
-    publicar = {**daily, "posicion_bcra": indicators.posicion_bcra_mensual(posicion_bcra)}
+    publicar = {**daily, "posicion_bcra": indicators.posicion_bcra_mensual(posicion_bcra),
+                **indicators.reservas_netas_mensual(posicion_bcra, load_fmi_programa(offline))}
     payload = build_payload(panel, ipd, compras, status, publicar, flujos=load_flujos_financieros())
 
     # Panel diario completo, útil para análisis en Excel / R / Stata.

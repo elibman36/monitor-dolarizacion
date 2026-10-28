@@ -94,8 +94,11 @@ def fake_api(monkeypatch, tmp_path):
         if mes < "2025-01" or mes == "2025-06":  # 2025-06: mes sin PDF
             return None
         return {"fecha": mes, "cortas_usd_millones": -1000.0, "largas_usd_millones": 0.0,
-                "vendida_neta_usd_millones": 1000.0}
+                "vendida_neta_usd_millones": 1000.0, "reservas_brutas_usd_millones": 40000.0,
+                "pasivos_cp_bcra_usd_millones": -35000.0}
     monkeypatch.setattr(sources, "bcra_planilla_reservas", fake_planilla)
+    monkeypatch.setattr(sources, "fmi_programa_girado", lambda f: {
+        "fecha": f[:7], "girado_deg_millones": 9000.0, "usd_por_deg": 1.35, "girado_usd_millones": 12150.0})
     monkeypatch.setattr(config, "BCRA_PLANILLA_DESDE", "2024-06")
     monkeypatch.setattr(config, "DATA_DIR", tmp_path)
     monkeypatch.setattr(config, "SERIES_DIR", tmp_path / "series")
@@ -115,6 +118,10 @@ def test_run_end_to_end(fake_api):
     # Paginación: todas las fechas hábiles de 2025 en adelante, sin duplicados.
     assert fut["fecha"].nunique() == sum(1 for x in syn["fechas"] if x.year >= 2025)
     assert not fut.duplicated(["fecha", "contrato"]).any()
+    netas = dict(payload["series"]["reservas_netas"]["data"])
+    sin_fmi = dict(payload["series"]["reservas_netas_sin_fmi"]["data"])
+    assert netas["2025-03-31"] == 5000.0 and sin_fmi["2025-03-31"] == 5000.0  # antes del programa
+    assert sin_fmi["2025-04-30"] == 5000.0 - 12150.0
     h = payload["headline"]
     assert h["ipd"] is not None
     # El shock simulado debe verse como presión alta al inicio del episodio.
@@ -298,6 +305,18 @@ def test_parse_planilla_reservas():
     cero = vacia.replace("Posiciones cortas\n", "Posiciones cortas 0.00\n")
     assert sources.parse_planilla_reservas(cero)["vendida_neta_usd_millones"] == 0.0
     assert sources.parse_planilla_reservas("sin datos") is None
+    con_netas = nueva.replace("(b) Instrumentos", (
+        "A. Activos de reserva oficiales 46.091,73\n(1) Reservas en moneda extranjera 37.686,95\n"
+        "II. Flujos netos predeterminados a corto plazo de activos en divisas (valor nominal)\n"
+        "1. Préstamos en moneda extranjera, valores, y depósitos 6 -16.754,11 -14.618,06 0,00 -2.136,04 23.786,79\n"
+        "2. Posiciones agregadas cortas y largas de contratos a término y de futuros en moneda extranjera con\n"
+        "respecto a la moneda local (incluído el componente a término de los swaps de monedas)7\n"
+        "-19.384,47 0,00 0,00 -19.384,47\n(a) Posiciones cortas ( - ) -19.384,47\n"
+        "3. Otros (especificar) -2.488,33 -110,00 -626,87 -1.751,46\nIII. Flujos contigentes\n(b) Instrumentos"))
+    c = sources.parse_planilla_reservas(con_netas)
+    assert c["reservas_brutas_usd_millones"] == pytest.approx(46091.73)
+    assert c["pasivos_cp_bcra_usd_millones"] == pytest.approx(-38626.91)
+    assert c["vendida_neta_usd_millones"] == pytest.approx(6278.46)
 
 
 def test_posicion_bcra_rezago():
