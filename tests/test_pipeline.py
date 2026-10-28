@@ -738,3 +738,20 @@ def test_cambio_semanal_suma_y_respeta_el_signo_de_los_flujos():
     assert d["reservas"] < 0          # suben las reservas: resta, aunque subieron menos que antes
     assert d["canje"] > 0
     assert d[report.PREVIO] > 0       # sale el alivio de la semana anterior
+
+
+def test_flujo_acumulado_suma_con_su_signo_y_se_borra():
+    from monitor import indicators
+    idx = pd.bdate_range("2022-01-03", periods=930)
+    rng = np.random.default_rng(3)
+    d = np.r_[rng.normal(0, 300, 900), np.full(20, 200.0), np.full(10, 0.0)]
+    res = pd.Series(30000 + np.cumsum(d), index=idx)
+    z, acum = indicators.flujo_acumulado(res, {"transform": "dlog", "sign": -1}, 21)
+    # Mientras el BCRA compra, la presión baja semana a semana (no se queda
+    # quieta como con el movimiento de 5 días).
+    semanas = z.iloc[[899, 904, 909, 914, 919]]
+    assert (semanas.diff().dropna() < 0).all()
+    # Cuando deja de comprar, lo acumulado se borra de a poco: sube, pero no
+    # vuelve a cero de golpe.
+    assert z.iloc[919] < z.iloc[924] < z.iloc[929] < 0
+    assert (acum["noticia"].iloc[920:] == 0).all()

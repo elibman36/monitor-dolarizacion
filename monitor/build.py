@@ -405,6 +405,7 @@ def build_payload(panel: pd.DataFrame, ipd: dict, compras: pd.DataFrame,
             "pca": {b: {"varianza_explicada": _clean(v["varianza_explicada"])}
                     for b, v in ipd["pesos_info"].items()},
             "horizon": config.IPD_HORIZON,
+            "flujos_vida_media": config.IPD_FLUJOS_VIDA_MEDIA,
             "zscore_window": config.IPD_ZSCORE_WINDOW,
             "percentile_window": config.IPD_PERCENTILE_WINDOW,
             "indice_suavizado": config.INDICE_SUAVIZADO,
@@ -477,6 +478,9 @@ def run(offline: bool = False) -> dict:
         out_panel[f"z_{c}"] = ipd["components"][c]
     for c in ipd["aportes"].columns:
         out_panel[f"pts_{c}"] = ipd["aportes"][c]
+    for c, a in ipd.get("acumulados", {}).items():
+        out_panel[f"noticia_{c}"] = a["noticia"]
+        out_panel[f"escala_{c}"] = a["escala"]
     out_panel.to_csv(config.DATA_DIR / "panel_diario.csv", date_format="%Y-%m-%d", float_format="%.6g")
 
     config.OUTPUT_JSON.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

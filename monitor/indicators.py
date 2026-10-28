@@ -262,6 +262,7 @@ def compute_ipd(df: pd.DataFrame, blocks_cfg: dict | None = None,
     block_series: dict[str, pd.Series] = {}
     pesos: dict[str, dict[str, float]] = {}
     pesos_info: dict[str, dict] = {}
+    acumulados: dict[str, pd.DataFrame] = {}
     for bkey, block in blocks_cfg.items():
         zs = {}
         for ckey, spec in block["components"].items():
@@ -270,12 +271,15 @@ def compute_ipd(df: pd.DataFrame, blocks_cfg: dict | None = None,
             serie = df[ckey]
             if "piso" in spec:
                 serie = serie.clip(lower=spec["piso"])
-            x = transform(serie, spec["transform"], spec.get("horizonte", h)) * spec["sign"]
-            # Un componente puede pedir un recorte más estricto (p. ej. una
-            # intervención esporádica, que contra una ventana casi toda en cero
-            # da desvíos extremos).
-            z = rolling_z(x, config.IPD_ZSCORE_WINDOW, config.IPD_ZSCORE_MIN_OBS, spec.get("clip", config.IPD_Z_CLIP),
-                          centro_cero=spec.get("centro_cero", False))
+            if spec.get("centro_cero") and config.IPD_FLUJOS_VIDA_MEDIA:
+                z, acumulados[ckey] = flujo_acumulado(serie, spec, config.IPD_FLUJOS_VIDA_MEDIA)
+            else:
+                x = transform(serie, spec["transform"], spec.get("horizonte", h)) * spec["sign"]
+                # Un componente puede pedir un recorte más estricto (p. ej. una
+                # intervención esporádica, que contra una ventana casi toda en
+                # cero da desvíos extremos).
+                z = rolling_z(x, config.IPD_ZSCORE_WINDOW, config.IPD_ZSCORE_MIN_OBS, spec.get("clip", config.IPD_Z_CLIP),
+                              centro_cero=spec.get("centro_cero", False))
             if z.dropna().empty:
                 continue
             zs[ckey] = z
@@ -329,6 +333,7 @@ def compute_ipd(df: pd.DataFrame, blocks_cfg: dict | None = None,
         "n_componentes": n_comp,
         "blocks": blocks,
         "components": comps,
+        "acumulados": acumulados,
     }
 
 
@@ -413,6 +418,28 @@ def apply_min_weight(w: pd.Series, minimo: float) -> pd.Series:
             return pd.concat([pd.Series(minimo, index=w.index[fijos]), nuevo]).reindex(w.index)
         fijos[nuevo.index[bajo]] = True
     return pd.Series(1 / len(w), index=w.index)
+
+
+def flujo_acumulado(serie: pd.Series, spec: dict, vida_media: float) -> tuple[pd.Series, pd.DataFrame]:
+    """Componente de flujo acumulado: cada movimiento diario (estandarizado
+    contra cero) se suma a un acumulado que se borra con la vida media dada, y
+    el acumulado se estandariza con su desvío histórico (sin mirar el futuro).
+    Devuelve el z-score y, para repartir el cambio semanal, el movimiento
+    diario estandarizado ("noticia") y la escala del acumulado."""
+    rho = 0.5 ** (1 / vida_media)
+    x = transform(serie.ffill(), spec["transform"], 1) * spec["sign"]
+    noticia = rolling_z(x, config.IPD_ZSCORE_WINDOW, config.IPD_ZSCORE_MIN_OBS, spec.get("clip", config.IPD_Z_CLIP),
+                        centro_cero=True)
+    valores = noticia.fillna(0.0).to_numpy()
+    acum = np.zeros(len(valores))
+    a = 0.0
+    for i, v in enumerate(valores):
+        a = rho * a + v
+        acum[i] = a
+    acum = pd.Series(acum, index=serie.index).where(noticia.notna().cummax())
+    escala = acum.where(acum != 0).expanding(config.IPD_ZSCORE_WINDOW).std().shift(1)
+    z = (acum / escala.where(escala > 0)).clip(-config.IPD_Z_CLIP, config.IPD_Z_CLIP)
+    return z, pd.DataFrame({"noticia": noticia.fillna(0.0), "escala": escala})
 
 
 def apply_max_weight(w: pd.Series, maximo: float) -> pd.Series:

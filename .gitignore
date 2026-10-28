@@ -3,3 +3,7 @@ __pycache__/
 reportes/ultimo.html
 reportes/*/ultimo.html
 reportes/ultimo.eml
+
+# Versión alternativa (flujos acumulados): se regenera con python -m monitor.alternativo
+data/alternativo/
+reportes/alternativo/ultimo.*

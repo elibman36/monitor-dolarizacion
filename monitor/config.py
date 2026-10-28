@@ -179,6 +179,14 @@ IPD_PCA_PESO_MINIMO = 0.10
 # componentes (extranjerización) concentra mucho peso en dos o tres variables.
 IPD_PESO_MAXIMO = 0.10
 
+# Flujos acumulados (versión alternativa, apagada por defecto). Con None, los
+# componentes centro_cero entran por su movimiento de IPD_HORIZON días. Con un
+# número de días hábiles, cada movimiento diario se suma a un acumulado que se
+# va borrando con esa vida media: así una semana en que las reservas suben
+# siempre baja el índice, aunque suban menos que la anterior (lo de antes no
+# sale de golpe a los 5 días, se borra de a poco).
+IPD_FLUJOS_VIDA_MEDIA = None
+
 # Cada componente lleva dos frases para el resumen escrito del reporte: qué
 # está pasando cuando suma presión y cuándo resta ("habitual" = últimos 2 años).
 IPD_BLOCKS = {

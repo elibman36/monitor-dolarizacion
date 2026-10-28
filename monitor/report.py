@@ -295,8 +295,8 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, i1: floa
                          f"<td class='num muted'>{fmt((w or 0) * 100, 0)}%</td><td class='num'>{_nivel(v)}</td>"
                          f"<td class='num{' muted' if va == 'sin dato nuevo' else ''}'>{va}</td><td class='num'>{vp}</td>{_celda_aporte(dpts[c])}</tr>")
     if PREVIO in dpts and np.isfinite(dpts[PREVIO]):
-        filas.append(f"<tr class='sub'><td colspan='5'>{PREVIO_LABEL}"
-                     "<br><span class='muted' style='font-weight:400'>Lo que hicieron la semana anterior el oficial, las reservas, la BADLAR, los depósitos y el riesgo país</span></td>"
+        filas.append(f"<tr class='sub'><td colspan='5'>{perfil.get('previo_label', PREVIO_LABEL)}"
+                     f"<br><span class='muted' style='font-weight:400'>{perfil.get('previo_nota', PREVIO_NOTA)}</span></td>"
                      f"{_celda_aporte(dpts[PREVIO], True)}</tr>")
     filas.append(fila_100("Índice", "100%", i1, i1 - i0, "tot").replace(
         "</td></tr>", f"<br><span class='muted' style='font-weight:400'>(de {fmt(i0, 1)} a {fmt(i1, 1)})</span></td></tr>"))
@@ -477,7 +477,7 @@ def resumen(indice, semana, dpts: dict, perfil: dict | None = None) -> list[str]
     _, i0 = _hasta(indice, semana.viernes - pd.Timedelta(days=7))
     tramo = indicators.status_for(i1)[1].lower()
     labels = {c: spec["label"] for b in blocks_cfg.values() for c, spec in b["components"].items()}
-    labels[PREVIO] = PREVIO_LABEL
+    labels[PREVIO] = perfil.get("previo_label", PREVIO_LABEL)
     puntos = []
     if np.isfinite(i1):
         txt = f"El índice cerró la semana en <b>{fmt(i1, 0)}/100</b> ({tramo})"
@@ -605,10 +605,13 @@ def _minis_ar(p: pd.DataFrame, semana: Semana) -> list[str]:
 # Clave de la línea con lo que deja de contar de la semana anterior.
 PREVIO = "_semana_anterior"
 PREVIO_LABEL = "Movimientos de la semana anterior que dejan de contar"
+APENDICE_FLUJOS = '<b>Por su movimiento de la semana</b> (oficial contra la inflación, reservas, BADLAR, depósitos en dólares y riesgo país). Se miden por cuánto se movieron en los últimos 5 días, centrado en cero: la presión es el movimiento. Cada una muestra lo que hizo esta semana, con su signo: unas reservas que suben siempre restan y un riesgo país que sube siempre suma. Como el índice mira sólo los últimos 5 días, lo que estas variables hicieron la semana anterior deja de contar: eso va en una línea aparte, “Movimientos de la semana anterior que dejan de contar”. Por ejemplo, si la semana anterior las reservas subieron mucho, ese alivio sale del índice y esa línea suma.'
+NOTA_FLUJOS = 'El oficial (contra la inflación, medida por el CER), las reservas, la BADLAR, los depósitos y el riesgo país entran por su movimiento de los últimos 5 días, centrado en cero: muestran lo que hicieron esta semana, con su signo (unas reservas que suben siempre restan). Lo que hicieron la semana anterior deja de contar y va en una línea aparte.'
+PREVIO_NOTA = "Lo que hicieron la semana anterior el oficial, las reservas, la BADLAR, los depósitos y el riesgo país"
 
 
 def cambio_por_componente(p: pd.DataFrame, semana: Semana, meta: dict, comps: list[str],
-                          blocks_cfg: dict | None = None) -> dict[str, float]:
+                          blocks_cfg: dict | None = None, vida_media: float | None = None) -> dict[str, float]:
     """Cuántos puntos movió cada componente al índice en la semana.
 
     El cambio del índice se reparte en proporción a peso x cambio del z-score
@@ -618,6 +621,9 @@ def cambio_por_componente(p: pd.DataFrame, semana: Semana, meta: dict, comps: li
     muestran sólo lo de esta semana, con su signo: unas reservas que suben
     siempre restan. Lo que esos hicieron la semana anterior, que el índice
     deja de mirar, va junto en la clave PREVIO. Todo suma el cambio del índice.
+
+    Con flujos acumulados (`vida_media`), cada flujo muestra lo que se movió
+    en la semana y en PREVIO va lo acumulado antes, que se va borrando.
     """
     blocks_cfg = blocks_cfg or config.IPD_BLOCKS
     flujo = {c for b in blocks_cfg.values() for c, spec in b["components"].items() if spec.get("centro_cero")}
@@ -633,6 +639,19 @@ def cambio_por_componente(p: pd.DataFrame, semana: Semana, meta: dict, comps: li
     total = sum(w * (z1 - z0) for z1, z0, w in z.values())
     if len(z) == len(comps) and np.isfinite(i1 - i0) and total * (i1 - i0) > 0:
         k = (i1 - i0) / total
+        if vida_media:
+            rho = 0.5 ** (1 / vida_media)
+            out, resto = {}, 0.0
+            for c, (z1, z0, w) in z.items():
+                out[c] = k * w * (z1 - z0)
+                if c in flujo and f"noticia_{c}" in p:
+                    n = p[f"noticia_{c}"][(p.index > semana.viernes - pd.Timedelta(days=7)) & (p.index <= semana.viernes)].dropna()
+                    escala = _hasta(p[f"escala_{c}"], semana.viernes)[1]
+                    semana_c = sum(rho ** (len(n) - 1 - j) * v for j, v in enumerate(n.to_numpy())) / escala
+                    resto += out[c] - k * w * semana_c
+                    out[c] = k * w * semana_c
+            out[PREVIO] = resto
+            return out
         out = {c: k * w * (z1 if c in flujo else z1 - z0) for c, (z1, z0, w) in z.items()}
         out[PREVIO] = -k * sum(w * z0 for c, (z1, z0, w) in z.items() if c in flujo)
         return out
@@ -661,7 +680,8 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     pts_cierre = {c: _hasta(p[f"pts_{c}"], semana.viernes)[1] for c in labels if f"pts_{c}" in p}
     sub1 = {b: _hasta(p[f"indice_bloque_{b}"], semana.viernes)[1] for b in blocks_cfg if f"indice_bloque_{b}" in p}
     colores_sub = dict(zip(blocks_cfg, [S1, S2, S3]))
-    dpts = cambio_por_componente(p, semana, meta, list(pts_cierre), blocks_cfg)
+    dpts = cambio_por_componente(p, semana, meta, list(pts_cierre), blocks_cfg,
+                                 payload.get("config", {}).get("flujos_vida_media"))
     sub_dpts = {b: sum(dpts[c] for c in blocks_cfg[b]["components"] if c in dpts and np.isfinite(dpts[c]))
                 for b in blocks_cfg}
     subs_hero = "".join(
@@ -715,6 +735,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
   <div class="meta">Datos al {fecha_larga(f_cierre)}<br><a href="{DASHBOARD_URL}{perfil["query"]}">Tablero diario</a></div>
 </header>
 
+{perfil.get("aviso", "")}
 <section class="hero">
   <div class="card">
     <h2>Índice de Dolarización</h2>
@@ -742,7 +763,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note"><b>Nivel</b> y <b>variación</b>: el dato de cada variable al viernes {fecha_larga(semana.viernes)} (o el último publicado) y cuánto cambió en la semana. {perfil["nota_variables"]} <b>Cambio del índice</b>: cuántos puntos subió (rojo) o bajó (azul) el índice en la semana por cada variable; suman el cambio del índice. Las variables de nivel (volatilidades, brecha, canje, futuros) mueven el índice según cuánto cambiaron: si suben, lo suben. El oficial (contra la inflación, medida por el CER), las reservas, la BADLAR, los depósitos y el riesgo país entran por su movimiento de los últimos 5 días, centrado en cero: muestran lo que hicieron esta semana, con su signo (unas reservas que suben siempre restan). Lo que hicieron la semana anterior deja de contar y va en una línea aparte. Más detalle en el apéndice.</p>
+  <p class="note"><b>Nivel</b> y <b>variación</b>: el dato de cada variable al viernes {fecha_larga(semana.viernes)} (o el último publicado) y cuánto cambió en la semana. {perfil["nota_variables"]} <b>Cambio del índice</b>: cuántos puntos subió (rojo) o bajó (azul) el índice en la semana por cada variable; suman el cambio del índice. Las variables de nivel (volatilidades, brecha, canje, futuros) mueven el índice según cuánto cambiaron: si suben, lo suben. {perfil.get("nota_flujos", NOTA_FLUJOS)} Más detalle en el apéndice.</p>
   {tabla_html}
 </section>
 
@@ -879,7 +900,7 @@ def apendice(perfil: dict, meta: dict) -> str:
   <p>El índice mide cuánta presión hay sobre el peso: arriba de 50, presión hacia la depreciación; abajo, alivio. El reporte muestra cuántos puntos movió cada variable el índice en la semana; junto con la línea de la semana anterior, suman el cambio del índice. Lo que mueve el índice depende de cómo entra cada variable:</p>
   <ul>
     <li><b>Por su nivel</b> (volatilidades del oficial y del CCL, brecha, canje, devaluación implícita y posición abierta en futuros). Si la variable sube en la semana, el índice sube; si baja, baja. Que esté por encima o por debajo de lo habitual de los dos años anteriores define si, en el nivel, cuenta como presión o como calma: una volatilidad baja que sube empuja el índice hacia arriba, aunque todavía cuente como calma.</li>
-    <li><b>Por su movimiento de la semana</b> (oficial contra la inflación, reservas, BADLAR, depósitos en dólares y riesgo país). Se miden por cuánto se movieron en los últimos 5 días, centrado en cero: la presión es el movimiento. Cada una muestra lo que hizo esta semana, con su signo: unas reservas que suben siempre restan y un riesgo país que sube siempre suma. Como el índice mira sólo los últimos 5 días, lo que estas variables hicieron la semana anterior deja de contar: eso va en una línea aparte, “Movimientos de la semana anterior que dejan de contar”. Por ejemplo, si la semana anterior las reservas subieron mucho, ese alivio sale del índice y esa línea suma.</li>
+    <li>{perfil.get("apendice_flujos", APENDICE_FLUJOS)}</li>
     <li><b>Contra una referencia</b>. El oficial se mide contra la inflación (CER): si sube menos que los precios, cuenta como alivio aunque haya subido. Las compras de dólares de personas humanas se miden contra su promedio de 12 meses.</li>
   </ul>
   <p>Cuánto mueve el índice cada variable depende de qué tan grande es su cambio frente a lo que suele moverse en los dos años anteriores, y de su peso.</p>
