@@ -171,7 +171,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
           <button data-f="d" aria-pressed="true">Diario</button><button data-f="w">Semanal</button><button data-f="m">Mensual</button>
         </div>
       </div>
-      <p class="note" id="idx-note">Dato diario. Las verticales marcan elecciones y episodios cambiarios.</p>
       <div class="chart tall" id="c-idx" role="img" aria-label="Índice de presión cambiaria 0 a 100"></div>
     </div>
   </section>
@@ -364,15 +363,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
   const isLong = (pairs) => pairs.length > 1 && (new Date(pairs[pairs.length - 1][0]) - new Date(pairs[0][0])) / 864e5 > 2 * 365;
 
-  function eventLines(pairs) {
-    if (!pairs.length) return [];
-    const a = pairs[0][0], b = pairs[pairs.length - 1][0];
-    return (DATA.events || []).filter((e) => e.date >= a && e.date <= b).map((e) => ({
-      xAxis: e.date, name: e.label,
-      label: { show: false },
-    }));
-  }
-
   function mount(id) {
     const el = document.getElementById(id);
     let c = echarts.getInstanceByDom(el);
@@ -470,13 +460,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       data.forEach(([d, v]) => { const k = keyOf(d); const a = acc.get(k) || [0, 0]; a[0] += v; a[1]++; acc.set(k, a); });
       data = [...acc].map(([k, [s, n]]) => [k, s / n]);
     }
-    const notas = {
-      d: "Dato diario, sin promediar: reacciona enseguida pero salta de un día a otro (las vistas semanal y mensual lo suavizan).",
-      w: "Promedio semanal del índice (cada punto es la semana que empieza ese lunes).",
-      m: "Promedio mensual del índice.",
-    };
-    document.getElementById("idx-note").textContent = notas[idxFreq] +
-      " El color indica el tramo; las verticales marcan elecciones y episodios cambiarios. Arrastrá la barra inferior o usá la rueda del mouse para hacer zoom.";
     const fmtFecha = (d) => idxFreq === "m" ? d.slice(0, 7) + " (promedio)" : idxFreq === "w" ? `Semana del ${d}` : d;
     const c = mount("c-idx");
     const o = base();
@@ -496,7 +479,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       markLine: {
         symbol: "none", silent: true,
         lineStyle: { color: css("--axis"), type: "solid", width: 1 },
-        data: [{ yAxis: 50, label: { show: false } }, ...eventLines(data)],
+        data: [{ yAxis: 50, label: { show: false } }],
       },
       markArea: {
         silent: true,
