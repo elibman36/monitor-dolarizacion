@@ -132,13 +132,13 @@ def reservas_netas_mensual(planilla: pd.DataFrame | None, fmi: pd.DataFrame | No
     netas = pd.Series(brutas + pasivos, index=fechas, name="reservas_netas").dropna()
     netas = netas[~netas.index.duplicated(keep="last")].sort_index()
     netas.index.name = "fecha"
-    girado = pd.Series(0.0, index=netas.index)
+    girado = pd.Series(np.nan, index=netas.index)
     if fmi is not None and not fmi.empty:
         g = pd.Series(pd.to_numeric(fmi["girado_usd_millones"], errors="coerce").to_numpy(),
                       index=pd.to_datetime(fmi["fecha"].astype(str).str[:7] + "-01") + pd.offsets.MonthEnd(0))
         girado = g.reindex(netas.index)
-        # Antes del programa no hay nada que descontar; después, un mes sin dato queda sin calcular.
-        girado[girado.index < pd.Timestamp("2025-04-01")] = 0.0
+    # Antes del programa no hay nada que descontar; después, un mes sin dato queda sin calcular.
+    girado[girado.index < pd.Timestamp("2025-04-01")] = 0.0
     sin_fmi = (netas - girado).dropna().rename("reservas_netas_sin_fmi")
     return {"reservas_netas": netas, "reservas_netas_sin_fmi": sin_fmi}
 
