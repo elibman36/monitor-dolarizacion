@@ -202,11 +202,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </div>
   </section>
 
-  <h2 class="section-title">Tabla de datos</h2>
-  <section class="card table-wrap">
-    <table id="tbl"><thead><tr><th>Variable</th><th class="num">Último</th><th>Fecha</th><th class="num">Hace 7 días</th><th class="num">Hace 30 días</th><th>Fuente</th></tr></thead><tbody></tbody></table>
-  </section>
-
   <h2 class="section-title">Metodología</h2>
   <section class="card method">
     <p>El índice mide la presión sobre el peso en una escala de 0 a 100: 50 es neutral, arriba hay presión hacia la depreciación y abajo, alivio. Combina 13 variables en tres subíndices:</p>
@@ -696,15 +691,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   function renderTable() {
     renderPesos();
-    const tb = document.querySelector("#tbl tbody");
-    tb.innerHTML = "";
-    // La medida de base del índice (en desvíos) es técnica: no va en la tabla.
-    Object.entries(DATA.series).filter(([k]) => k !== "ipd").forEach(([k, s]) => {
-      const dg = digitsFor(s.unit, s.last);
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${s.label} <span style="color:var(--muted)">(${s.unit})</span></td><td class="num">${nf(s.last, dg)}</td><td>${s.last_date}</td><td class="num">${nf(s.prev_7d, dg)}</td><td class="num">${nf(s.prev_30d, dg)}</td><td>${s.source}</td>`;
-      tb.appendChild(tr);
-    });
     document.getElementById("foot").textContent = `Actualizado: ${new Date(DATA.generated_at).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", dateStyle: "short", timeStyle: "short", hour12: false })} (hora argentina). Fuentes: ${PAISES.ar.fuentes}.`;
   }
 
