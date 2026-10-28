@@ -7,6 +7,7 @@ fuente falla (usar la última copia guardada).
 
 from __future__ import annotations
 
+import html
 import io
 import logging
 import os
@@ -381,7 +382,7 @@ def fmi_programa_girado(fecha: str) -> dict | None:
     r = _session.get("https://www.imf.org/external/np/fin/tad/extarr2.aspx",
                      params={"memberKey1": 30, "date1key": fecha}, timeout=60)
     r.raise_for_status()
-    t = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", r.text))
+    t = re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", r.text)))
     m = re.search(r"Extended Fund Facility\s+Apr 11, 2025\s+\w{3} \d{1,2}, \d{4}\s+([\d,]+)\s+([\d,]+)", t)
     girado_deg = float(m.group(2).replace(",", "")) / 1000 if m else 0.0  # miles de DEG -> millones
     usd_por_deg = fmi_usd_por_deg(fecha)
