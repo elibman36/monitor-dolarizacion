@@ -743,20 +743,13 @@ def test_tope_de_peso_por_componente():
     assert g[("b", "w")] > 0.15  # el exceso se reparte entre los que no tocan el tope
 
 
-def test_cambio_semanal_suma_y_respeta_el_signo_de_los_flujos():
-    from monitor import report
+def test_cambio_semanal_suma_el_cambio_del_indice():
     fechas = pd.to_datetime(["2026-10-16", "2026-10-23"])
-    # Reservas (flujo, centrado en cero): subieron mucho la semana anterior y
-    # un poco esta; canje (nivel): subió.
-    p = pd.DataFrame({"indice_0_100": [44.0, 46.0], "z_reservas": [-2.0, -0.5], "z_canje": [0.0, 0.5]}, index=fechas)
-    meta = {"reservas": {"weight_ipd": 0.5}, "canje": {"weight_ipd": 0.5}}
-    blocks = {"b": {"components": {"reservas": {"centro_cero": True}, "canje": {}}}}
-    semana = report.Semana(pd.Timestamp("2026-10-19"), pd.Timestamp("2026-10-23"))
-    d = indicators.cambio_por_componente(p, semana.viernes, meta, ["reservas", "canje"], blocks)
+    # Los aportes suman índice - 50 cada día: sus diferencias suman el cambio.
+    p = pd.DataFrame({"indice_0_100": [44.0, 46.0], "pts_reservas": [-3.0, 0.5], "pts_canje": [-3.0, -4.5]}, index=fechas)
+    d = indicators.cambio_por_componente(p, fechas[-1], ["reservas", "canje"])
+    assert d == {"reservas": 3.5, "canje": -1.5}
     assert abs(sum(d.values()) - 2.0) < 1e-9
-    assert d["reservas"] < 0          # suben las reservas: resta, aunque subieron menos que antes
-    assert d["canje"] > 0
-    assert d[report.PREVIO] > 0       # sale el alivio de la semana anterior
 
 
 def test_flujo_acumulado_suma_con_su_signo_y_se_borra():

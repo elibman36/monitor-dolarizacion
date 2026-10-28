@@ -541,67 +541,16 @@ def monthly_fx_purchases(df: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values("fecha")
 
 
-# Clave del cambio semanal que no es de ningún componente: lo que las variables
-# de movimiento hicieron la semana anterior y deja de contar.
-PREVIO = "_semana_anterior"
-
-
-def _ultimo_hasta(s: pd.Series, fecha: pd.Timestamp) -> tuple[pd.Timestamp | None, float]:
+def _ultimo_hasta(s: pd.Series, fecha: pd.Timestamp) -> float:
     s = s.dropna()
     s = s[s.index <= fecha]
-    return (s.index[-1], float(s.iloc[-1])) if not s.empty else (None, np.nan)
+    return float(s.iloc[-1]) if not s.empty else np.nan
 
 
-def cambio_por_componente(p: pd.DataFrame, fecha: pd.Timestamp, meta: dict, comps: list[str],
-                          blocks_cfg: dict | None = None, vida_media: float | None = None) -> dict[str, float]:
-    """Cuántos puntos movió cada componente al índice en la semana que termina
-    en `fecha` (contra 7 días antes).
-
-    El cambio del índice se reparte en proporción a peso x cambio del z-score
-    de cada componente: una variable que no se movió (p. ej. un dato mensual
-    sin publicación nueva) no mueve el índice. Los que entran por su
-    movimiento de la semana, centrados en cero (reservas, riesgo país...),
-    muestran sólo lo de esta semana, con su signo: unas reservas que suben
-    siempre restan. Lo que esos hicieron la semana anterior, que el índice
-    deja de mirar, va junto en la clave PREVIO. Todo suma el cambio del índice.
-
-    Con flujos acumulados (`vida_media`), cada flujo muestra lo que se movió
-    en la semana y en PREVIO va lo acumulado antes, que se va borrando.
-    """
-    blocks_cfg = blocks_cfg or config.IPD_BLOCKS
-    flujo = {c for b in blocks_cfg.values() for c, spec in b["components"].items() if spec.get("centro_cero")}
-    _, i1 = _ultimo_hasta(p["indice_0_100"], fecha)
-    _, i0 = _ultimo_hasta(p["indice_0_100"], fecha - pd.Timedelta(days=7))
-    z = {}
-    for c in comps:
-        if f"z_{c}" not in p:
-            continue
-        _, z1 = _ultimo_hasta(p[f"z_{c}"], fecha)
-        _, z0 = _ultimo_hasta(p[f"z_{c}"], fecha - pd.Timedelta(days=7))
-        z[c] = (z1 if np.isfinite(z1) else 0.0, z0 if np.isfinite(z0) else 0.0, meta.get(c, {}).get("weight_ipd") or 0)
-    total = sum(w * (z1 - z0) for z1, z0, w in z.values())
-    if len(z) == len(comps) and np.isfinite(i1 - i0) and total * (i1 - i0) > 0:
-        k = (i1 - i0) / total
-        if vida_media:
-            rho = 0.5 ** (1 / vida_media)
-            out, resto = {}, 0.0
-            for c, (z1, z0, w) in z.items():
-                out[c] = k * w * (z1 - z0)
-                if c in flujo and f"noticia_{c}" in p:
-                    n = p[f"noticia_{c}"][(p.index > fecha - pd.Timedelta(days=7)) & (p.index <= fecha)].dropna()
-                    escala = _ultimo_hasta(p[f"escala_{c}"], fecha)[1]
-                    semana_c = sum(rho ** (len(n) - 1 - j) * v for j, v in enumerate(n.to_numpy())) / escala
-                    resto += out[c] - k * w * semana_c
-                    out[c] = k * w * semana_c
-            out[PREVIO] = resto
-            return out
-        out = {c: k * w * (z1 if c in flujo else z1 - z0) for c, (z1, z0, w) in z.items()}
-        out[PREVIO] = -k * sum(w * z0 for c, (z1, z0, w) in z.items() if c in flujo)
-        return out
-    # Sin z-scores: diferencia de los aportes (los de flujo, su aporte de hoy).
-    def pts(c, f):
-        return _ultimo_hasta(p[f"pts_{c}"], f)[1]
+def cambio_por_componente(p: pd.DataFrame, fecha: pd.Timestamp, comps: list[str]) -> dict[str, float]:
+    """Cuántos puntos aportó cada componente a la suba o a la baja del índice
+    en la semana que termina en `fecha` (contra 7 días antes): la diferencia
+    de su aporte (pts_*). Como los aportes suman índice - 50 cada día, estas
+    diferencias suman exactamente el cambio del índice."""
     previo = fecha - pd.Timedelta(days=7)
-    out = {c: pts(c, fecha) - (0 if c in flujo else pts(c, previo)) for c in comps}
-    out[PREVIO] = -sum(pts(c, previo) for c in comps if c in flujo)
-    return out
+    return {c: _ultimo_hasta(p[f"pts_{c}"], fecha) - _ultimo_hasta(p[f"pts_{c}"], previo) for c in comps}
