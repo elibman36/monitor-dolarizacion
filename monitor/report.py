@@ -289,7 +289,7 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, i1: floa
                  f"<td class='num'>({_txt_cambio_indice(i1 - i0)})</td></tr>")
     cab = ("<thead><tr><th>Subíndice y componente</th><th class='num'>Peso</th>"
            "<th class='num'>Dato semana anterior</th><th class='num'>Dato esta semana</th><th class='num'>Variación</th>"
-           "<th class='num'>Hace subir o bajar el índice (pts)</th></tr></thead>")
+           "<th class='num'>Aporte a la suba o a la baja del índice (pts)</th></tr></thead>")
     return f"<table class='vars aportes'>{cab}<tbody>{''.join(filas)}</tbody></table>"
 
 
@@ -733,7 +733,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note">El dato de cada variable el viernes anterior y este, su variación y cuántos puntos hizo subir (rojo) o bajar (azul) el índice frente a la semana anterior. {perfil["nota_variables"]}</p>
+  <p class="note">El dato de cada variable el viernes anterior y este, su variación y su aporte a la suba (rojo) o a la baja (azul) del índice frente a la semana anterior, en puntos. {perfil["nota_variables"]}</p>
   {tabla_html}
 </section>
 

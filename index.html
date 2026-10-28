@@ -182,7 +182,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card-head">
       <h2>Qué explica el índice</h2>
     </div>
-    <p class="note">El dato de cada variable hoy y hace una semana, su variación y cuántos puntos hizo subir (rojo) o bajar (azul) el índice.</p>    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
+    <p class="note">El dato de cada variable hoy y hace una semana, su variación y su aporte a la suba (rojo) o a la baja (azul) del índice, en puntos.</p>    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
     <h2>Subíndices</h2>
@@ -597,7 +597,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       }
       return `<td class="num muted">${dato(v0)}</td><td class="num">${dato(v1)}</td><td class="num">${varTxt}</td>`;
     };
-    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Peso</th><th class="num">Hace una semana</th><th class="num">Hoy</th><th class="num">Variación</th><th class="num">Hace subir o bajar el índice (pts)</th></tr>`;
+    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Peso</th><th class="num">Hace una semana</th><th class="num">Hoy</th><th class="num">Variación</th><th class="num">Aporte a la suba o a la baja del índice (pts)</th></tr>`;
     const filas = [];
     Object.entries(DATA.ipd.blocks).forEach(([bk, b]) => {
       const cs = comps.filter((x) => x.block === bk).sort((x, y) => (y.weight || 0) - (x.weight || 0));
