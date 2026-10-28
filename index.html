@@ -122,6 +122,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .status-list span.err { color: var(--critical); }
 .method p, .method li { color: var(--ink-2); font-size: 14px; }
 .method code { font-size: 13px; }
+.anexo { max-width: 860px; width: calc(100% - 32px); max-height: 85vh; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--ink); padding: 20px 24px; }
+.anexo::backdrop { background: rgba(0, 0, 0, 0.35); }
+.anexo-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+.anexo-head h2 { margin: 0; }
 #banner { display: none; margin-bottom: 16px; }
 @media (max-width: 900px) {
   .hero, .grid2 { grid-template-columns: 1fr; }
@@ -142,6 +146,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         <button data-r="90">3M</button><button data-r="182">6M</button><button data-r="365" aria-pressed="true">1A</button><button data-r="730">2A</button><button data-r="1825">5A</button><button data-r="3650">10A</button><button data-r="0">Todo</button>
       </div>
       <a class="btn" id="lnk-pdf" href="reportes/ultimo.pdf" target="_blank" rel="noopener">Reporte semanal (PDF)</a>
+      <button class="btn" id="btn-anexo" type="button">Anexo metodológico</button>
       <a class="btn" id="lnk-csv" href="https://github.com/elibman36/monitor-dolarizacion/blob/main/data/panel_diario.csv" target="_blank" rel="noopener">Datos (CSV)</a>
       <button class="btn" id="theme" type="button" aria-label="Cambiar tema">◐</button>
     </div>
@@ -202,8 +207,13 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     </div>
   </section>
 
-  <h2 class="section-title">Metodología</h2>
-  <section class="card method">
+  </div>
+  <p class="note" id="foot" style="margin-top:16px"></p>
+</div>
+
+<dialog id="anexo" class="anexo method" aria-labelledby="anexo-t">
+  <div class="anexo-head"><h2 id="anexo-t">Anexo metodológico</h2><button class="btn" id="anexo-cerrar" aria-label="Cerrar">Cerrar</button></div>
+
     <p>El índice mide la presión sobre el peso en una escala de 0 a 100: 50 es neutral, arriba hay presión hacia la depreciación y abajo, alivio. Combina 13 variables en tres subíndices:</p>
     <ul>
       <li><b>Presión cambiaria:</b> tipo de cambio real, su volatilidad, reservas, tasa BADLAR, brecha MEP / oficial y futuros vendidos por el BCRA.</li>
@@ -214,11 +224,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="table-wrap"><table id="pesos-tbl"><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody></tbody></table></div>
     <p class="note" id="pesos-nota"></p>
     <p class="note">Detalle de la metodología en el reporte semanal y en el repositorio.</p>
-  </section>
-  </div>
-  <p class="note" id="foot" style="margin-top:16px"></p>
-</div>
-
+</dialog>
 <script>
 (() => {
   const STATUS = {
@@ -279,6 +285,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => redibujar());
   function redibujar() { if (DATA) renderAll(); }
+
+  // ---- anexo metodológico ---------------------------------------------
+  const anexo = document.getElementById("anexo");
+  document.getElementById("btn-anexo").addEventListener("click", () => anexo.showModal());
+  document.getElementById("anexo-cerrar").addEventListener("click", () => anexo.close());
+  anexo.addEventListener("click", (e) => { if (e.target === anexo) anexo.close(); });
 
   // ---- rango ------------------------------------------------------------
   document.querySelectorAll("#range button").forEach((b) => b.addEventListener("click", () => {
