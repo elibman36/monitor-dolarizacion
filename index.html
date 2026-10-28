@@ -264,9 +264,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   const charts = [];
   let DATA = null;
   let rangeDays = 365;
-  // El gráfico del índice abre con toda la historia; sigue a los botones de
-  // período recién cuando el usuario elige uno.
-  let idxFullHistory = true;
 
   // ---- tema -------------------------------------------------------------
   const themeBtn = document.getElementById("theme");
@@ -288,7 +285,6 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     document.querySelectorAll("#range button").forEach((x) => x.setAttribute("aria-pressed", "false"));
     b.setAttribute("aria-pressed", "true");
     rangeDays = +b.dataset.r;
-    idxFullHistory = false;
     renderCharts();
   }));
 
@@ -445,7 +441,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   // ---- gráficos -----------------------------------------------------------
   function renderIndex() {
-    let data = idxFullHistory ? (DATA.ipd.indice || []) : cut(DATA.ipd.indice || []);
+    // Toda la historia, abierta en el período elegido (se navega con la barra
+    // o la rueda del mouse): así se ve el movimiento de un día a otro.
+    let data = DATA.ipd.indice || [];
     if (!data.length) return emptyState("c-idx", "Todavía no hay historia suficiente para calcular el índice.");
     // Diario: el dato de cada día. Semanal y mensual: promedios.
     const keyOf = { w: (d) => { const x = new Date(d + "T00:00:00Z"); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return x.toISOString().slice(0, 10); },
@@ -482,13 +480,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
           { yAxis: tr.from, itemStyle: { color: css(`--dv-${tr.key}`), opacity: 0.07 } }, { yAxis: Math.min(tr.to, 100) }]),
       },
     });
-    // Sin color fijo: lo pone el visualMap según el tramo.
-    serie.lineStyle = { width: idxFreq === "d" && data.length > 1500 ? 1.5 : 2 }; delete serie.itemStyle;
+    // Sin color fijo: lo pone el visualMap según el tramo. Sin muestreo: cada
+    // dato es un punto.
+    serie.lineStyle = { width: 1.8 }; delete serie.itemStyle; delete serie.sampling;
+    const desde = (cut(data)[0] || [])[0];
     o.series = [serie];
     o.grid.bottom = 44;
     o.dataZoom = [
-      { type: "inside", xAxisIndex: 0, filterMode: "none" },
-      { type: "slider", xAxisIndex: 0, filterMode: "none", height: 18, bottom: 6, showDetail: false,
+      { type: "inside", xAxisIndex: 0, filterMode: "none", startValue: desde },
+      { type: "slider", xAxisIndex: 0, filterMode: "none", startValue: desde, height: 18, bottom: 6, showDetail: false,
         borderColor: css("--border"), fillerColor: css("--wash"), backgroundColor: "transparent",
         dataBackground: { lineStyle: { color: css("--axis") }, areaStyle: { color: css("--wash") } },
         handleStyle: { color: css("--surface"), borderColor: css("--axis") }, moveHandleStyle: { color: css("--axis") } },
