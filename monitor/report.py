@@ -516,10 +516,11 @@ def resumen(indice, semana, pts: dict, dpts: dict, perfil: dict | None = None) -
         puntos.append("<b>Por subíndice</b>: " + "; ".join(por_bloque) + ".")
     if np.isfinite(i0):
         pc = {k: v for k, v in dpts.items() if k != PREVIO and np.isfinite(v)}
-        txt = f"<b>Frente al viernes anterior</b> ({fmt(i0, 0)}), {_txt_cambio_indice(i1 - i0)}"
-        partes = [f"lo hicieron {verbo}: " + "; ".join(items)
-                  for verbo, items in (("subir", lista(pc, 1)), ("bajar", lista(pc, -1))) if items]
-        puntos.append(txt + (". " + ". ".join(p[:1].upper() + p[1:] for p in partes) if partes else "") + ".")
+        puntos.append(f"<b>Frente al viernes anterior</b> ({fmt(i0, 0)}), {_txt_cambio_indice(i1 - i0)}.")
+        for signo, titulo in ((1, "Aporte a la suba"), (-1, "Aporte a la baja")):
+            items = lista(pc, signo)
+            if items:
+                puntos.append(f"<b>{titulo}</b>: " + "; ".join(items) + ".")
     return puntos
 
 
