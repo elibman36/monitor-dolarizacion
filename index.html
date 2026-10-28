@@ -182,7 +182,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card-head">
       <h2>Qué explica el índice</h2>
     </div>
-    <p class="note">Aporte: puntos que cada variable empuja el índice por encima (rojo) o por debajo (azul) de 50.</p>    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
+    <p class="note">El dato de cada variable hoy y hace una semana, su variación y cuántos puntos hizo subir (rojo) o bajar (azul) el índice.</p>    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
     <h2>Subíndices</h2>
@@ -550,18 +550,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       return `<td class="num ${v > 0 ? "up" : "down"}"${bold ? ' style="font-weight:700"' : ""}>${v > 0 ? "▲" : "▼"} ${sg(v)}</td>`;
     };
     const ALIAS = { tc_a3500: "tc_oficial_ref", futuros_oi: "futuros_interes_abierto", intervencion: "intervencion_usd", ventas_spot: "ventas_spot_usd" };
-    // Lo que el índice mira de cada variable: en los componentes "dlog"/"diff"
-    // su cambio en H días hábiles hasta hoy (calendario del índice, último dato
-    // disponible en cada fecha); en el resto, su nivel.
-    const H = DATA.config.horizon || 5;
-    const dias = (DATA.ipd.indice || []).map((x) => x[0]);
+    // Último dato disponible en una fecha.
     const asof = (d, f) => { let i = d.length - 1; while (i >= 0 && d[i][0] > f) i--; return i >= 0 ? d[i][1] : null; };
-    const cambioH = (s, f) => {
-      let j = dias.length - 1; while (j >= 0 && dias[j] > f) j--;
-      if (j - H < 0) return null;
-      const v1 = asof(s.data, dias[j]), v0 = asof(s.data, dias[j - H]);
-      return v1 == null || v0 == null ? null : { abs: v1 - v0, pct: (v1 / v0 - 1) * 100 };
-    };
     const txtCambio = (s, c) => {
       if (!c) return "–";
       const pp = s.unit.startsWith("%"), pb = s.unit === "pb", usd = /^(millones de USD|M USD)/.test(s.unit);
@@ -570,39 +560,55 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       if (usd) return sg(c.abs, 0) + " M USD";
       return sg(c.pct) + "%";
     };
-    // Variación de la variable en la última semana (H días hábiles). El tipo
-    // de cambio real (oficial / CER), mensualizada. La FAE es mensual: contra
-    // el mes anterior.
-    const variacion = (k) => {
-      if (k === "compras_ph") {
-        const ph = DATA.monthly && DATA.monthly.compras_personas_humanas;
-        if (!ph || ph.length < 2) return "–";
-        const u = ph[ph.length - 1], a = ph[ph.length - 2];
-        return `${sg(u.netas_usd_millones - a.netas_usd_millones, 0)} M USD <span class="muted">(${u.fecha} vs. mes anterior)</span>`;
-      }
-      if (k === "tc_a3500") {
-        const tc = cambioH(DATA.series.tc_oficial_ref, h.date), cer = DATA.series.cer ? cambioH(DATA.series.cer, h.date) : null;
-        if (!tc || !cer) return "–";
-        const sem = (1 + tc.pct / 100) / (1 + cer.pct / 100);
-        return sg((Math.pow(sem, 30 / 7) - 1) * 100) + "% <span class='muted'>mensual</span>";
-      }
-      const s = DATA.series[k] || DATA.series[ALIAS[k]];
-      if (!s || !s.data) return "–";
-      if (/mes/.test(s.unit)) {  // dato de fin de mes
-        const n = s.data.length;
-        return n > 1 ? `${txtCambio(s, { abs: s.data[n - 1][1] - s.data[n - 2][1], pct: (s.data[n - 1][1] / s.data[n - 2][1] - 1) * 100 })} <span class="muted">(fin de mes)</span>` : "–";
-      }
-      return txtCambio(s, cambioH(s, h.date));
+    // Dato de cada variable hoy y 7 días antes (último disponible en cada
+    // fecha), como en el reporte. El tipo de cambio real se muestra con el
+    // oficial en pesos y su variación real mensualizada. La posición abierta,
+    // con el promedio de 21 días que usa el índice. La FAE es mensual: entra
+    // 30 días después del cierre de cada mes.
+    const dHace7 = (() => { const t = new Date(h.date); t.setDate(t.getDate() - 7); return t.toISOString().slice(0, 10); })();
+    const media21 = (data) => data.map((x, i) => {
+      const w = data.slice(Math.max(0, i - 20), i + 1).map((y) => y[1]).filter((y) => y != null);
+      return [x[0], w.length >= 10 ? w.reduce((t, y) => t + y, 0) / w.length : null];
+    });
+    const faeAl = (f) => {
+      const ph = (DATA.monthly && DATA.monthly.compras_personas_humanas) || [];
+      let v = null;
+      ph.forEach((x) => { const t = new Date(x.fecha + "-01"); t.setMonth(t.getMonth() + 1); t.setDate(30); if (t.toISOString().slice(0, 10) <= f) v = x.netas_usd_millones; });
+      return v;
     };
-    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Peso</th><th class="num">Variación en la semana</th><th class="num">Aporte al índice</th></tr>`;
+    const fila = (k) => {
+      let s = DATA.series[k] || DATA.series[ALIAS[k]], data = s && s.data, unit = s ? s.unit : "";
+      let v0, v1;
+      if (k === "compras_ph") { v0 = faeAl(dHace7); v1 = faeAl(h.date); unit = "millones de USD"; }
+      else if (!data) return "<td></td><td></td><td></td>";
+      else {
+        if (k === "futuros_oi") data = media21(data);
+        v0 = asof(data, dHace7); v1 = asof(data, h.date);
+      }
+      const u = unit.split(",")[0].replace("millones de USD", "M USD");
+      const dato = (v) => v == null ? "–" : `${nf(v, digitsFor(unit, v))} <span class="muted">${u}</span>`;
+      let varTxt = "–";
+      if (k === "tc_a3500" && DATA.series.cer) {
+        const c0 = asof(DATA.series.cer.data, dHace7), c1 = asof(DATA.series.cer.data, h.date);
+        if (v0 && v1 && c0 && c1) varTxt = sg((Math.pow((v1 / v0) / (c1 / c0), 30 / 7) - 1) * 100) + "% <span class='muted'>real mensual</span>";
+      } else if (v0 != null && v1 != null) {
+        if (v0 === v1 && (k === "compras_ph" || /mes/.test(unit))) varTxt = "<span class='muted'>sin dato nuevo</span>";
+        else varTxt = txtCambio({ unit }, { abs: v1 - v0, pct: (v1 / v0 - 1) * 100 });
+      }
+      return `<td class="num muted">${dato(v0)}</td><td class="num">${dato(v1)}</td><td class="num">${varTxt}</td>`;
+    };
+    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Peso</th><th class="num">Hace una semana</th><th class="num">Hoy</th><th class="num">Variación</th><th class="num">Hace subir o bajar el índice (pts)</th></tr>`;
     const filas = [];
     Object.entries(DATA.ipd.blocks).forEach(([bk, b]) => {
       const cs = comps.filter((x) => x.block === bk).sort((x, y) => (y.weight || 0) - (x.weight || 0));
       if (!cs.length) return;
-      filas.push(`<tr class="sub"><td>${b.label}</td><td class="num">${b.weight != null ? nf(b.weight * 100, 0) + "%" : ""}</td><td class="num">${b.indice_last != null ? nf(b.indice_last, 0) + "/100" : ""}</td>${aporte(b.puntos, true)}</tr>`);
-      cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td><td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td><td class="num">${variacion(x.key)}</td>${aporte(x.puntos)}</tr>`));
+      const cb = cs.reduce((t, x) => t + (x.cambio_semana || 0), 0);
+      filas.push(`<tr class="sub"><td>${b.label}</td><td class="num">${b.weight != null ? nf(b.weight * 100, 0) + "%" : ""}</td><td></td><td class="num">${b.indice_last != null ? nf(b.indice_last, 0) + "/100" : ""}</td><td></td>${aporte(cb, true)}</tr>`);
+      cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td><td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td>${fila(x.key)}${aporte(x.cambio_semana)}</tr>`));
     });
-    filas.push(`<tr class="tot"><td>Índice</td><td class="num">100%</td><td class="num">${nf(h.indice, 0)}/100</td>${aporte(h.indice - 50, true)}</tr>`);
+    const di = h.indice_7d == null ? null : h.indice - h.indice_7d;
+    const cambioTxt = di == null ? "" : Math.abs(di) < 0.5 ? "sin cambios" : `${di > 0 ? "subió" : "bajó"} ${nf(Math.abs(di), 0)} ${Math.round(Math.abs(di)) === 1 ? "punto" : "puntos"}`;
+    filas.push(`<tr class="tot"><td>Índice</td><td class="num">100%</td><td class="num muted">${h.indice_7d == null ? "–" : nf(h.indice_7d, 0) + "/100"}</td><td class="num">${nf(h.indice, 0)}/100</td><td class="num">${di == null ? "" : sg(di, 0) + " pts"}</td><td class="num">${cambioTxt ? "(" + cambioTxt + ")" : ""}</td></tr>`);
     tbl.querySelector("tbody").innerHTML = filas.join("");
   }
 

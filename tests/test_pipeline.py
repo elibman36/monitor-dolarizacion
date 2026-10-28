@@ -252,7 +252,7 @@ def test_reporte_semanal_html(fake_api):
     payload = json.loads((tmp / "monitor.json").read_text())
     html_txt = report.construir_html(semana, p, payload)
     assert "Reporte semanal" in html_txt and "/100" in html_txt
-    assert "Qué explica el índice" in html_txt and "Aporte al cambio del índice" in html_txt and "Variación semana anterior" in html_txt and "<svg" in html_txt
+    assert "Qué explica el índice" in html_txt and "Hace subir o bajar el índice" in html_txt and "Dato semana anterior" in html_txt and "<svg" in html_txt
     assert "Apéndice metodológico" in html_txt and "Sube el índice en la semana" in html_txt
 
 
@@ -752,7 +752,7 @@ def test_cambio_semanal_suma_y_respeta_el_signo_de_los_flujos():
     meta = {"reservas": {"weight_ipd": 0.5}, "canje": {"weight_ipd": 0.5}}
     blocks = {"b": {"components": {"reservas": {"centro_cero": True}, "canje": {}}}}
     semana = report.Semana(pd.Timestamp("2026-10-19"), pd.Timestamp("2026-10-23"))
-    d = report.cambio_por_componente(p, semana, meta, ["reservas", "canje"], blocks)
+    d = indicators.cambio_por_componente(p, semana.viernes, meta, ["reservas", "canje"], blocks)
     assert abs(sum(d.values()) - 2.0) < 1e-9
     assert d["reservas"] < 0          # suben las reservas: resta, aunque subieron menos que antes
     assert d["canje"] > 0

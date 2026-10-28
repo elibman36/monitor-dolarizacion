@@ -216,13 +216,13 @@ def _celda_aporte(v: float, negrita: bool = False) -> str:
     return f"<td class='num' style='color:{color};{b}'>{'▲' if v > 0 else '▼'} {fmt(v, 1, signo=True)}</td>"
 
 
-def _txt_variacion(v: dict | None, previa: bool = False) -> str:
-    """Variación de la variable en una semana (la del reporte o la anterior),
-    en su unidad: millones de USD, pp, pb, % (precios) o % mensualizado (tipo
-    de cambio real). Las series mensuales sin dato nuevo en esa semana lo dicen."""
+def _txt_variacion(v: dict | None) -> str:
+    """Variación de la variable en la semana, en su unidad: millones de USD,
+    pp, pb, % (precios) o % mensualizado (tipo de cambio real). Las series
+    mensuales sin dato nuevo en la semana lo dicen."""
     if not v:
         return ""
-    nueva, a, d = (v["nueva_prev"], v["a_prev"], v["d_prev"]) if previa else (v["nueva"], v["a"], v["d"])
+    nueva, a, d = v["nueva"], v["a"], v["d"]
     if not nueva or ("mes" in v["unidad"] and a == 0):
         return "<span class='muted'>sin dato nuevo</span>"
     if a is None or not np.isfinite(a):
@@ -230,6 +230,19 @@ def _txt_variacion(v: dict | None, previa: bool = False) -> str:
     if v["tipo"] == "abs":
         return f"{fmt(a, 0, signo=True)} {_unidad_corta(v).replace(' por mes', '')}"
     return _txt_var(d if v["tipo"] in ("pct", "pct_mens") else a, v["tipo"], v["dec"])
+
+
+def _txt_dato(v: dict | None, previo: bool = False) -> str:
+    """Valor de la variable al cierre de la semana (o de la anterior)."""
+    if not v:
+        return ""
+    x = v["v_prev"] if previo else v["v"]
+    if x is None or not np.isfinite(x):
+        return "–"
+    u = _unidad_corta(v).replace(" por mes", "")
+    if u in ("%", "% anual", "% n.a.", "% TNA"):
+        return f"{fmt(x, 1)}{'%' if u == '%' else ' ' + u}"
+    return f"{fmt(x, v['dec'] if u.startswith('$') else 0)} {u}"
 
 
 def _txt_cambio_indice(d: float) -> str:
@@ -242,9 +255,9 @@ def _txt_cambio_indice(d: float) -> str:
 
 def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, i1: float, i0: float,
                   datos: dict, perfil: dict, pesos_b: dict | None = None) -> str:
-    """Una fila por subíndice y componente: peso, variación de la semana
-    anterior, variación de esta semana y cuánto aportó al cambio del índice.
-    Al final, el índice y si subió o bajó."""
+    """Una fila por subíndice y componente: peso, dato de la semana anterior,
+    dato de esta semana, variación y cuánto hizo subir o bajar el índice
+    frente a la semana anterior. Al final, el índice."""
     def suma(cols):
         vals = [dpts[c] for c in cols if c in dpts and np.isfinite(dpts[c])]
         return sum(vals) if vals else np.nan
@@ -253,24 +266,30 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, i1: floa
         cols = [c for c in b["components"] if c in dpts]
         if not cols:
             continue
-        filas.append(f"<tr class='sub'><td>{html.escape(b['label'])} <span class='muted' style='font-weight:400'>"
-                     f"({fmt(sub1.get(bkey, np.nan), 0)}/100)</span></td>"
-                     f"<td class='num'>{fmt((pesos_b or {}).get(bkey, b['weight']) * 100, 0)}%</td><td></td><td></td>"
+        filas.append(f"<tr class='sub'><td>{html.escape(b['label'])}</td>"
+                     f"<td class='num'>{fmt((pesos_b or {}).get(bkey, b['weight']) * 100, 0)}%</td><td></td>"
+                     f"<td class='num'>{fmt(sub1.get(bkey, np.nan), 0)}/100</td><td></td>"
                      f"{_celda_aporte(suma(cols), True)}</tr>")
         for c in sorted(cols, key=lambda c: -(meta.get(c, {}).get("weight") or 0)):
             w = meta.get(c, {}).get("weight_ipd")
-            v = datos.get(_var_comp(perfil, c))
+            vk = _var_comp(perfil, c)
+            v = datos.get(vk)
+            # El tipo de cambio real se muestra con el oficial en pesos y su
+            # variación real, mensualizada.
+            nivel = datos.get("tc_oficial_ref") if vk == "tcr" else v
+            var = _txt_variacion(v)
+            if vk == "tcr" and var.endswith("% mensual"):
+                var = var.replace("% mensual", "% real mensual")
             filas.append(f"<tr><td class='comp'>{html.escape(b['components'][c]['label'])}</td>"
                          f"<td class='num muted'>{fmt((w or 0) * 100, 0)}%</td>"
-                         f"<td class='num muted'>{_txt_variacion(v, previa=True)}</td><td class='num'>{_txt_variacion(v)}</td>"
-                         f"{_celda_aporte(dpts[c])}</tr>")
-    # Los aportes no suman exactamente el cambio del índice: también deja de
-    # contar lo que las variables de movimiento hicieron la semana anterior.
-    filas.append(f"<tr class='tot'><td>Índice</td><td class='num'>100%</td><td></td><td></td>"
-                 f"<td class='num'>{fmt(i1, 0)}/100 ({_txt_cambio_indice(i1 - i0)})</td></tr>")
+                         f"<td class='num muted'>{_txt_dato(nivel, previo=True)}</td><td class='num'>{_txt_dato(nivel)}</td>"
+                         f"<td class='num'>{var}</td>{_celda_aporte(dpts[c])}</tr>")
+    filas.append(f"<tr class='tot'><td>Índice</td><td class='num'>100%</td><td class='num muted'>{fmt(i0, 0)}/100</td>"
+                 f"<td class='num'>{fmt(i1, 0)}/100</td><td class='num'>{fmt(i1 - i0, 0, signo=True)} pts</td>"
+                 f"<td class='num'>({_txt_cambio_indice(i1 - i0)})</td></tr>")
     cab = ("<thead><tr><th>Subíndice y componente</th><th class='num'>Peso</th>"
-           "<th class='num'>Variación semana anterior</th><th class='num'>Variación esta semana</th>"
-           "<th class='num'>Aporte al cambio del índice (pts)</th></tr></thead>")
+           "<th class='num'>Dato semana anterior</th><th class='num'>Dato esta semana</th><th class='num'>Variación</th>"
+           "<th class='num'>Hace subir o bajar el índice (pts)</th></tr></thead>")
     return f"<table class='vars aportes'>{cab}<tbody>{''.join(filas)}</tbody></table>"
 
 
@@ -381,16 +400,14 @@ def tabla_variables(p: pd.DataFrame, semana: Semana, variables: list | None = No
         if col not in p:
             continue
         f1, v1 = _hasta(p[col], semana.viernes)
-        f0, v0 = _hasta(p[col], cierre_prev)
-        _, vm2 = _hasta(p[col], cierre_prev - pd.Timedelta(days=7))
+        _, v0 = _hasta(p[col], cierre_prev)
         _, v4 = _hasta(p[col], hace4)
         d1, d4 = _variacion(v1, v0, tipo), _variacion(v1, v4, tipo, 28)
         a1, a4 = _variacion(v1, v0, "abs"), _variacion(v1, v4, "abs")
         # "nueva": hubo dato en la semana (una serie que la fuente dejó de
-        # actualizar no se comenta en el resumen). Lo mismo para la anterior.
+        # actualizar no se comenta en el resumen).
         datos[col] = {"v": v1, "d": d1, "d4": d4, "a": a1, "a4": a4, "fecha": f1, "nueva": f1 is not None and f1 >= semana.lunes,
-                      "d_prev": _variacion(v0, vm2, tipo), "a_prev": _variacion(v0, vm2, "abs"),
-                      "nueva_prev": f0 is not None and f0 >= semana.lunes - pd.Timedelta(days=7),
+                      "v_prev": v0,
                       "label": label, "unidad": unidad, "dec": dec, "tipo": tipo}
         nota = "" if f1 is None or f1 >= semana.lunes else f' <span class="muted">(al {f1.day}/{f1.month})</span>'
         filas.append(
@@ -611,62 +628,8 @@ def _minis_ar(p: pd.DataFrame, semana: Semana, payload: dict | None = None) -> l
 
 # Clave de lo que deja de contar de la semana anterior (no se muestra: los
 # aportes de la semana no suman el cambio del índice).
-PREVIO = "_semana_anterior"
+PREVIO = indicators.PREVIO
 APENDICE_FLUJOS = '<b>Por su movimiento de la semana</b> (tipo de cambio real, reservas, BADLAR, depósitos en dólares y riesgo país). Se miden por cuánto se movieron en los últimos 5 días, centrado en cero: la presión es el movimiento. Cada una muestra lo que hizo esta semana, con su signo: unas reservas que suben siempre restan y un riesgo país que sube siempre suma. Como el índice mira sólo los últimos 5 días, lo que estas variables hicieron la semana anterior deja de contar. Por eso los aportes no suman exactamente el cambio del índice: si las reservas suben lo mismo dos semanas seguidas, aportan lo mismo (restan) las dos semanas y el índice queda igual.'
-
-
-def cambio_por_componente(p: pd.DataFrame, semana: Semana, meta: dict, comps: list[str],
-                          blocks_cfg: dict | None = None, vida_media: float | None = None) -> dict[str, float]:
-    """Cuántos puntos movió cada componente al índice en la semana.
-
-    El cambio del índice se reparte en proporción a peso x cambio del z-score
-    de cada componente: una variable que no se movió (p. ej. un dato mensual
-    sin publicación nueva) no mueve el índice. Los que entran por su
-    movimiento de la semana, centrados en cero (reservas, riesgo país...),
-    muestran sólo lo de esta semana, con su signo: unas reservas que suben
-    siempre restan. Lo que esos hicieron la semana anterior, que el índice
-    deja de mirar, va junto en la clave PREVIO. Todo suma el cambio del índice.
-
-    Con flujos acumulados (`vida_media`), cada flujo muestra lo que se movió
-    en la semana y en PREVIO va lo acumulado antes, que se va borrando.
-    """
-    blocks_cfg = blocks_cfg or config.IPD_BLOCKS
-    flujo = {c for b in blocks_cfg.values() for c, spec in b["components"].items() if spec.get("centro_cero")}
-    _, i1 = _hasta(p["indice_0_100"], semana.viernes)
-    _, i0 = _hasta(p["indice_0_100"], semana.viernes - pd.Timedelta(days=7))
-    z = {}
-    for c in comps:
-        if f"z_{c}" not in p:
-            continue
-        _, z1 = _hasta(p[f"z_{c}"], semana.viernes)
-        _, z0 = _hasta(p[f"z_{c}"], semana.viernes - pd.Timedelta(days=7))
-        z[c] = (z1 if np.isfinite(z1) else 0.0, z0 if np.isfinite(z0) else 0.0, meta.get(c, {}).get("weight_ipd") or 0)
-    total = sum(w * (z1 - z0) for z1, z0, w in z.values())
-    if len(z) == len(comps) and np.isfinite(i1 - i0) and total * (i1 - i0) > 0:
-        k = (i1 - i0) / total
-        if vida_media:
-            rho = 0.5 ** (1 / vida_media)
-            out, resto = {}, 0.0
-            for c, (z1, z0, w) in z.items():
-                out[c] = k * w * (z1 - z0)
-                if c in flujo and f"noticia_{c}" in p:
-                    n = p[f"noticia_{c}"][(p.index > semana.viernes - pd.Timedelta(days=7)) & (p.index <= semana.viernes)].dropna()
-                    escala = _hasta(p[f"escala_{c}"], semana.viernes)[1]
-                    semana_c = sum(rho ** (len(n) - 1 - j) * v for j, v in enumerate(n.to_numpy())) / escala
-                    resto += out[c] - k * w * semana_c
-                    out[c] = k * w * semana_c
-            out[PREVIO] = resto
-            return out
-        out = {c: k * w * (z1 if c in flujo else z1 - z0) for c, (z1, z0, w) in z.items()}
-        out[PREVIO] = -k * sum(w * z0 for c, (z1, z0, w) in z.items() if c in flujo)
-        return out
-    # Sin z-scores: diferencia de los aportes (los de flujo, su aporte de hoy).
-    def pts(c, f):
-        return _hasta(p[f"pts_{c}"], f)[1]
-    previo = semana.viernes - pd.Timedelta(days=7)
-    out = {c: pts(c, semana.viernes) - (0 if c in flujo else pts(c, previo)) for c in comps}
-    out[PREVIO] = -sum(pts(c, previo) for c in comps if c in flujo)
-    return out
 
 
 def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict | None = None) -> str:
@@ -685,8 +648,8 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     pts_cierre = {c: _hasta(p[f"pts_{c}"], semana.viernes)[1] for c in labels if f"pts_{c}" in p}
     sub1 = {b: _hasta(p[f"indice_bloque_{b}"], semana.viernes)[1] for b in blocks_cfg if f"indice_bloque_{b}" in p}
     colores_sub = dict(zip(blocks_cfg, [S1, S2, S3]))
-    dpts = cambio_por_componente(p, semana, meta, list(pts_cierre), blocks_cfg,
-                                 payload.get("config", {}).get("flujos_vida_media"))
+    dpts = indicators.cambio_por_componente(p, semana.viernes, meta, list(pts_cierre), blocks_cfg,
+                                            payload.get("config", {}).get("flujos_vida_media"))
     sub_pts = {b: sum(pts_cierre[c] for c in blocks_cfg[b]["components"] if c in pts_cierre and np.isfinite(pts_cierre[c]))
                 for b in blocks_cfg}
     subs_hero = "".join(
@@ -770,7 +733,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note">Cuánto cambió cada variable la semana anterior y esta, y cuántos puntos subió (rojo) o bajó (azul) el índice por cada una. {perfil["nota_variables"]}</p>
+  <p class="note">El dato de cada variable el viernes anterior y este, su variación y cuántos puntos hizo subir (rojo) o bajar (azul) el índice frente a la semana anterior. {perfil["nota_variables"]}</p>
   {tabla_html}
 </section>
 

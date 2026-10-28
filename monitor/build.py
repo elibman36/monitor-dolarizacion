@@ -522,6 +522,15 @@ def run(offline: bool = False) -> dict:
         out_panel[f"escala_{c}"] = a["escala"]
     out_panel.to_csv(config.DATA_DIR / "panel_diario.csv", date_format="%Y-%m-%d", float_format="%.6g")
 
+    # Cuánto movió cada componente el índice en la última semana (contra 7 días
+    # antes), con el mismo cálculo que el reporte.
+    fecha = ipd["indice"].dropna().index[-1]
+    meta = {c["key"]: c for c in payload["ipd"]["components"]}
+    cambio = indicators.cambio_por_componente(out_panel, fecha, meta, [k for k in meta if f"pts_{k}" in out_panel],
+                                              config.IPD_BLOCKS,
+                                              config.IPD_FLUJOS_VIDA_MEDIA)
+    for c in payload["ipd"]["components"]:
+        c["cambio_semana"] = _clean(cambio.get(c["key"]))
     config.OUTPUT_JSON.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     h = payload["headline"]
     log.info("IPD %s = %s | índice 0-100 = %s (%s)", h["date"], h["ipd"], h["indice"], h["status_label"])
