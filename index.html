@@ -400,20 +400,23 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     bar.innerHTML = (DATA.config.tramos || []).map((tr) =>
       `<span style="flex:${tr.to - tr.from};background:var(--dv-${tr.key})" title="${tr.label} (${tr.from}–${Math.round(tr.to)})"></span>`).join("") +
       (h.indice == null ? "" : `<i class="gauge-mark" style="left:${Math.max(0, Math.min(100, h.indice))}%"></i>`);
-    const d = (a, b, dg) => (a == null || b == null) ? "–" : ((a - b > 0 ? "+" : "") + nf(a - b, dg));
+    // Cambio contra el dato anterior (el día hábil previo con dato).
+    const anterior = (pares) => {
+      const xs = (pares || []).filter((x) => x[1] != null);
+      return xs.length > 1 ? { fecha: xs[xs.length - 2][0], v: xs[xs.length - 2][1], ult: xs[xs.length - 1][1] } : null;
+    };
+    const dif = (a) => a == null ? "–" : (Math.abs(a.ult - a.v) < 0.5 ? "0" : (a.ult - a.v > 0 ? "+" : "") + nf(a.ult - a.v, 0));
+    const ai = anterior(DATA.ipd.indice);
     document.getElementById("hero-kv").innerHTML = `
       <span>Fecha</span><b>${h.date || "–"}</b>
-      <span>Cambio en 7 días</span><b>${d(h.indice, h.indice_7d, 0)} pts</b>
-      <span>Cambio en 30 días</span><b>${d(h.indice, h.indice_30d, 0)} pts</b>
+      <span>Cambio vs. dato anterior${ai ? ` (${ai.fecha})` : ""}</span><b>${dif(ai)} pts</b>
 `;
-    // Subíndices, cada uno en su escala 0-100, con su cambio en 7 días.
+    // Subíndices, cada uno en su escala 0-100, con su cambio contra el dato anterior.
     const bl = Object.values(DATA.ipd.blocks || {}).filter((b) => b.indice_last != null);
     const cols = ["--s1", "--s2", "--s3"];
     document.getElementById("hero-subs").innerHTML = bl.length
-      ? `<div class="subs-t">Subíndices (0–100). Entre paréntesis, cuánto movió cada uno el índice en 7 días</div><div class="kv">` + bl.map((b, i) => {
-        const dp = b.puntos == null || b.puntos_7d == null ? null : b.puntos - b.puntos_7d;
-        const dtxt = dp == null ? "–" : Math.abs(dp) < 0.05 ? "0" : (dp > 0 ? "+" : "") + nf(dp, 1);
-        return `<span><i class="sw" style="background:var(${cols[i % 3]})"></i>${b.label}</span><b>${nf(b.indice_last, 0)}/100 <small>(${dtxt} pts)</small></b>`;
+      ? `<div class="subs-t">Subíndices (0–100). Entre paréntesis, el cambio contra el dato anterior</div><div class="kv">` + bl.map((b, i) => {
+        return `<span><i class="sw" style="background:var(${cols[i % 3]})"></i>${b.label}</span><b>${nf(b.indice_last, 0)}/100 <small>(${dif(anterior(b.indice))})</small></b>`;
       }).join("") + "</div>"
       : "";
   }
