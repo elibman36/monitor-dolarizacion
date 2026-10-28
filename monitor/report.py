@@ -275,40 +275,44 @@ def _txt_cambio_indice(d: float) -> str:
     return f"{'subió' if d > 0 else 'bajó'} {fmt(abs(d), 0)} {'punto' if round(abs(d)) == 1 else 'puntos'}"
 
 
-def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, i1: float, i0: float,
+def tabla_aportes(blocks_cfg: dict, meta: dict, pts: dict, dpts: dict, sub1: dict, i1: float, i0: float,
                   datos: dict, perfil: dict, pesos_b: dict | None = None) -> str:
     """Una fila por subíndice y componente: peso, nivel, variación en la semana
-    (absoluta y porcentual) y cuántos puntos aportó al índice en la semana;
-    al final, el índice y si subió o bajó."""
-    def suma(cols):
-        vals = [dpts[c] for c in cols if c in dpts and np.isfinite(dpts[c])]
+    (absoluta y porcentual), aporte al índice (puntos por encima o por debajo
+    de 50: suman la distancia del índice a 50) y aporte al cambio de la semana.
+    Al final, el índice: su distancia a 50 y si subió o bajó."""
+    def suma(d, cols):
+        vals = [d[c] for c in cols if c in d and np.isfinite(d[c])]
         return sum(vals) if vals else np.nan
-    def fila_100(label, peso, n1, cambio, clase):
-        # Subíndices e índice: sólo nivel y cambio (su variación en la escala
-        # 0-100 se confundía con la del índice).
-        return (f"<tr class='{clase}'><td>{label}</td><td class='num'>{peso}</td>"
-                f"<td class='num'>{fmt(n1, 0)}/100</td><td></td><td></td>{_celda_aporte(cambio, True)}</tr>")
     filas = []
     for bkey, b in blocks_cfg.items():
-        cols = [c for c in b["components"] if c in dpts]
+        cols = [c for c in b["components"] if c in pts]
         if not cols:
             continue
-        filas.append(fila_100(html.escape(b["label"]), f"{fmt((pesos_b or {}).get(bkey, b['weight']) * 100, 0)}%",
-                              sub1.get(bkey, np.nan), suma(cols), "sub"))
+        # Subíndices: sólo nivel y aportes (su variación en la escala 0-100 se
+        # confundía con la del índice).
+        filas.append(f"<tr class='sub'><td>{html.escape(b['label'])}</td>"
+                     f"<td class='num'>{fmt((pesos_b or {}).get(bkey, b['weight']) * 100, 0)}%</td>"
+                     f"<td class='num'>{fmt(sub1.get(bkey, np.nan), 0)}/100</td><td></td><td></td>"
+                     f"{_celda_aporte(suma(pts, cols), True)}{_celda_aporte(suma(dpts, cols), True)}</tr>")
         for c in sorted(cols, key=lambda c: -(meta.get(c, {}).get("weight") or 0)):
             w = meta.get(c, {}).get("weight_ipd")
             v = datos.get(_var_comp(perfil, c))
             va, vp = _var_semana(v)
             filas.append(f"<tr><td class='comp'>{html.escape(b['components'][c]['label'])}</td>"
                          f"<td class='num muted'>{fmt((w or 0) * 100, 0)}%</td><td class='num'>{_nivel(v)}</td>"
-                         f"<td class='num{' muted' if va == 'sin dato nuevo' else ''}'>{va}</td><td class='num'>{vp}</td>{_celda_aporte(dpts[c])}</tr>")
-    # El índice: su valor y, entre paréntesis, si subió o bajó. Los aportes de
-    # la semana no suman su cambio: también cuenta que deja de pesar lo que las
-    # variables de movimiento hicieron antes.
-    filas.append(f"<tr class='tot'><td>Índice</td><td class='num'>100%</td><td class='num'>{fmt(i1, 0)}/100</td>"
-                 f"<td></td><td></td><td class='num'>({_txt_cambio_indice(i1 - i0)})</td></tr>")
+                         f"<td class='num{' muted' if va == 'sin dato nuevo' else ''}'>{va}</td><td class='num'>{vp}</td>"
+                         f"{_celda_aporte(pts[c])}{_celda_aporte(dpts.get(c, np.nan))}</tr>")
+    # El índice: cuánto quedó por encima o por debajo de 50 (lo que suman los
+    # aportes) y si subió o bajó. Los aportes al cambio no suman exactamente
+    # su cambio: también deja de pesar lo que las variables de movimiento
+    # hicieron la semana anterior.
+    filas.append(f"<tr class='tot'><td>Índice</td><td class='num'>100%</td><td class='num'>{fmt(i1, 0)}/100</td><td></td><td></td>"
+                 f"{_celda_aporte(i1 - 50, True).replace('</td>', f'<br><span class=muted style=font-weight:400>({fmt(i1, 1)} − 50)</span></td>')}"
+                 f"<td class='num'>({_txt_cambio_indice(i1 - i0)})</td></tr>")
     cab = ("<thead><tr><th>Subíndice y componente</th><th class='num'>Peso</th><th class='num'>Nivel</th>"
-           "<th class='num'>Variación en la semana</th><th class='num'>Variación %</th><th class='num'>Aporte en la semana (pts)</th></tr></thead>")
+           "<th class='num'>Variación en la semana</th><th class='num'>Variación %</th>"
+           "<th class='num'>Aporte al índice (pts)</th><th class='num'>Aporte al cambio en la semana (pts)</th></tr></thead>")
     return f"<table class='vars aportes'>{cab}<tbody>{''.join(filas)}</tbody></table>"
 
 
@@ -475,9 +479,10 @@ def _corto(label: str) -> str:
     return _minus(label.split(" (")[0])
 
 
-def resumen(indice, semana, dpts: dict, perfil: dict | None = None) -> list[str]:
-    """Resumen en palabras: cuánto se movió el índice en la semana y qué lo
-    empujó, en puntos."""
+def resumen(indice, semana, pts: dict, dpts: dict, perfil: dict | None = None) -> list[str]:
+    """Resumen en palabras. Primero dónde quedó el índice respecto de 50 y qué
+    lo deja ahí (los aportes suman la distancia a 50); después cuánto se movió
+    respecto del viernes anterior y qué lo movió."""
     perfil = perfil or PERFIL_AR
     blocks_cfg = perfil["blocks"]
     _, i1 = _hasta(indice, semana.viernes)
@@ -485,29 +490,34 @@ def resumen(indice, semana, dpts: dict, perfil: dict | None = None) -> list[str]
     tramo = indicators.status_for(i1)[1].lower()
     labels = {c: spec["label"] for b in blocks_cfg.values() for c, spec in b["components"].items()}
     puntos = []
-    if np.isfinite(i1):
-        txt = f"El índice cerró la semana en <b>{fmt(i1, 0)}/100</b> ({tramo})"
-        if np.isfinite(i0):
-            dif = i1 - i0
-            if abs(dif) < 1.5:
-                txt += f", sin cambios relevantes respecto del viernes anterior ({fmt(i0, 0)})"
-            else:
-                txt += f", {fmt(abs(dif), 0)} puntos {'por encima' if dif > 0 else 'por debajo'} del viernes anterior ({fmt(i0, 0)})"
-        puntos.append(txt + ".")
-    pc = {k: v for k, v in dpts.items() if k != PREVIO and np.isfinite(v)}
-    # Qué lo movió: cuántos puntos cambió el aporte de cada componente en la
-    # semana, de mayor a menor.
-    if pc:
-        for signo, titulo in ((1, "Lo hicieron subir"), (-1, "Lo hicieron bajar")):
-            comps = sorted((k for k in pc if signo * pc[k] >= 0.1), key=lambda k: -abs(pc[k]))[:5]
-            if comps:
-                puntos.append(f"<b>{titulo}</b>: " + "; ".join(_movimiento(labels[k], pc[k]) for k in comps) + ".")
-        por_bloque = []
-        for k, b in blocks_cfg.items():
-            if not any(c in pc for c in b["components"]):
-                continue
-            por_bloque.append(f"{_minus(b['label'])} ({_pts1(sum(pc[c] for c in b['components'] if c in pc))} pts)")
+
+    def lista(d: dict, signo: int) -> list[str]:
+        comps = sorted((k for k in d if signo * d[k] >= 0.1), key=lambda k: -abs(d[k]))[:5]
+        return [_movimiento(labels[k], d[k]) for k in comps]
+
+    if not np.isfinite(i1):
+        return puntos
+    dist = i1 - 50
+    if abs(dist) < 0.5:
+        donde = "en 50, el punto neutral"
+    else:
+        donde = f"{fmt(abs(dist), 0)} {'punto' if round(abs(dist)) == 1 else 'puntos'} {'por encima' if dist > 0 else 'por debajo'} de 50"
+    puntos.append(f"El índice cerró la semana en <b>{fmt(i1, 0)}/100</b> ({tramo}): {donde}.")
+    pn = {k: v for k, v in pts.items() if np.isfinite(v)}
+    for signo, titulo in ((1, "Lo empujan por encima de 50"), (-1, "Lo empujan por debajo de 50")):
+        items = lista(pn, signo)
+        if items:
+            puntos.append(f"<b>{titulo}</b>: " + "; ".join(items) + ".")
+    por_bloque = [f"{_minus(b['label'])} ({_pts1(sum(pn[c] for c in b['components'] if c in pn))} pts)"
+                  for b in blocks_cfg.values() if any(c in pn for c in b["components"])]
+    if por_bloque:
         puntos.append("<b>Por subíndice</b>: " + "; ".join(por_bloque) + ".")
+    if np.isfinite(i0):
+        pc = {k: v for k, v in dpts.items() if k != PREVIO and np.isfinite(v)}
+        txt = f"<b>Frente al viernes anterior</b> ({fmt(i0, 0)}), {_txt_cambio_indice(i1 - i0)}"
+        partes = [f"lo hicieron {verbo}: " + "; ".join(items)
+                  for verbo, items in (("subir", lista(pc, 1)), ("bajar", lista(pc, -1))) if items]
+        puntos.append(txt + (". " + ". ".join(p[:1].upper() + p[1:] for p in partes) if partes else "") + ".")
     return puntos
 
 
@@ -620,7 +630,7 @@ def _minis_ar(p: pd.DataFrame, semana: Semana, payload: dict | None = None) -> l
 # aportes de la semana no suman el cambio del índice).
 PREVIO = "_semana_anterior"
 APENDICE_FLUJOS = '<b>Por su movimiento de la semana</b> (oficial contra la inflación, reservas, BADLAR, depósitos en dólares y riesgo país). Se miden por cuánto se movieron en los últimos 5 días, centrado en cero: la presión es el movimiento. Cada una muestra lo que hizo esta semana, con su signo: unas reservas que suben siempre restan y un riesgo país que sube siempre suma. Como el índice mira sólo los últimos 5 días, lo que estas variables hicieron la semana anterior deja de contar. Por eso los aportes no suman exactamente el cambio del índice: si las reservas suben lo mismo dos semanas seguidas, aportan lo mismo (restan) las dos semanas y el índice queda igual.'
-NOTA_FLUJOS = 'El oficial (contra la inflación, medida por el CER), las reservas, la BADLAR, los depósitos y el riesgo país entran por su movimiento de los últimos 5 días, centrado en cero: muestran lo que hicieron esta semana, con su signo (unas reservas que suben siempre restan). Los aportes no suman exactamente el cambio del índice, porque también deja de contar lo que estas variables hicieron la semana anterior (si las reservas suben lo mismo dos semanas seguidas, restan las dos semanas y el índice queda igual).'
+NOTA_FLUJOS = "El oficial (contra la inflación, medida por el CER), las reservas, la BADLAR, los depósitos y el riesgo país aportan según cuánto se movieron en los últimos 5 días: unas reservas que suben siempre restan."
 
 
 def cambio_por_componente(p: pd.DataFrame, semana: Semana, meta: dict, comps: list[str],
@@ -695,11 +705,11 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     colores_sub = dict(zip(blocks_cfg, [S1, S2, S3]))
     dpts = cambio_por_componente(p, semana, meta, list(pts_cierre), blocks_cfg,
                                  payload.get("config", {}).get("flujos_vida_media"))
-    sub_dpts = {b: sum(dpts[c] for c in blocks_cfg[b]["components"] if c in dpts and np.isfinite(dpts[c]))
+    sub_pts = {b: sum(pts_cierre[c] for c in blocks_cfg[b]["components"] if c in pts_cierre and np.isfinite(pts_cierre[c]))
                 for b in blocks_cfg}
     subs_hero = "".join(
         f"<span><i style='background:{colores_sub[b]}'></i>{html.escape(blocks_cfg[b]['label'])}</span>"
-        f"<b>{fmt(sub1[b], 0)}/100 <small>({_pts1(sub_dpts.get(b, np.nan))} pts)</small></b>"
+        f"<b>{fmt(sub1[b], 0)}/100 <small>({_pts1(sub_pts.get(b, np.nan))} pts)</small></b>"
         for b in blocks_cfg if b in sub1 and np.isfinite(sub1[b]))
     sub_svg = chart_subindices(indice, [(blocks_cfg[b]["label"], p[f"indice_bloque_{b}"], colores_sub[b]) for b in sub1], semana) if sub1 else ""
 
@@ -716,8 +726,8 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
                 datos[vk]["habitual"] = (x.tail(config.IPD_ZSCORE_WINDOW).median() if spec["transform"] == "level"
                                          else x.tail(252).mean())
     pesos_b = {b: (payload["ipd"]["blocks"].get(b, {}).get("weight") or blocks_cfg[b]["weight"]) for b in blocks_cfg}
-    tabla_html = tabla_aportes(blocks_cfg, meta, dpts, sub1, i1, i0, datos, perfil, pesos_b)
-    puntos = resumen(indice, semana, dpts, perfil)
+    tabla_html = tabla_aportes(blocks_cfg, meta, pts_cierre, dpts, sub1, i1, i0, datos, perfil, pesos_b)
+    puntos = resumen(indice, semana, pts_cierre, dpts, perfil)
     texto_semana = racconto(semana.viernes)
 
     gauge = "".join(f"<span style='flex:{min(hi, 100) - lo};background:{TRAMO_COLOR[k]}'></span>"
@@ -761,7 +771,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
       <span>Semana anterior</span><b>{fmt(i0, 0)} ({fmt(i1 - i0, 0, signo=True)} pts)</b>
       <span>Hace 4 semanas</span><b>{fmt(i4, 0)} ({fmt(i1 - i4, 0, signo=True)} pts)</b>
     </div>
-    {f"<div class='subs-t'>Subíndices (0–100). Entre paréntesis, cuántos puntos movió cada uno al índice en la semana</div><div class='kv subs'>{subs_hero}</div>" if subs_hero else ""}
+    {f"<div class='subs-t'>Subíndices (0–100). Entre paréntesis, cuánto aporta cada uno a la distancia del índice a 50</div><div class='kv subs'>{subs_hero}</div>" if subs_hero else ""}
   </div>
   <div class="card">
     <h2>Resumen de la semana</h2>
@@ -776,7 +786,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note"><b>Nivel</b> y <b>variación</b>: el dato de cada variable al viernes {fecha_larga(semana.viernes)} (o el último publicado) y cuánto cambió en la semana. {perfil["nota_variables"]} <b>Aporte en la semana</b>: cuántos puntos empujó cada variable el índice hacia arriba (rojo) o hacia abajo (azul) esta semana. Las variables de nivel (volatilidades, brecha, canje, futuros) aportan según cuánto cambiaron: si suben, suman. {perfil.get("nota_flujos", NOTA_FLUJOS)} Más detalle en el apéndice.</p>
+  <p class="note"><b>Nivel</b> y <b>variación</b>: el dato de cada variable al viernes {fecha_larga(semana.viernes)} (o el último publicado) y cuánto cambió en la semana. {perfil["nota_variables"]} <b>Aporte al índice</b>: cuántos puntos empuja cada variable el índice por encima (rojo) o por debajo (azul) de 50, el punto neutral; suman la distancia del índice a 50. Las variables de nivel (volatilidades, brecha, canje, futuros) aportan según estén por encima o por debajo de lo habitual de los dos años anteriores. {perfil.get("nota_flujos", NOTA_FLUJOS)} <b>Aporte al cambio en la semana</b>: cuánto subió o bajó el índice frente al viernes anterior por cada variable; no suman exactamente el cambio del índice, porque también deja de contar lo que las variables de movimiento hicieron la semana anterior. Más detalle en el apéndice.</p>
   {tabla_html}
 </section>
 
@@ -910,7 +920,7 @@ def apendice(perfil: dict, meta: dict) -> str:
         return ""
     return f"""<section class="page method apendice">
   <h2>Apéndice metodológico: qué mueve el índice</h2>
-  <p>El índice mide cuánta presión hay sobre el peso: arriba de 50, presión hacia la depreciación; abajo, alivio. El reporte muestra cuántos puntos empujó cada variable el índice en la semana, hacia arriba o hacia abajo, y al final el valor del índice y si subió o bajó. Lo que mueve el índice depende de cómo entra cada variable:</p>
+  <p>El índice mide cuánta presión hay sobre el peso: arriba de 50, presión hacia la depreciación; abajo, alivio. El reporte muestra primero cuántos puntos empuja cada variable el índice por encima o por debajo de 50 (suman la distancia del índice a 50) y después cuánto lo movió frente a la semana anterior. Lo que mueve el índice depende de cómo entra cada variable:</p>
   <ul>
     <li><b>Por su nivel</b> (volatilidades del oficial y del CCL, brecha, canje, devaluación implícita y posición abierta en futuros). Si la variable sube en la semana, el índice sube; si baja, baja. Que esté por encima o por debajo de lo habitual de los dos años anteriores define si, en el nivel, cuenta como presión o como calma: una volatilidad baja que sube empuja el índice hacia arriba, aunque todavía cuente como calma.</li>
     <li>{perfil.get("apendice_flujos", APENDICE_FLUJOS)}</li>

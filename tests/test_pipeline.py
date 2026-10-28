@@ -252,7 +252,7 @@ def test_reporte_semanal_html(fake_api):
     payload = json.loads((tmp / "monitor.json").read_text())
     html_txt = report.construir_html(semana, p, payload)
     assert "Reporte semanal" in html_txt and "/100" in html_txt
-    assert "Qué explica el índice" in html_txt and "Aporte en la semana" in html_txt and "Variación en la semana" in html_txt and "<svg" in html_txt
+    assert "Qué explica el índice" in html_txt and "Aporte al índice" in html_txt and "Aporte al cambio en la semana" in html_txt and "Variación en la semana" in html_txt and "<svg" in html_txt
     assert "Apéndice metodológico" in html_txt and "Sube el índice en la semana" in html_txt
 
 

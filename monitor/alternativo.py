@@ -47,9 +47,7 @@ def perfil() -> dict:
         "panel": DATA_DIR / "panel_diario.csv", "json": DATA_DIR / "monitor.json", "salida": SALIDA,
         "apendice": textos,
         "nota_flujos": (f"En esta versión, {NOMBRES} entran acumulados: cada movimiento diario se suma a la presión y se va "
-                        "borrando de a poco (la mitad en un mes). Cada uno muestra lo que se movió en la semana, con su signo "
-                        "(unas reservas que suben siempre restan, aunque suban menos que la semana anterior). Los aportes no "
-                        "suman exactamente el cambio del índice, porque lo acumulado antes se va borrando."),
+                        "borrando de a poco (la mitad en un mes); unas reservas que suben siempre restan."),
         "apendice_flujos": (f"<b>Acumulados</b> ({NOMBRES}). Cada movimiento diario se suma a la presión acumulada, que se va "
                             "borrando de a poco: pierde la mitad de su peso en un mes. Por eso el movimiento de la semana siempre "
                             "empuja el índice con su signo: si las reservas suben, el índice baja, aunque suban menos que la "
