@@ -40,25 +40,22 @@ def perfil() -> dict:
     }.items():
         _, sube, baja, ojo = textos[c]
         ojo = ojo.replace("Entra por su movimiento de los últimos 5 días, centrado en cero", "Su movimiento de la semana siempre empuja el índice con su signo")
-        ojo = ojo.replace("Lo que hizo la semana anterior va en la línea aparte.", "Lo acumulado antes se va borrando y va en la línea aparte.")
         textos[c] = (como, sube, baja, ojo)
     return {
         **report.PERFIL_AR,
         "titulo": " · versión alternativa",
         "panel": DATA_DIR / "panel_diario.csv", "json": DATA_DIR / "monitor.json", "salida": SALIDA,
         "apendice": textos,
-        "previo_label": "Lo acumulado en semanas anteriores, que se va borrando",
-        "previo_nota": f"Lo que acumularon antes {NOMBRES}: pierde la mitad de su peso en un mes",
         "nota_flujos": (f"En esta versión, {NOMBRES} entran acumulados: cada movimiento diario se suma a la presión y se va "
                         "borrando de a poco (la mitad en un mes). Cada uno muestra lo que se movió en la semana, con su signo "
-                        "(unas reservas que suben siempre restan, aunque suban menos que la semana anterior); lo acumulado "
-                        "antes, que se va borrando, va en una línea aparte."),
+                        "(unas reservas que suben siempre restan, aunque suban menos que la semana anterior). Los aportes no "
+                        "suman exactamente el cambio del índice, porque lo acumulado antes se va borrando."),
         "apendice_flujos": (f"<b>Acumulados</b> ({NOMBRES}). Cada movimiento diario se suma a la presión acumulada, que se va "
                             "borrando de a poco: pierde la mitad de su peso en un mes. Por eso el movimiento de la semana siempre "
                             "empuja el índice con su signo: si las reservas suben, el índice baja, aunque suban menos que la "
-                            "semana anterior. Lo acumulado antes pierde peso de a poco (y no de golpe a los 5 días); eso va en "
-                            "una línea aparte, “Lo acumulado en semanas anteriores, que se va borrando”. Si el BCRA venía "
-                            "comprando mucho, esa línea suma un poco cada semana, pero 10 M de compras siempre restan."),
+                            "semana anterior. Lo acumulado antes pierde peso de a poco (y no de golpe a los 5 días): si el BCRA "
+                            "venía comprando mucho y una semana compra 10 M, esos 10 M restan y el índice sube sólo un poco, "
+                            "porque lo acumulado se va borrando."),
         "aviso": ("<section class='section card' style='border-color:#e0a030;background:#fff8ea'><b>Versión alternativa, "
                   "para comparar.</b> El oficial, las reservas, la BADLAR, los depósitos y el riesgo país entran acumulados "
                   "(cada movimiento suma y se va borrando en un mes) en lugar de por su movimiento de los últimos 5 días. "
