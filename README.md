@@ -180,9 +180,7 @@ El cálculo sigue estos pasos:
    componente pesa según su carga en el primer componente principal (cuánto se
    mueve junto con el resto). Las cargas negativas valen cero, para no invertir
    el sentido económico de ninguna variable, y ningún componente pesa menos del
-   10% de su bloque (`IPD_PCA_PESO_MINIMO`) ni más del 10% del índice
-   (`IPD_PESO_MAXIMO`; el exceso se reparte entre los demás en proporción a su
-   peso). Los pesos se recalculan en cada
+   10% de su bloque (`IPD_PCA_PESO_MINIMO`). Los pesos se recalculan en cada
    corrida y se publican en `monitor.json`, el tablero y el reporte
    (`IPD_PONDERACION = "fija"` vuelve a los pesos manuales). Si falta un
    componente, su peso se reparte entre los demás; el índice sólo se publica si

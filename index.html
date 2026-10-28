@@ -171,7 +171,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
           <button data-f="d" aria-pressed="true">Diario</button><button data-f="w">Semanal</button><button data-f="m">Mensual</button>
         </div>
       </div>
-      <p class="note" id="idx-note">Dato diario, sin promediar. El color de la línea indica el tramo; las verticales marcan elecciones y episodios cambiarios.</p>
+      <p class="note" id="idx-note">Dato diario. Las verticales marcan elecciones y episodios cambiarios.</p>
       <div class="chart tall" id="c-idx" role="img" aria-label="Índice de presión cambiaria 0 a 100"></div>
     </div>
   </section>
@@ -182,8 +182,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card-head">
       <h2>Qué explica el índice</h2>
     </div>
-    <p class="note"><b>Aporte al índice</b>: cuántos puntos suma (rojo) o resta (azul) cada parte al índice, que arranca en 50; los aportes suman la distancia del índice a 50. <b>Qué mira el índice</b>: para el oficial (descontada la inflación: si sube lo mismo o menos que los precios no suma), las reservas, la BADLAR, los depósitos y el riesgo país, cuánto se movieron en los últimos 5 días hábiles (si las reservas subieron, restan; si cayeron, suman); para el resto, su nivel comparado con lo habitual de los dos años anteriores (en negrita): si está por encima suma y si está por debajo resta, aunque en la semana se haya movido para el otro lado (en gris).</p>
-    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
+    <p class="note">Aporte: puntos que cada variable empuja el índice por encima (rojo) o por debajo (azul) de 50.</p>    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
     <h2>Subíndices</h2>
@@ -199,7 +198,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   <section class="grid1">
     <div class="card">
       <h2>Compras de USD de personas humanas</h2>
-      <p class="note">Compras netas de billetes y divisas sin fines específicos, mensual, millones de USD. BCRA, balance cambiario.</p>
+      <p class="note">Millones de USD por mes.</p>
       <div class="chart" id="c-ph" role="img" aria-label="Compras de dólares de personas humanas"></div>
     </div>
   </section>
@@ -211,21 +210,16 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
   <h2 class="section-title">Metodología</h2>
   <section class="card method">
-    <div>
-    <p>El Índice de Dolarización (ID) adapta el <em>Exchange Market Pressure Index</em> (Girton y Roper, 1977; Eichengreen, Rose y Wyplosz, 1996) a la economía bimonetaria argentina. Cada componente se transforma para que un valor más alto signifique más presión, se estandariza contra los últimos 2 años con mediana y desvío absoluto mediano (una versión robusta del z-score, para que un salto extremo como el de diciembre de 2023 no haga parecer chicos los movimientos siguientes). Para el oficial, las reservas, la BADLAR, los depósitos en dólares y el riesgo país, que se miden por su cambio en 5 días hábiles, el centro es cero y no la mediana: así una semana en que las reservas suben siempre resta presión, y una en que caen siempre suma (con la escala de sus dos años anteriores). Los componentes se promedian dentro de tres subíndices:</p>
+    <p>El índice mide la presión sobre el peso en una escala de 0 a 100: 50 es neutral, arriba hay presión hacia la depreciación y abajo, alivio. Combina 13 variables en tres subíndices:</p>
     <ul>
-      <li><b>Presión cambiaria:</b> depreciación del oficial A3500 en 5 días descontada la inflación (con el CER: si el dólar sube lo mismo o menos que los precios, no suma presión), volatilidad del oficial (20 días), evolución de las reservas brutas en 5 días, suba de la tasa BADLAR en 5 días (defensa del peso), brecha MEP / oficial, que mide cuánto pesan las restricciones para comprar al oficial, y futuros de dólar vendidos por el BCRA (intervención en el mercado de futuros, como la venta de reservas en el de contado: cobertura que absorbe el BCRA para contener la devaluación implícita; cuenta la variación mensual de la posición vendida neta, así que ampliarla suma presión y desarmarla resta; dato de fin de mes de la planilla de reservas, que entra 35 días después).</li>
-      <li><b>Dolarización de portafolios:</b> devaluación implícita en los futuros de A3 Mercados (TNA a 90 días), posición abierta en futuros de dólar (demanda de cobertura, promedio de 21 días para sacar el efecto de los vencimientos), depósitos en dólares del sector privado (cuando caen suma presión; cuando crecen, alivia) y compras netas de dólares de personas humanas (FAE, dato mensual que entra un mes después de su cierre, medido contra su promedio de 12 meses para no confundir la salida del cepo con presión).</li>
-      <li><b>Extranjerización de portafolios:</b> canje (CCL / MEP), que mide la preferencia por tener dólares afuera del país; volatilidad del CCL, y suba del riesgo país en 5 días.</li>
+      <li><b>Presión cambiaria:</b> tipo de cambio real, su volatilidad, reservas, tasa BADLAR, brecha MEP / oficial y futuros vendidos por el BCRA.</li>
+      <li><b>Dolarización de portafolios:</b> devaluación implícita y posición abierta en futuros, depósitos en dólares y compras de dólares de personas humanas.</li>
+      <li><b>Extranjerización de portafolios:</b> canje (CCL / MEP), volatilidad del CCL y riesgo país.</li>
     </ul>
-    <p>El índice se publica desde 2003. Los datos de 1996–2002 sólo se usan como referencia para estandarizar: con la convertibilidad el tipo de cambio no se movía, la BADLAR oscilaba 20 a 45 puntos por semana y se desplomó con el corralito, y hay huecos en los datos. No todos los componentes existen desde el inicio: la brecha se suma en 2011 (con el blue hasta 2012 y el CCL hasta que hay MEP, en 2018), la FAE en 2008, el canje en 2019 y los futuros en 2020. El tooltip del gráfico de la medida de base indica cuántos componentes había cada día.</p>
-    </div>
-    <p><b>Ponderación.</b> Los subíndices se ponderan con componentes principales, igual que los componentes dentro de cada uno. Dentro de cada bloque, los pesos salen de componentes principales: se toman los promedios mensuales de los componentes estandarizados desde 2003 y cada uno pesa según su carga en el primer componente principal del bloque, es decir, según cuánto se mueve junto con el resto. Las cargas negativas valen cero, para no invertir el sentido económico de ninguna variable, y ningún componente pesa menos del 10% de su bloque: así ninguna variable queda afuera aunque la PCA le asigne carga nula. Además, ningún componente pesa más del 10% del índice: lo que excede se reparte entre los demás en proporción a su peso, para que un subíndice con pocas variables no concentre el índice en dos o tres. Los pesos se recalculan en cada actualización con toda la historia.</p>
+    <p>Las reservas, los depósitos, la tasa, el tipo de cambio real y el riesgo país cuentan por su movimiento de los últimos 5 días hábiles; el resto, por su nivel frente a los dos años anteriores. Los pesos salen de componentes principales:</p>
     <div class="table-wrap"><table id="pesos-tbl"><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody></tbody></table></div>
     <p class="note" id="pesos-nota"></p>
-    <p>Si falta un componente, su peso se reparte entre los demás de su subíndice. El índice se publica cuando hay datos para al menos el 40% del peso.</p>
-    <p><b>Índice 0–100.</b> Para comunicarlo, la medida de base de cada día se lleva a una escala de 0 a 100 con la distribución normal, sin promediar días: Índice = 100 × Φ(ID / σ), donde σ es el desvío histórico del ID. Así reacciona enseguida a los giros, aunque puede moverse bastante de un día a otro; las vistas semanal y mensual del gráfico lo promedian. 50 es neutral. Debajo de 50 hay presión apreciatoria (alivio: entran dólares, baja el riesgo país, se acumulan reservas). Arriba de 50 hay presión depreciatoria. Un valor de 90 indica que la presión es tan alta como en el 10% de los días más tensos de la serie desde 2003. Tramos: 0–10 fuerte presión apreciatoria; 10–35 presión apreciatoria; 35–65 neutral; 65–90 presión depreciatoria; 90–100 fuerte presión depreciatoria. <b>Aportes en puntos:</b> la distancia del índice a 50 se reparte entre los componentes según su aporte a la medida de base, así que los aportes suman exactamente esa distancia.</p>
-    <p class="note">Advertencias: las reservas brutas cambian también por pagos de deuda y por la valuación del oro y las monedas; los cambios de régimen, como el desdoblamiento o las bandas de abr-25, alteran la comparabilidad. Los parámetros están en <code>monitor/config.py</code>.</p>
+    <p class="note">Detalle de la metodología en el reporte semanal y en el repositorio.</p>
   </section>
   </div>
   <p class="note" id="foot" style="margin-top:16px"></p>
@@ -261,12 +255,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     { title: "Volatilidad cambiaria (20 días)", keys: ["vol_oficial", "vol_ccl"], names: ["Oficial", "CCL"], unit: "% anualizada" },
     { title: "Riesgo país", keys: ["riesgo_pais"], unit: "pb" },
     { title: "Reservas internacionales", keys: ["reservas", "reservas_netas", "reservas_netas_sin_fmi"],
-      names: ["Brutas", "Netas", "Netas sin FMI"],
-      unit: "millones de USD", nota: "Netas según la planilla de reservas del BCRA (formato FMI): brutas menos encajes en dólares, depósitos del Tesoro, préstamos del BIS, swap con China y pases. Sin FMI: además, sin lo girado por el programa de abril de 2025. Dato de fin de mes." },
+      names: ["Brutas", "Netas (eje der.)", "Netas sin FMI (eje der.)"], der: ["reservas_netas", "reservas_netas_sin_fmi"],
+      unit: "millones de USD" },
     { title: "Tasa BADLAR (bancos privados)", keys: ["tasa"], unit: "% n.a." },
     { title: "Devaluación implícita en futuros (90 días)", keys: ["deval_implicita"], unit: "% TNA" },
-    { title: "Interés abierto en futuros de dólar", keys: ["futuros_interes_abierto"], unit: "contratos" },
-    { title: "Posición vendida neta del BCRA en futuros (fin de mes)", keys: ["posicion_bcra"], unit: "millones de USD", bars: true },
+    { title: "Posición abierta en futuros de dólar", keys: ["futuros_interes_abierto"], unit: "millones de USD" },
+    { title: "Futuros vendidos por el BCRA", keys: ["posicion_bcra"], unit: "millones de USD, fin de mes", bars: true },
     { title: "Depósitos en dólares", keys: ["depositos_usd"], unit: "millones de USD" },
   ];
 
@@ -373,11 +367,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   function eventLines(pairs) {
     if (!pairs.length) return [];
     const a = pairs[0][0], b = pairs[pairs.length - 1][0];
-    // En rangos largos sólo se rotulan los eventos cambiarios, para no superponer textos.
-    const long = (new Date(b) - new Date(a)) / 864e5 > 6 * 365;
     return (DATA.events || []).filter((e) => e.date >= a && e.date <= b).map((e) => ({
       xAxis: e.date, name: e.label,
-      label: { show: !long || e.tipo === "cambiario", formatter: e.label, color: css("--muted"), fontSize: 10, position: "insideEndTop" },
+      label: { show: false },
     }));
   }
 
@@ -576,55 +568,39 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       if (pp) return sg(c.abs) + " pp";
       if (pb) return sg(c.abs, 0) + " pb";
       if (usd) return sg(c.abs, 0) + " M USD";
-      return sg(c.abs, 2) + " $ (" + sg(c.pct) + "%)";
+      return sg(c.pct) + "%";
     };
-    const queMira = (k, transform) => {
+    // Variación de la variable en la última semana (H días hábiles). El tipo
+    // de cambio real (oficial / CER), mensualizada. La FAE es mensual: contra
+    // el mes anterior.
+    const variacion = (k) => {
+      if (k === "compras_ph") {
+        const ph = DATA.monthly && DATA.monthly.compras_personas_humanas;
+        if (!ph || ph.length < 2) return "–";
+        const u = ph[ph.length - 1], a = ph[ph.length - 2];
+        return `${sg(u.netas_usd_millones - a.netas_usd_millones, 0)} M USD <span class="muted">(${u.fecha} vs. mes anterior)</span>`;
+      }
+      if (k === "tc_a3500") {
+        const tc = cambioH(DATA.series.tc_oficial_ref, h.date), cer = DATA.series.cer ? cambioH(DATA.series.cer, h.date) : null;
+        if (!tc || !cer) return "–";
+        const sem = (1 + tc.pct / 100) / (1 + cer.pct / 100);
+        return sg((Math.pow(sem, 30 / 7) - 1) * 100) + "% <span class='muted'>mensual</span>";
+      }
       const s = DATA.series[k] || DATA.series[ALIAS[k]];
-      // Las compras de personas (FAE) son mensuales y vienen aparte.
-      const ph = DATA.monthly && DATA.monthly.compras_personas_humanas;
-      if (k === "compras_ph" && ph && ph.length > 1) {
-        const u = ph[ph.length - 1], a = ph[ph.length - 2], v = u.netas_usd_millones - a.netas_usd_millones;
-        const prom = ph.slice(-12).reduce((t, x) => t + x.netas_usd_millones, 0) / Math.min(12, ph.length);
-        const dif = u.netas_usd_millones - prom;
-        return `<td class="num">${nf(u.netas_usd_millones, 0)} <span class="muted">M USD en ${u.fecha} · ${sg(v, 0)} M USD contra el mes anterior</span><br><b>${nf(Math.abs(dif), 0)} M USD ${dif > 0 ? "por encima" : "por debajo"} del promedio de 12 meses</b></td>`;
+      if (!s || !s.data) return "–";
+      if (/mes/.test(s.unit)) {  // dato de fin de mes
+        const n = s.data.length;
+        return n > 1 ? `${txtCambio(s, { abs: s.data[n - 1][1] - s.data[n - 2][1], pct: (s.data[n - 1][1] / s.data[n - 2][1] - 1) * 100 })} <span class="muted">(fin de mes)</span>` : "–";
       }
-      if (!s || s.last == null) return "<td></td>";
-      if ((transform === "dlog" || transform === "diff") && s.data && !/mes/.test(s.unit)) {
-        // El oficial se compara con la inflación del mismo período (CER).
-        const cer = k === "tc_a3500" && DATA.series.cer ? cambioH(DATA.series.cer, h.date) : null;
-        return `<td class="num">${txtCambio(s, cambioH(s, h.date))} <span class="muted">en ${H} días${cer ? ` · inflación ${nf(cer.pct, 1)}%` : ""}</span></td>`;
-      }
-      // Nivel, si subió o bajó en la semana (las series mensuales, contra el
-      // mes anterior) y, en negrita, cuánto está por encima o por debajo de lo
-      // habitual (mediana de los dos años anteriores, como el índice).
-      const mensual = /mes/.test(s.unit);
-      const prev = mensual ? (s.data && s.data.length > 1 ? s.data[s.data.length - 2][1] : null) : s.prev_7d;
-      let ch = "";
-      if (prev != null) {
-        const usd = /^(millones de USD|M USD)/.test(s.unit), pp = s.unit.startsWith("%"), pb = s.unit === "pb";
-        const v = pp || pb || usd ? s.last - prev : (s.last / prev - 1) * 100;
-        const txt = Math.abs(v) < 0.05 ? "sin cambios" : pp ? sg(v) + " pp" : pb ? sg(v, 0) + " pb" : usd ? sg(v, 0) + " M USD" : sg(v) + "%";
-        ch = ` · ${txt} ${mensual ? "contra el mes anterior" : "en la semana"}`;
-      }
-      let hab = "";
-      if (transform === "level" && s.data && s.data.length > 20) {
-        const xs = s.data.slice(-(DATA.config.zscore_window || 504)).map((x) => x[1]).sort((a, b) => a - b);
-        const med = xs[Math.floor(xs.length / 2)];
-        const pp = s.unit.startsWith("%"), pb = s.unit === "pb";
-        const dif = s.last - med;
-        const txt = pp ? nf(Math.abs(dif), 1) + " pp" : pb ? nf(Math.abs(dif), 0) + " pb" : nf(Math.abs(dif) / Math.abs(med) * 100, 0) + "%";
-        hab = Math.abs(dif) < (pp ? 0.05 : pb ? 0.5 : Math.abs(med) * 0.005) ? "<br><b>en lo habitual (mediana de 2 años)</b>"
-          : `<br><b>${txt} ${dif > 0 ? "por encima" : "por debajo"} de lo habitual (mediana de 2 años)</b>`;
-      }
-      return `<td class="num">${nf(s.last, digitsFor(s.unit, s.last))} <span class="muted">${s.unit.split(",")[0]}${ch}</span>${hab}</td>`;
+      return txtCambio(s, cambioH(s, h.date));
     };
-    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Peso</th><th class="num">Qué mira el índice</th><th class="num">Aporte al índice</th></tr>`;
+    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Peso</th><th class="num">Variación en la semana</th><th class="num">Aporte al índice</th></tr>`;
     const filas = [];
     Object.entries(DATA.ipd.blocks).forEach(([bk, b]) => {
       const cs = comps.filter((x) => x.block === bk).sort((x, y) => (y.weight || 0) - (x.weight || 0));
       if (!cs.length) return;
       filas.push(`<tr class="sub"><td>${b.label}</td><td class="num">${b.weight != null ? nf(b.weight * 100, 0) + "%" : ""}</td><td class="num">${b.indice_last != null ? nf(b.indice_last, 0) + "/100" : ""}</td>${aporte(b.puntos, true)}</tr>`);
-      cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td><td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td>${queMira(x.key, x.transform)}${aporte(x.puntos)}</tr>`));
+      cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td><td class="num muted">${x.weight_ipd == null ? "" : nf(x.weight_ipd * 100, 0) + "%"}</td><td class="num">${variacion(x.key)}</td>${aporte(x.puntos)}</tr>`));
     });
     filas.push(`<tr class="tot"><td>Índice</td><td class="num">100%</td><td class="num">${nf(h.indice, 0)}/100</td>${aporte(h.indice - 50, true)}</tr>`);
     tbl.querySelector("tbody").innerHTML = filas.join("");
@@ -638,7 +614,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       const avail = m.keys.filter((k) => DATA.series[k]);
       const card = document.createElement("div");
       card.className = "card";
-      card.innerHTML = `<h2>${m.title}</h2><p class="note">${m.unit}${avail.length ? " · " + [...new Set(avail.map((k) => DATA.series[k].source))].join(" / ") : ""}${m.nota && avail.length > 1 ? ". " + m.nota : ""}</p><div class="chart small" id="m-${idx}"></div>`;
+      card.innerHTML = `<h2>${m.title}</h2><p class="note">${m.unit}</p><div class="chart small" id="m-${idx}"></div>`;
       box.appendChild(card);
       if (!avail.length) {
         return emptyState(`m-${idx}`, "Serie no disponible en la fuente.");
@@ -657,8 +633,13 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         const name = m.names ? m.names[m.keys.indexOf(k)] : DATA.series[k].label;
         const col = cols[m.keys.indexOf(k)];
         if (m.bars) return { name, type: "bar", data: DATA.series[k].data, itemStyle: { color: col }, barMaxWidth: 10 };
-        return lineSeries(name, DATA.series[k].data, col);
+        return lineSeries(name, DATA.series[k].data, col, m.der && m.der.includes(k) ? { yAxisIndex: 1 } : {});
       });
+      if (m.der && avail.some((k) => m.der.includes(k))) {
+        // Eje propio a la derecha para las series de otra magnitud.
+        o.yAxis = [o.yAxis, Object.assign({}, o.yAxis, { position: "right", splitLine: { show: false } })];
+        o.grid.right = 48;
+      }
       // Dato mensual: al menos 3 años a la vista.
       const desde = avail.map((k) => (cut(DATA.series[k].data, m.bars ? 1095 : 0)[0] || [])[0]).filter(Boolean).sort()[0];
       o.grid.bottom = 34;
@@ -741,6 +722,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     renderIndex(); renderBlocks(); renderContrib(); renderMultiples(); renderMonthly();
   }
 
+  // Futuros siempre en dólares: cada contrato es de USD 1.000.
+  function enDolares(d) {
+    const f = d.series && d.series.futuros_interes_abierto;
+    if (f) {
+      const m = (v) => v == null ? v : v / 1000;
+      f.data = f.data.map(([t, v]) => [t, m(v)]);
+      f.last = m(f.last); f.prev_7d = m(f.prev_7d); f.prev_30d = m(f.prev_30d);
+      f.unit = "millones de USD"; f.label = "Posición abierta en futuros de dólar";
+    }
+    return d;
+  }
+
   function renderAll() {
     if (!DATA) return;
     renderHero(); renderTiles(); renderCharts(); renderTable();
@@ -753,7 +746,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const src = new URLSearchParams(location.search).get("data") || PAISES.ar.json;
     return fetch(src, { cache: "no-store" })
       .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then((d) => { DATA = d; renderAll(); });
+      .then((d) => { DATA = enDolares(d); renderAll(); });
   }
   cargar()
     .catch(() => {

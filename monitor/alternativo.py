@@ -2,7 +2,7 @@
 
     python -m monitor.alternativo --fecha 2026-10-26
 
-En el índice publicado, el oficial (contra la inflación), las reservas, la
+En el índice publicado, el tipo de cambio real, las reservas, la
 BADLAR, los depósitos en dólares y el riesgo país entran por su movimiento de
 los últimos 5 días. Cuando una semana termina, lo que pasó sale de golpe: si
 el BCRA venía acumulando 1.000 M y una semana acumula 10 M, el índice sube,
@@ -26,28 +26,25 @@ VIDA_MEDIA = 21  # días hábiles: lo acumulado pierde la mitad de su peso en un
 DATA_DIR = config.DATA_DIR / "alternativo"
 SALIDA = config.ROOT / "reportes" / "alternativo"
 
-NOMBRES = "el oficial (contra la inflación), las reservas, la BADLAR, los depósitos y el riesgo país"
+NOMBRES = "el tipo de cambio real, las reservas, la BADLAR, los depósitos y el riesgo país"
 
 
 def perfil() -> dict:
     textos = dict(report.APENDICE_AR)
     for c, como in {
-        "tc_a3500": "Movimientos diarios del dólar oficial mayorista (A3500) descontada la inflación (CER), acumulados: lo de cada día se suma y se va borrando (la mitad en un mes).",
+        "tc_a3500": "Movimientos diarios del tipo de cambio real (oficial A3500 / CER), acumulados: lo de cada día se suma y se va borrando (la mitad en un mes).",
         "reservas": "Movimientos diarios de las reservas brutas del BCRA, acumulados: lo de cada día se suma y se va borrando (la mitad en un mes).",
         "tasa": "Movimientos diarios de la tasa BADLAR de bancos privados, acumulados: lo de cada día se suma y se va borrando (la mitad en un mes).",
         "depositos_usd": "Movimientos diarios de los depósitos en dólares del sector privado, acumulados: lo de cada día se suma y se va borrando (la mitad en un mes).",
         "riesgo_pais": "Movimientos diarios del riesgo país (EMBI Argentina), acumulados: lo de cada día se suma y se va borrando (la mitad en un mes).",
     }.items():
-        _, sube, baja, ojo = textos[c]
-        ojo = ojo.replace("Entra por su movimiento de los últimos 5 días, centrado en cero", "Su movimiento de la semana siempre empuja el índice con su signo")
-        textos[c] = (como, sube, baja, ojo)
+        _, sube, baja = textos[c]
+        textos[c] = (como, sube, baja)
     return {
         **report.PERFIL_AR,
         "titulo": " · versión alternativa",
         "panel": DATA_DIR / "panel_diario.csv", "json": DATA_DIR / "monitor.json", "salida": SALIDA,
         "apendice": textos,
-        "nota_flujos": (f"En esta versión, {NOMBRES} entran acumulados: cada movimiento diario se suma a la presión y se va "
-                        "borrando de a poco (la mitad en un mes); unas reservas que suben siempre restan."),
         "apendice_flujos": (f"<b>Acumulados</b> ({NOMBRES}). Cada movimiento diario se suma a la presión acumulada, que se va "
                             "borrando de a poco: pierde la mitad de su peso en un mes. Por eso el movimiento de la semana siempre "
                             "empuja el índice con su signo: si las reservas suben, el índice baja, aunque suban menos que la "
