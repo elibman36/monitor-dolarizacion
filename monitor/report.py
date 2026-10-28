@@ -240,12 +240,14 @@ def _txt_dato(v: dict | None, previo: bool = False) -> str:
     if x is None or not np.isfinite(x):
         return "–"
     u = _unidad_corta(v).replace(" por mes", "")
+    if u.startswith("$"):  # tipo de cambio: el número solo
+        return fmt(x, v["dec"])
     if u in ("%", "% anual", "% n.a.", "% TNA"):
         return f"{fmt(x, 1)}{'%' if u == '%' else ' ' + u}"
     return f"{fmt(x, v['dec'] if u.startswith('$') else 0)} {u}"
 
 
-def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, i1: float, i0: float,
+def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, sub0: dict, i1: float, i0: float,
                   datos: dict, perfil: dict) -> str:
     """Una fila por subíndice y componente: dato de la semana anterior, dato
     de esta semana, variación y aporte a la suba o a la baja del índice frente
@@ -259,18 +261,17 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, i1: floa
         cols = [c for c in b["components"] if c in dpts]
         if not cols:
             continue
-        filas.append(f"<tr class='sub'><td>{html.escape(b['label'])}</td><td></td>"
-                     f"<td class='num'>{fmt(sub1.get(bkey, np.nan), 0)}/100</td><td></td>"
+        s1, s0 = sub1.get(bkey, np.nan), sub0.get(bkey, np.nan)
+        filas.append(f"<tr class='sub'><td>{html.escape(b['label'])}</td><td class='num muted'>{fmt(s0, 0)}/100</td>"
+                     f"<td class='num'>{fmt(s1, 0)}/100</td><td class='num'>{fmt(s1 - s0, 0, signo=True)} pts</td>"
                      f"{_celda_aporte(suma(cols), True)}</tr>")
         for c in sorted(cols, key=lambda c: -(meta.get(c, {}).get("weight") or 0)):
             vk = _var_comp(perfil, c)
             v = datos.get(vk)
-            # El tipo de cambio real se muestra con el oficial en pesos y su
-            # variación real, mensualizada.
+            # El tipo de cambio se muestra nominal (dato y variación de la
+            # semana); su aporte sí se mide contra la inflación.
             nivel = datos.get("tc_oficial_ref") if vk == "tcr" else v
-            var = _txt_variacion(v)
-            if vk == "tcr" and var.endswith("% mensual"):
-                var = var.replace("% mensual", "% real mensual")
+            var = _txt_variacion(nivel)
             filas.append(f"<tr><td class='comp'>{html.escape(b['components'][c]['label'])}</td>"
                          f"<td class='num muted'>{_txt_dato(nivel, previo=True)}</td><td class='num'>{_txt_dato(nivel)}</td>"
                          f"<td class='num'>{var}</td>{_celda_aporte(dpts[c])}</tr>")
@@ -279,7 +280,7 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, i1: floa
                  f"{_celda_aporte(i1 - i0, True)}</tr>")
     cab = ("<thead><tr><th>Subíndice y componente</th>"
            "<th class='num'>Dato semana anterior</th><th class='num'>Dato esta semana</th><th class='num'>Variación</th>"
-           "<th class='num'>Aporte a la suba o a la baja del índice (pts)</th></tr></thead>")
+           "<th class='num'>Aporte a la variación del índice (pts)</th></tr></thead>")
     return f"<table class='vars aportes'>{cab}<tbody>{''.join(filas)}</tbody></table>"
 
 
@@ -300,8 +301,11 @@ def chart_mini(series: list[tuple], titulo: str, unidad: str, semana: Semana) ->
         if eje == ["der"]:
             if der is None:
                 der = ax.twinx()
-                der.tick_params(labelsize=6, colors=MUTED)
-                der.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: fmt(v / 1000, 0) + " mil"))
+                # Eje derecho en el color de las netas, para que se lea con cuál va.
+                der.tick_params(labelsize=6.5, colors=color, width=0.8, length=2)
+                der.spines["right"].set_color(color)
+                der.spines["right"].set_linewidth(0.8)
+                der.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: fmt(v, 0)))
                 der.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(3))
                 ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(3))
                 for lado in ("top", "left", "bottom"):
@@ -630,9 +634,10 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
     meta = {c["key"]: c for c in payload["ipd"]["components"]}
     pts_cierre = {c: _hasta(p[f"pts_{c}"], semana.viernes)[1] for c in labels if f"pts_{c}" in p}
     sub1 = {b: _hasta(p[f"indice_bloque_{b}"], semana.viernes)[1] for b in blocks_cfg if f"indice_bloque_{b}" in p}
+    sub0 = {b: _hasta(p[f"indice_bloque_{b}"], semana.viernes - pd.Timedelta(days=7))[1] for b in blocks_cfg if f"indice_bloque_{b}" in p}
     colores_sub = dict(zip(blocks_cfg, [S1, S2, S3]))
     dpts = indicators.cambio_por_componente(p, semana.viernes, list(pts_cierre))
-    sub_pts = {b: sum(pts_cierre[c] for c in blocks_cfg[b]["components"] if c in pts_cierre and np.isfinite(pts_cierre[c]))
+    sub_pts = {b: sum(dpts[c] for c in blocks_cfg[b]["components"] if c in dpts and np.isfinite(dpts[c]))
                 for b in blocks_cfg}
     subs_hero = "".join(
         f"<span><i style='background:{colores_sub[b]}'></i>{html.escape(blocks_cfg[b]['label'])}</span>"
@@ -655,7 +660,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
                 datos[vk]["habitual"] = (x.tail(config.IPD_ZSCORE_WINDOW).median() if spec["transform"] == "level"
                                          else x.tail(252).mean())
     pesos_b = {b: (payload["ipd"]["blocks"].get(b, {}).get("weight") or blocks_cfg[b]["weight"]) for b in blocks_cfg}
-    tabla_html = tabla_aportes(blocks_cfg, meta, dpts, sub1, i1, i0, datos, perfil)
+    tabla_html = tabla_aportes(blocks_cfg, meta, dpts, sub1, sub0, i1, i0, datos, perfil)
     puntos = resumen(indice, semana, dpts, perfil)
     texto_semana = racconto(semana.viernes)
 
@@ -700,7 +705,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
       <span>Semana anterior</span><b>{fmt(i0, 0)} ({fmt(i1 - i0, 0, signo=True)} pts)</b>
       <span>Hace 4 semanas</span><b>{fmt(i4, 0)} ({fmt(i1 - i4, 0, signo=True)} pts)</b>
     </div>
-    {f"<div class='subs-t'>Subíndices (0–100). Entre paréntesis, cuánto aporta cada uno a la distancia del índice a 50</div><div class='kv subs'>{subs_hero}</div>" if subs_hero else ""}
+    {f"<div class='subs-t'>Subíndices (0–100). Entre paréntesis, su aporte a la variación del índice en la semana</div><div class='kv subs'>{subs_hero}</div>" if subs_hero else ""}
   </div>
   <div class="card">
     <h2>Resumen de la semana</h2>
@@ -711,7 +716,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note">El dato de cada variable el viernes anterior y este, su variación y su aporte a la suba (rojo) o a la baja (azul) del índice frente a la semana anterior, en puntos: suman el cambio del índice. {perfil["nota_variables"]}</p>
+  <p class="note">El dato de cada variable el viernes anterior y este, su variación y su aporte a la variación del índice frente a la semana anterior (rojo, a la suba; azul, a la baja), en puntos: suman el cambio del índice. El aporte del tipo de cambio se mide contra la inflación. {perfil["nota_variables"]}</p>
   {tabla_html}
 </section>
 

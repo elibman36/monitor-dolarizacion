@@ -186,6 +186,11 @@ IPD_PESO_MAXIMO = None
 # sale de golpe a los 5 días, se borra de a poco).
 IPD_FLUJOS_VIDA_MEDIA = None
 
+# Componentes con dato mensual: una semana sin dato nuevo no aportan al cambio
+# del índice (su aporte se mueve sólo por el promedio de 12 meses o por la
+# escala de los demás; ver indicators.cambio_por_componente).
+COMPONENTES_MENSUALES = ("compras_ph", "posicion_bcra")
+
 # Cada componente lleva dos frases para el resumen escrito del reporte: qué
 # está pasando cuando suma presión y cuándo resta ("habitual" = últimos 2 años).
 IPD_BLOCKS = {
@@ -196,7 +201,7 @@ IPD_BLOCKS = {
             # Depreciación real: el oficial descontada la inflación (CER). Si el
             # dólar sube lo mismo o menos que los precios, no hay presión.
             "tc_a3500":  {"transform": "dlog",  "sign": +1, "centro_cero": True, "weight": 1.0,
-                          "label": "Depreciación del oficial",
+                          "label": "Tipo de cambio oficial",
                           "frases": ("el oficial subió más que la inflación",
                                      "el oficial subió menos que la inflación")},
             "vol_oficial": {"transform": "level", "sign": +1, "weight": 1.0,

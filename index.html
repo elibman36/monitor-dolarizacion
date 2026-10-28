@@ -186,7 +186,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card-head">
       <h2>Qué explica el índice</h2>
     </div>
-    <p class="note">El dato de cada variable hoy y hace una semana, su variación y su aporte a la suba (rojo) o a la baja (azul) del índice, en puntos: suman el cambio del índice.</p>    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
+    <p class="note">El dato de cada variable hoy y hace una semana, su variación y su aporte a la variación del índice (rojo, a la suba; azul, a la baja), en puntos: suman el cambio del índice. El aporte del tipo de cambio se mide contra la inflación.</p>    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
     <h2>Subíndices</h2>
@@ -579,24 +579,22 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         v0 = asof(data, dHace7); v1 = asof(data, h.date);
       }
       const u = unit.split(",")[0].replace("millones de USD", "M USD");
-      const dato = (v) => v == null ? "–" : `${nf(v, digitsFor(unit, v))} <span class="muted">${u}</span>`;
+      const dato = (v) => v == null ? "–" : unit.startsWith("$") ? nf(v, 2) : `${nf(v, digitsFor(unit, v))} <span class="muted">${u}</span>`;
       let varTxt = "–";
-      if (k === "tc_a3500" && DATA.series.cer) {
-        const c0 = asof(DATA.series.cer.data, dHace7), c1 = asof(DATA.series.cer.data, h.date);
-        if (v0 && v1 && c0 && c1) varTxt = sg((Math.pow((v1 / v0) / (c1 / c0), 30 / 7) - 1) * 100) + "% <span class='muted'>real mensual</span>";
-      } else if (v0 != null && v1 != null) {
+      if (v0 != null && v1 != null) {
         if (v0 === v1 && (k === "compras_ph" || /mes/.test(unit))) varTxt = "<span class='muted'>sin dato nuevo</span>";
         else varTxt = txtCambio({ unit }, { abs: v1 - v0, pct: (v1 / v0 - 1) * 100 });
       }
       return `<td class="num muted">${dato(v0)}</td><td class="num">${dato(v1)}</td><td class="num">${varTxt}</td>`;
     };
-    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Hace una semana</th><th class="num">Hoy</th><th class="num">Variación</th><th class="num">Aporte a la suba o a la baja del índice (pts)</th></tr>`;
+    tbl.querySelector("thead").innerHTML = `<tr><th>Subíndice y componente</th><th class="num">Hace una semana</th><th class="num">Hoy</th><th class="num">Variación</th><th class="num">Aporte a la variación del índice (pts)</th></tr>`;
     const filas = [];
     Object.entries(DATA.ipd.blocks).forEach(([bk, b]) => {
       const cs = comps.filter((x) => x.block === bk).sort((x, y) => (y.weight || 0) - (x.weight || 0));
       if (!cs.length) return;
       const cb = cs.reduce((t, x) => t + (x.cambio_semana || 0), 0);
-      filas.push(`<tr class="sub"><td>${b.label}</td><td></td><td class="num">${b.indice_last != null ? nf(b.indice_last, 0) + "/100" : ""}</td><td></td>${aporte(cb, true)}</tr>`);
+      const s0 = asof(b.indice || [], dHace7), s1 = b.indice_last;
+      filas.push(`<tr class="sub"><td>${b.label}</td><td class="num muted">${s0 != null ? nf(s0, 0) + "/100" : ""}</td><td class="num">${s1 != null ? nf(s1, 0) + "/100" : ""}</td><td class="num">${s0 != null && s1 != null ? sg(s1 - s0, 0) + " pts" : ""}</td>${aporte(cb, true)}</tr>`);
       cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td>${fila(x.key)}${aporte(x.cambio_semana)}</tr>`));
     });
     const di = h.indice_7d == null ? null : h.indice - h.indice_7d;
@@ -635,7 +633,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       });
       if (m.der && avail.some((k) => m.der.includes(k))) {
         // Eje propio a la derecha para las series de otra magnitud.
-        o.yAxis = [o.yAxis, Object.assign({}, o.yAxis, { position: "right", splitLine: { show: false } })];
+        const colDer = cols[m.keys.indexOf(m.der[0])];
+        o.yAxis = [o.yAxis, Object.assign({}, o.yAxis, { position: "right", splitLine: { show: false },
+          axisLine: { show: true, lineStyle: { color: colDer } }, axisLabel: Object.assign({}, o.yAxis.axisLabel, { color: colDer }) })];
         o.grid.right = 48;
       }
       // Dato mensual: al menos 3 años a la vista.
