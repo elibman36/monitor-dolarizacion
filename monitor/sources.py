@@ -310,6 +310,36 @@ def _numero_planilla(x: str) -> float:
     return float(re.sub(r"[.,]", "", entero) + "." + dec)
 
 
+# Número con decimales (descarta las llamadas a notas pegadas al texto, como el
+# "6" de "depósitos 6 -16.754,11").
+_NUM_DEC = r"(-?\d[\d.,]*[.,]\d{2})(?!\d)"
+
+
+def _reservas_netas_planilla(t: str) -> dict:
+    """Reservas brutas (I.A) y pasivos del BCRA a menos de un año (sección II,
+    columna de las autoridades monetarias): II.1 préstamos, valores y depósitos
+    (encajes en dólares, depósitos del Tesoro, BIS), II.2 posiciones cortas en
+    contratos a término (el swap con China) y II.3 otros (pases pasivos). Los
+    pasivos van con signo negativo, como en la planilla. None si no se leen."""
+    out = {"reservas_brutas_usd_millones": None, "pasivos_cp_bcra_usd_millones": None}
+    m = re.search(r"A\. Activos de reserva oficiales\s*" + _NUM_DEC, t)
+    if m:
+        out["reservas_brutas_usd_millones"] = _numero_planilla(m.group(1))
+    i, j = t.find("II. Flujos netos predeterminados"), t.find("III. Flujos")
+    if m is None or i < 0 or j < i:
+        return out
+    sec = t[i:j]
+    total = 0.0
+    for patron in (r"1\. Pr[ée]stamos en moneda extranjera[^\n]*?" + _NUM_DEC,
+                   r"swaps de monedas\)\s*\d*\s*" + _NUM_DEC,
+                   r"3\. Otros \(especificar\)[ \t]*" + _NUM_DEC):
+        x = re.search(patron, sec)
+        if x:  # ítem en blanco = sin pasivos de ese tipo
+            total += _numero_planilla(x.group(1))
+    out["pasivos_cp_bcra_usd_millones"] = round(-abs(total) if total else 0.0, 2) + 0.0
+    return out
+
+
 def parse_planilla_reservas(texto: str) -> dict | None:
     """Posición del BCRA en derivados de moneda extranjera liquidados en pesos.
 
@@ -330,7 +360,7 @@ def parse_planilla_reservas(texto: str) -> dict | None:
     cortas = re.search(r"Posiciones cortas[^\d\n-]*" + num, tramo)
     largas = re.search(r"Posiciones largas[^\d\n-]*" + num, tramo)
     fecha_cierre = re.sub(r"[.]", "/", fecha.group(1))
-    out = {"fecha": pd.to_datetime(fecha_cierre, dayfirst=True).strftime("%Y-%m")}
+    out = {"fecha": pd.to_datetime(fecha_cierre, dayfirst=True).strftime("%Y-%m"), **_reservas_netas_planilla(t)}
     if cortas is None and largas is None:
         # Ítem en blanco: hasta 2011 el BCRA no lo informaba ("no disponibles").
         # Desde 2012 siempre trae un número, aunque sea 0.
@@ -342,6 +372,37 @@ def parse_planilla_reservas(texto: str) -> dict | None:
             "cortas_usd_millones": round(-abs(c), 2) + 0.0,  # sin "-0.0"
             "largas_usd_millones": round(abs(l), 2),
             "vendida_neta_usd_millones": round(abs(c) - abs(l), 2)}
+
+
+def fmi_programa_girado(fecha: str) -> dict | None:
+    """Monto girado del programa con el FMI de abril de 2025 (Extended Fund
+    Facility del 11/04/2025) a una fecha, en millones de USD, y el tipo de
+    cambio USD por DEG de esa fecha. None si la página no trae el dato."""
+    r = _session.get("https://www.imf.org/external/np/fin/tad/extarr2.aspx",
+                     params={"memberKey1": 30, "date1key": fecha}, timeout=60)
+    r.raise_for_status()
+    t = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", r.text))
+    m = re.search(r"Extended Fund Facility\s+Apr 11, 2025\s+\w{3} \d{1,2}, \d{4}\s+([\d,]+)\s+([\d,]+)", t)
+    girado_deg = float(m.group(2).replace(",", "")) / 1000 if m else 0.0  # miles de DEG -> millones
+    usd_por_deg = fmi_usd_por_deg(fecha)
+    if usd_por_deg is None:
+        return None
+    return {"fecha": fecha[:7], "girado_deg_millones": girado_deg, "usd_por_deg": usd_por_deg,
+            "girado_usd_millones": round(girado_deg * usd_por_deg, 2)}
+
+
+def fmi_usd_por_deg(fecha: str) -> float | None:
+    """Dólares por DEG del último día hábil del mes de `fecha` (FMI)."""
+    r = _session.get("https://www.imf.org/external/np/fin/data/rms_mth.aspx",
+                     params={"SelectDate": fecha, "reportType": "CVSDR"}, timeout=60)
+    r.raise_for_status()
+    t = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", r.text))
+    m = re.search(r"U\.S\. dollar\s+((?:(?:\d\.\d+|NA)\s+)+)", t)
+    if not m:
+        return None
+    valores = [float(v) for v in m.group(1).split() if v != "NA"]
+    # "Currency units per SDR": para el dólar ronda 1,3-1,5.
+    return valores[-1] if valores and 1 < valores[-1] < 2 else None
 
 
 def bcra_planilla_reservas(mes: str) -> dict | None:
