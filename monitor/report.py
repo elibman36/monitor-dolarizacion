@@ -742,7 +742,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note">El dato de cada variable el viernes anterior y este, su variación y su aporte a la variación del índice frente a la semana anterior (rojo, a la suba; azul, a la baja), en puntos: suman el cambio del índice. El aporte del tipo de cambio se mide contra la inflación. Reservas y depósitos: variación semanal promedio de los últimos 20 días hábiles, como la mira el índice. {perfil["nota_variables"]}</p>
+  <p class="note">El dato de cada variable el viernes anterior y este, su variación y su aporte a la variación del índice frente a la semana anterior (rojo, a la suba; azul, a la baja), en puntos: suman el cambio del índice. El aporte del tipo de cambio se mide contra la inflación. Reservas y depósitos: variación semanal promedio de los últimos {config.INDICE_SUAVIZADO} días hábiles, como la mira el índice. {perfil["nota_variables"]}</p>
   {tabla_html}
 </section>
 
@@ -773,7 +773,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
   <h2>Metodología</h2>
   {perfil["metodo"](pca_txt, pesos_b) if perfil["codigo"] == "ar" else perfil["metodo"](pca_txt)}
   <table><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody>{comp_rows}</tbody></table>
-  <p>El promedio ponderado de cada día se promedia con los 19 días hábiles anteriores (20 días, un mes) y se lleva a una escala de 0 a 100 con la normal acumulada. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Los aportes en puntos reparten la distancia del índice a 50 entre los componentes, así que suman exactamente esa distancia. Si falta un componente, su peso se reparte entre los demás de su subíndice. Cada subíndice también se lleva a su propia escala de 0 a 100 con el mismo método, para leerlo solo; en puntos del índice, los tres subíndices suman la distancia del índice a 50.{perfil["metodo_extra"]}</p>
+  <p>El promedio ponderado de cada día se promedia con los {config.INDICE_SUAVIZADO - 1} días hábiles anteriores ({config.INDICE_SUAVIZADO} días) y se lleva a una escala de 0 a 100 con la normal acumulada. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Los aportes en puntos reparten la distancia del índice a 50 entre los componentes, así que suman exactamente esa distancia. Si falta un componente, su peso se reparte entre los demás de su subíndice. Cada subíndice también se lleva a su propia escala de 0 a 100 con el mismo método, para leerlo solo; en puntos del índice, los tres subíndices suman la distancia del índice a 50.{perfil["metodo_extra"]}</p>
   <p><b>Fuentes:</b> {perfil["fuentes"]}</p>
   <p class="muted">Generado el {generado.day}/{generado.month}/{generado.year} a las {generado:%H:%M} (hora argentina). Tablero diario y datos: <a href="{DASHBOARD_URL}">{DASHBOARD_URL}</a></p>
 </section>

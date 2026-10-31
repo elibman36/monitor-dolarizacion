@@ -186,7 +186,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card-head">
       <h2>Qué explica el índice</h2>
     </div>
-    <p class="note">El dato de cada variable hoy y hace una semana, su variación y su aporte a la variación del índice (rojo, a la suba; azul, a la baja), en puntos: suman el cambio del índice. El aporte del tipo de cambio se mide contra la inflación. Reservas y depósitos: variación semanal promedio de los últimos 20 días hábiles, como la mira el índice.</p>    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
+    <p class="note">El dato de cada variable hoy y hace una semana, su variación y su aporte a la variación del índice (rojo, a la suba; azul, a la baja), en puntos: suman el cambio del índice. El aporte del tipo de cambio se mide contra la inflación. Reservas y depósitos: variación semanal promedio de los últimos <span class="n-prom">20</span> días hábiles, como la mira el índice.</p>    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
     <h2>Subíndices</h2>
@@ -214,7 +214,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 <dialog id="anexo" class="anexo method" aria-labelledby="anexo-t">
   <div class="anexo-head"><h2 id="anexo-t">Anexo metodológico</h2><button class="btn" id="anexo-cerrar" aria-label="Cerrar">Cerrar</button></div>
 
-    <p>El índice mide la presión sobre el peso en una escala de 0 a 100: 50 es neutral, arriba hay presión hacia la depreciación y abajo, alivio. Cada día es el promedio de los últimos 20 días hábiles. Combina 13 variables en tres subíndices:</p>
+    <p>El índice mide la presión sobre el peso en una escala de 0 a 100: 50 es neutral, arriba hay presión hacia la depreciación y abajo, alivio. Cada día es el promedio de los últimos <span class="n-prom">20</span> días hábiles. Combina 13 variables en tres subíndices:</p>
     <ul>
       <li><b>Presión cambiaria:</b> tipo de cambio real, su volatilidad, reservas, tasa BADLAR, brecha MEP / oficial y futuros vendidos por el BCRA.</li>
       <li><b>Dolarización de portafolios:</b> devaluación implícita y posición abierta en futuros, depósitos en dólares y compras de dólares de personas humanas.</li>
@@ -588,9 +588,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
         const vals = cal.map((f) => asof(data, f));
         const prom = (f) => {
           let j = cal.length - 1; while (j >= 0 && cal[j] > f) j--;
-          if (j < 24) return null;
-          let t = 0; for (let i = j - 19; i <= j; i++) { if (vals[i] == null || vals[i - 5] == null) return null; t += vals[i] - vals[i - 5]; }
-          return t / 20;
+          const n = DATA.config.indice_suavizado || 20;
+          if (j < n + 4) return null;
+          let t = 0; for (let i = j - n + 1; i <= j; i++) { if (vals[i] == null || vals[i - 5] == null) return null; t += vals[i] - vals[i - 5]; }
+          return t / n;
         };
         const a0 = prom(dHace7), a1 = prom(h.date);
         const m = (x) => x == null ? "–" : `${sg(x, 0)} <span class="muted">M USD</span>`;
@@ -740,6 +741,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   }
 
   function renderAll() {
+    document.querySelectorAll(".n-prom").forEach((e) => { e.textContent = DATA.config.indice_suavizado || 20; });
     if (!DATA) return;
     renderHero(); renderTiles(); renderCharts(); renderTable();
   }
