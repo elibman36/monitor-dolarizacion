@@ -281,6 +281,10 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, sub0: di
             nivel = datos.get("tc_oficial_ref") if vk == "tcr" else v
             var = _txt_variacion(nivel)
             dato0, dato1 = _txt_dato(nivel, previo=True), _txt_dato(nivel)
+            if "sin dato nuevo" in var and np.isfinite(dpts.get(c, np.nan)) and abs(dpts[c]) >= 0.05:
+                # Con el índice promediado, el último dato mensual entra de a
+                # poco durante varias semanas.
+                var = "<span class='muted'>sin dato nuevo (entra de a poco)</span>"
             if vk in VARIACION_DE_VARIACION and v and "prom20" in v:
                 # Reservas y depósitos: lo que mira el índice es su variación
                 # semanal promediada en 20 días hábiles. Se muestra la de la

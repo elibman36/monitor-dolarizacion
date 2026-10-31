@@ -186,8 +186,8 @@ IPD_PESO_MAXIMO = None
 # sale de golpe a los 5 días, se borra de a poco).
 IPD_FLUJOS_VIDA_MEDIA = None
 
-# Componentes con dato mensual: una semana sin dato nuevo no aportan al cambio
-# del índice (su aporte se mueve sólo por el promedio de 12 meses o por la
+# Componentes con dato mensual: si no hubo dato nuevo en la ventana del promedio
+# del índice, no aportan al cambio (su aporte se mueve sólo por el promedio de 12 meses o por la
 # escala de los demás; ver indicators.cambio_por_componente).
 COMPONENTES_MENSUALES = ("compras_ph", "posicion_bcra")
 

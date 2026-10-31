@@ -612,7 +612,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       const cb = cs.reduce((t, x) => t + (x.cambio_semana || 0), 0);
       const s0 = asof(b.indice || [], dHace7), s1 = b.indice_last;
       filas.push(`<tr class="sub"><td>${b.label}</td><td class="num muted">${s0 != null ? nf(s0, 0) + "/100" : ""}</td><td class="num">${s1 != null ? nf(s1, 0) + "/100" : ""}</td><td class="num">${s0 != null && s1 != null ? sg(s1 - s0, 0) + " pts" : ""}</td>${aporte(cb, true)}</tr>`);
-      cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td>${fila(x.key)}${aporte(x.cambio_semana)}</tr>`));
+      cs.forEach((x) => filas.push(`<tr title="Dato al ${x.last_date}"><td class="comp">${x.label}</td>${fila(x.key).replace("sin dato nuevo</span>", x.cambio_semana != null && Math.abs(x.cambio_semana) >= 0.05 ? "sin dato nuevo (entra de a poco)</span>" : "sin dato nuevo</span>")}${aporte(x.cambio_semana)}</tr>`));
     });
     const di = h.indice_7d == null ? null : h.indice - h.indice_7d;
     filas.push(`<tr class="tot"><td>Índice</td><td class="num muted">${h.indice_7d == null ? "–" : nf(h.indice_7d, 0) + "/100"}</td><td class="num">${nf(h.indice, 0)}/100</td><td class="num">${di == null ? "" : sg(di, 1) + " pts"}</td>${di == null ? "<td></td>" : aporte(di, true)}</tr>`);

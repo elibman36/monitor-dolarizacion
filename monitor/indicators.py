@@ -553,14 +553,21 @@ def cambio_por_componente(p: pd.DataFrame, fecha: pd.Timestamp, comps: list[str]
     aporte (pts_*). Como los aportes suman índice - 50 cada día, estas
     diferencias suman exactamente el cambio del índice.
 
-    Un componente mensual sin dato nuevo en la semana aporta 0: lo que movió
-    su aporte (por su promedio de 12 meses o por la escala de los demás) se
-    reparte entre los otros en proporción a su aporte, así la suma no cambia.
+    Un componente mensual sin dato nuevo en la ventana del promedio aporta 0:
+    lo que movió su aporte (por su promedio de 12 meses o por la escala de los
+    demás) se reparte entre los otros en proporción a su aporte, así la suma
+    no cambia.
     """
     previo = fecha - pd.Timedelta(days=7)
     out = {c: _ultimo_hasta(p[f"pts_{c}"], fecha) - _ultimo_hasta(p[f"pts_{c}"], previo) for c in comps}
+    # Sin dato nuevo = el valor no cambió desde el comienzo de la ventana del
+    # promedio de la semana anterior: con el índice promediado en N días, un
+    # dato mensual nuevo entra de a poco durante N días y aporta en todas esas
+    # semanas.
+    dias = p.index[p.index <= previo]
+    inicio = dias[-config.INDICE_SUAVIZADO] if len(dias) >= config.INDICE_SUAVIZADO else previo
     quietos = [c for c in comps if c in config.COMPONENTES_MENSUALES and c in p
-               and _ultimo_hasta(p[c], fecha) == _ultimo_hasta(p[c], previo)]
+               and _ultimo_hasta(p[c], fecha) == _ultimo_hasta(p[c], inicio)]
     resto = sum(out[c] for c in quietos if np.isfinite(out[c]))
     otros = {c: abs(v) for c, v in out.items() if c not in quietos and np.isfinite(v)}
     total = sum(otros.values())
