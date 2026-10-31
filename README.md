@@ -185,10 +185,9 @@ El cálculo sigue estos pasos:
    (`IPD_PONDERACION = "fija"` vuelve a los pesos manuales). Si falta un
    componente, su peso se reparte entre los demás; el índice sólo se publica si
    está disponible al menos el 40% del peso.
-3. **Índice 0–100.** El ID de cada día, sin promediar, se lleva a una escala
-   de 0 a 100 con la normal acumulada: Índice = 100 × Φ(ID / σ), con σ el
-   desvío histórico del ID (`INDICE_SUAVIZADO` en `config.py` permite promediar
-   días; hasta oct-2026 se usaron 20). 50 es neutral; debajo, presión
+3. **Índice 0–100.** El ID, promediado en 20 días hábiles (`INDICE_SUAVIZADO`
+   en `config.py`), se lleva a una escala de 0 a 100 con la normal acumulada:
+   Índice = 100 × Φ(ID / σ), con σ el desvío histórico del ID promediado. 50 es neutral; debajo, presión
    apreciatoria (alivio); arriba, presión depreciatoria. Tramos:
    - 0–10: fuerte presión apreciatoria;
    - 10–35: presión apreciatoria;

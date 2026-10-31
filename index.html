@@ -214,7 +214,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 <dialog id="anexo" class="anexo method" aria-labelledby="anexo-t">
   <div class="anexo-head"><h2 id="anexo-t">Anexo metodológico</h2><button class="btn" id="anexo-cerrar" aria-label="Cerrar">Cerrar</button></div>
 
-    <p>El índice mide la presión sobre el peso en una escala de 0 a 100: 50 es neutral, arriba hay presión hacia la depreciación y abajo, alivio. Combina 13 variables en tres subíndices:</p>
+    <p>El índice mide la presión sobre el peso en una escala de 0 a 100: 50 es neutral, arriba hay presión hacia la depreciación y abajo, alivio. Cada día es el promedio de los últimos 20 días hábiles. Combina 13 variables en tres subíndices:</p>
     <ul>
       <li><b>Presión cambiaria:</b> tipo de cambio real, su volatilidad, reservas, tasa BADLAR, brecha MEP / oficial y futuros vendidos por el BCRA.</li>
       <li><b>Dolarización de portafolios:</b> devaluación implícita y posición abierta en futuros, depósitos en dólares y compras de dólares de personas humanas.</li>
@@ -536,7 +536,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     const tbl = document.getElementById("contrib-tbl");
     if (!comps.length) { tbl.querySelector("tbody").innerHTML = "<tr><td>Sin componentes disponibles.</td></tr>"; return; }
     const h = DATA.headline;
-    const sg = (v, dg = 1) => (v > 0 ? "+" : "") + nf(v, dg);
+    const sg = (v, dg = 1) => { const r = Number(v.toFixed(dg)) === 0 ? 0 : v; return (r > 0 ? "+" : "") + nf(r, dg); };
     const aporte = (v, bold) => {
       if (v == null) return "<td class='num muted'>–</td>";
       if (Math.abs(v) < 0.05) return "<td class='num muted'>0</td>";
@@ -580,6 +580,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       }
       const u = unit.split(",")[0].replace("millones de USD", "M USD");
       const dato = (v) => v == null ? "–" : unit.startsWith("$") ? nf(v, 2) : `${nf(v, digitsFor(unit, v))} <span class="muted">${u}</span>`;
+      if (k === "reservas" || k === "depositos_usd") {
+        // Lo que mira el índice es su variación: la de la semana anterior, la
+        // de esta y cuánto cambió.
+        const d14 = (() => { const t = new Date(h.date); t.setDate(t.getDate() - 14); return t.toISOString().slice(0, 10); })();
+        const vm2 = asof(data, d14);
+        const a0 = v0 != null && vm2 != null ? v0 - vm2 : null, a1 = v0 != null && v1 != null ? v1 - v0 : null;
+        const m = (x) => x == null ? "–" : `${sg(x, 0)} <span class="muted">M USD</span>`;
+        return `<td class="num muted">${m(a0)}</td><td class="num">${m(a1)}</td><td class="num">${a0 != null && a1 != null ? sg(a1 - a0, 0) + " M USD" : "–"}</td>`;
+      }
       let varTxt = "–";
       if (v0 != null && v1 != null) {
         if (v0 === v1 && (k === "compras_ph" || /mes/.test(unit))) varTxt = "<span class='muted'>sin dato nuevo</span>";

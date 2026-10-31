@@ -297,10 +297,10 @@ IPD_PERCENTILE_WINDOW = 504
 # Índice 0-100: 100 * Φ(IPD suavizado / σ), con Φ la normal acumulada y σ el
 # desvío histórico del IPD suavizado. 50 = neutral; < 50 presión apreciatoria
 # (alivio); > 50 presión depreciatoria. INDICE_SUAVIZADO es la cantidad de días
-# hábiles que se promedian. Con 1 (sin promedio) el índice es el dato de cada
-# día: reacciona enseguida a los giros pero salta más (cambio semanal promedio
-# de unos 18 puntos, contra 6 con un promedio de 20 días, oct-2026).
-INDICE_SUAVIZADO = 1
+# hábiles que se promedian. Con 20 el índice es el promedio del último mes:
+# cambia menos de un día a otro (sin promedio, el cambio semanal promedio era de
+# unos 18 puntos, contra 6 con 20 días, oct-2026).
+INDICE_SUAVIZADO = 20
 INDICE_SIGMA = None  # None = desvío histórico calculado en cada corrida
 INDICE_TRAMOS = [
     # (desde, hasta, clave, etiqueta) - escala divergente, de azul a rojo

@@ -96,6 +96,8 @@ def _hasta(s: pd.Series, fecha: pd.Timestamp):
 def fmt(v, dec=1, signo=False, sufijo=""):
     if v is None or not np.isfinite(v):
         return "–"
+    if round(v, dec) == 0:
+        v = 0.0  # sin "-0"
     txt = f"{v:,.{dec}f}".replace(",", "X").replace(".", ",").replace("X", ".")
     if signo and v > 0:
         txt = "+" + txt
@@ -247,6 +249,11 @@ def _txt_dato(v: dict | None, previo: bool = False) -> str:
     return f"{fmt(x, v['dec'] if u.startswith('$') else 0)} {u}"
 
 
+# Variables que el índice mira por su variación en dinero: en la tabla, sus
+# columnas de dato son la variación de cada semana.
+VARIACION_DE_VARIACION = ("reservas", "depositos_usd")
+
+
 def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, sub0: dict, i1: float, i0: float,
                   datos: dict, perfil: dict) -> str:
     """Una fila por subíndice y componente: dato de la semana anterior, dato
@@ -272,8 +279,16 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, sub0: di
             # semana); su aporte sí se mide contra la inflación.
             nivel = datos.get("tc_oficial_ref") if vk == "tcr" else v
             var = _txt_variacion(nivel)
+            dato0, dato1 = _txt_dato(nivel, previo=True), _txt_dato(nivel)
+            if vk in VARIACION_DE_VARIACION and v:
+                # Reservas y depósitos: lo que miran es su variación. Se muestra
+                # la de la semana anterior, la de esta y cuánto cambió.
+                u = " " + _unidad_corta(v)
+                dato0 = fmt(v["a_prev"], 0, signo=True) + u
+                dato1 = fmt(v["a"], 0, signo=True) + u
+                var = fmt(v["a"] - v["a_prev"], 0, signo=True) + u
             filas.append(f"<tr><td class='comp'>{html.escape(b['components'][c]['label'])}</td>"
-                         f"<td class='num muted'>{_txt_dato(nivel, previo=True)}</td><td class='num'>{_txt_dato(nivel)}</td>"
+                         f"<td class='num muted'>{dato0}</td><td class='num'>{dato1}</td>"
                          f"<td class='num'>{var}</td>{_celda_aporte(dpts[c])}</tr>")
     filas.append(f"<tr class='tot'><td>Índice</td><td class='num muted'>{fmt(i0, 0)}/100</td>"
                  f"<td class='num'>{fmt(i1, 0)}/100</td><td class='num'>{fmt(i1 - i0, 1, signo=True)} pts</td>"
@@ -395,13 +410,14 @@ def tabla_variables(p: pd.DataFrame, semana: Semana, variables: list | None = No
             continue
         f1, v1 = _hasta(p[col], semana.viernes)
         _, v0 = _hasta(p[col], cierre_prev)
+        _, vm2 = _hasta(p[col], cierre_prev - pd.Timedelta(days=7))
         _, v4 = _hasta(p[col], hace4)
         d1, d4 = _variacion(v1, v0, tipo), _variacion(v1, v4, tipo, 28)
         a1, a4 = _variacion(v1, v0, "abs"), _variacion(v1, v4, "abs")
         # "nueva": hubo dato en la semana (una serie que la fuente dejó de
         # actualizar no se comenta en el resumen).
         datos[col] = {"v": v1, "d": d1, "d4": d4, "a": a1, "a4": a4, "fecha": f1, "nueva": f1 is not None and f1 >= semana.lunes,
-                      "v_prev": v0,
+                      "v_prev": v0, "a_prev": _variacion(v0, vm2, "abs"),
                       "label": label, "unidad": unidad, "dec": dec, "tipo": tipo}
         nota = "" if f1 is None or f1 >= semana.lunes else f' <span class="muted">(al {f1.day}/{f1.month})</span>'
         filas.append(
@@ -747,7 +763,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
   <h2>Metodología</h2>
   {perfil["metodo"](pca_txt, pesos_b) if perfil["codigo"] == "ar" else perfil["metodo"](pca_txt)}
   <table><thead><tr><th>Subíndice</th><th>Componente</th><th class="num">Peso en el subíndice</th><th class="num">Peso en el índice</th></tr></thead><tbody>{comp_rows}</tbody></table>
-  <p>El promedio ponderado de cada día se lleva a una escala de 0 a 100 con la normal acumulada, sin promediar días: el índice reacciona enseguida a los giros, aunque puede moverse bastante de un día a otro. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Los aportes en puntos reparten la distancia del índice a 50 entre los componentes, así que suman exactamente esa distancia. Si falta un componente, su peso se reparte entre los demás de su subíndice. Cada subíndice también se lleva a su propia escala de 0 a 100 con el mismo método, para leerlo solo; en puntos del índice, los tres subíndices suman la distancia del índice a 50.{perfil["metodo_extra"]}</p>
+  <p>El promedio ponderado de cada día se promedia con los 19 días hábiles anteriores (20 días, un mes) y se lleva a una escala de 0 a 100 con la normal acumulada. 50 es neutral; debajo hay presión apreciatoria (alivio) y arriba, presión depreciatoria. Un valor de 90 indica una presión tan alta como la del 10% de los días más tensos desde 2003. Los aportes en puntos reparten la distancia del índice a 50 entre los componentes, así que suman exactamente esa distancia. Si falta un componente, su peso se reparte entre los demás de su subíndice. Cada subíndice también se lleva a su propia escala de 0 a 100 con el mismo método, para leerlo solo; en puntos del índice, los tres subíndices suman la distancia del índice a 50.{perfil["metodo_extra"]}</p>
   <p><b>Fuentes:</b> {perfil["fuentes"]}</p>
   <p class="muted">Generado el {generado.day}/{generado.month}/{generado.year} a las {generado:%H:%M} (hora argentina). Tablero diario y datos: <a href="{DASHBOARD_URL}">{DASHBOARD_URL}</a></p>
 </section>
