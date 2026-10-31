@@ -186,7 +186,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="card-head">
       <h2>Qué explica el índice</h2>
     </div>
-    <p class="note">El dato de cada variable hoy y hace una semana, su variación y su aporte a la variación del índice (rojo, a la suba; azul, a la baja), en puntos: suman el cambio del índice. El aporte del tipo de cambio se mide contra la inflación.</p>    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
+    <p class="note">El dato de cada variable hoy y hace una semana, su variación y su aporte a la variación del índice (rojo, a la suba; azul, a la baja), en puntos: suman el cambio del índice. El aporte del tipo de cambio se mide contra la inflación. Reservas y depósitos: variación semanal promedio de los últimos 20 días hábiles, como la mira el índice.</p>    <div class="table-wrap"><table id="contrib-tbl" class="contrib"><thead></thead><tbody></tbody></table></div>
   </section>
   <section class="card" style="margin-bottom:16px">
     <h2>Subíndices</h2>
@@ -581,11 +581,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
       const u = unit.split(",")[0].replace("millones de USD", "M USD");
       const dato = (v) => v == null ? "–" : unit.startsWith("$") ? nf(v, 2) : `${nf(v, digitsFor(unit, v))} <span class="muted">${u}</span>`;
       if (k === "reservas" || k === "depositos_usd") {
-        // Lo que mira el índice es su variación: la de la semana anterior, la
-        // de esta y cuánto cambió.
-        const d14 = (() => { const t = new Date(h.date); t.setDate(t.getDate() - 14); return t.toISOString().slice(0, 10); })();
-        const vm2 = asof(data, d14);
-        const a0 = v0 != null && vm2 != null ? v0 - vm2 : null, a1 = v0 != null && v1 != null ? v1 - v0 : null;
+        // Lo que mira el índice: la variación semanal (5 días hábiles)
+        // promediada en 20 días, en el calendario del índice. Hace una semana,
+        // hoy y cuánto cambió.
+        const cal = (DATA.ipd.indice || []).map((x) => x[0]);
+        const vals = cal.map((f) => asof(data, f));
+        const prom = (f) => {
+          let j = cal.length - 1; while (j >= 0 && cal[j] > f) j--;
+          if (j < 24) return null;
+          let t = 0; for (let i = j - 19; i <= j; i++) { if (vals[i] == null || vals[i - 5] == null) return null; t += vals[i] - vals[i - 5]; }
+          return t / 20;
+        };
+        const a0 = prom(dHace7), a1 = prom(h.date);
         const m = (x) => x == null ? "–" : `${sg(x, 0)} <span class="muted">M USD</span>`;
         return `<td class="num muted">${m(a0)}</td><td class="num">${m(a1)}</td><td class="num">${a0 != null && a1 != null ? sg(a1 - a0, 0) + " M USD" : "–"}</td>`;
       }

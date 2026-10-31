@@ -250,7 +250,8 @@ def _txt_dato(v: dict | None, previo: bool = False) -> str:
 
 
 # Variables que el índice mira por su variación en dinero: en la tabla, sus
-# columnas de dato son la variación de cada semana.
+# columnas de dato son su variación semanal promedio de los últimos 20 días
+# hábiles (lo que mira el índice), al cierre de cada semana.
 VARIACION_DE_VARIACION = ("reservas", "depositos_usd")
 
 
@@ -280,13 +281,14 @@ def tabla_aportes(blocks_cfg: dict, meta: dict, dpts: dict, sub1: dict, sub0: di
             nivel = datos.get("tc_oficial_ref") if vk == "tcr" else v
             var = _txt_variacion(nivel)
             dato0, dato1 = _txt_dato(nivel, previo=True), _txt_dato(nivel)
-            if vk in VARIACION_DE_VARIACION and v:
-                # Reservas y depósitos: lo que miran es su variación. Se muestra
-                # la de la semana anterior, la de esta y cuánto cambió.
+            if vk in VARIACION_DE_VARIACION and v and "prom20" in v:
+                # Reservas y depósitos: lo que mira el índice es su variación
+                # semanal promediada en 20 días hábiles. Se muestra la de la
+                # semana anterior, la de esta y cuánto cambió.
                 u = " " + _unidad_corta(v)
-                dato0 = fmt(v["a_prev"], 0, signo=True) + u
-                dato1 = fmt(v["a"], 0, signo=True) + u
-                var = fmt(v["a"] - v["a_prev"], 0, signo=True) + u
+                dato0 = fmt(v["prom20_prev"], 0, signo=True) + u
+                dato1 = fmt(v["prom20"], 0, signo=True) + u
+                var = fmt(v["prom20"] - v["prom20_prev"], 0, signo=True) + u
             filas.append(f"<tr><td class='comp'>{html.escape(b['components'][c]['label'])}</td>"
                          f"<td class='num muted'>{dato0}</td><td class='num'>{dato1}</td>"
                          f"<td class='num'>{var}</td>{_celda_aporte(dpts[c])}</tr>")
@@ -410,14 +412,13 @@ def tabla_variables(p: pd.DataFrame, semana: Semana, variables: list | None = No
             continue
         f1, v1 = _hasta(p[col], semana.viernes)
         _, v0 = _hasta(p[col], cierre_prev)
-        _, vm2 = _hasta(p[col], cierre_prev - pd.Timedelta(days=7))
         _, v4 = _hasta(p[col], hace4)
         d1, d4 = _variacion(v1, v0, tipo), _variacion(v1, v4, tipo, 28)
         a1, a4 = _variacion(v1, v0, "abs"), _variacion(v1, v4, "abs")
         # "nueva": hubo dato en la semana (una serie que la fuente dejó de
         # actualizar no se comenta en el resumen).
         datos[col] = {"v": v1, "d": d1, "d4": d4, "a": a1, "a4": a4, "fecha": f1, "nueva": f1 is not None and f1 >= semana.lunes,
-                      "v_prev": v0, "a_prev": _variacion(v0, vm2, "abs"),
+                      "v_prev": v0,
                       "label": label, "unidad": unidad, "dec": dec, "tipo": tipo}
         nota = "" if f1 is None or f1 >= semana.lunes else f' <span class="muted">(al {f1.day}/{f1.month})</span>'
         filas.append(
@@ -675,6 +676,15 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
                 x = p[vk][p.index <= semana.viernes].dropna()
                 datos[vk]["habitual"] = (x.tail(config.IPD_ZSCORE_WINDOW).median() if spec["transform"] == "level"
                                          else x.tail(252).mean())
+    # Variación semanal (5 días hábiles) promediada en INDICE_SUAVIZADO días,
+    # en el calendario del índice.
+    dias = p["indice_0_100"].dropna().index
+    for vk in VARIACION_DE_VARIACION:
+        if vk in datos and vk in p:
+            x = p[vk].ffill().reindex(dias)
+            prom = (x - x.shift(config.IPD_HORIZON)).rolling(config.INDICE_SUAVIZADO).mean()
+            datos[vk]["prom20"] = _hasta(prom, semana.viernes)[1]
+            datos[vk]["prom20_prev"] = _hasta(prom, semana.viernes - pd.Timedelta(days=7))[1]
     pesos_b = {b: (payload["ipd"]["blocks"].get(b, {}).get("weight") or blocks_cfg[b]["weight"]) for b in blocks_cfg}
     tabla_html = tabla_aportes(blocks_cfg, meta, dpts, sub1, sub0, i1, i0, datos, perfil)
     puntos = resumen(indice, semana, dpts, perfil)
@@ -732,7 +742,7 @@ def construir_html(semana: Semana, p: pd.DataFrame, payload: dict, perfil: dict 
 
 <section class="section card partible">
   <h2>Qué explica el índice</h2>
-  <p class="note">El dato de cada variable el viernes anterior y este, su variación y su aporte a la variación del índice frente a la semana anterior (rojo, a la suba; azul, a la baja), en puntos: suman el cambio del índice. El aporte del tipo de cambio se mide contra la inflación. {perfil["nota_variables"]}</p>
+  <p class="note">El dato de cada variable el viernes anterior y este, su variación y su aporte a la variación del índice frente a la semana anterior (rojo, a la suba; azul, a la baja), en puntos: suman el cambio del índice. El aporte del tipo de cambio se mide contra la inflación. Reservas y depósitos: variación semanal promedio de los últimos 20 días hábiles, como la mira el índice. {perfil["nota_variables"]}</p>
   {tabla_html}
 </section>
 
